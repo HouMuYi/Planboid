@@ -1,5 +1,5 @@
 /**
- * Toolbar.js - 工具列、圖檔雙匯出與全套剪貼簿快捷鍵
+ * Toolbar.js - 工具列、圖檔雙匯出與全套剪貼簿快捷鍵 (含清除地塊與清除邊線雙擦除工具)
  */
 
 import { SvgExporter } from "../renderer/SvgExporter.js";
@@ -14,37 +14,46 @@ export class Toolbar {
     }
 
     init() {
-        // 工具模式切換 (Pencil / Eraser / Select)
+        // 工具模式切換 (floor / wall / erase-floor / erase-wall / select)
         const toolButtons = document.querySelectorAll(".tool-btn");
         toolButtons.forEach(btn => {
             btn.addEventListener("click", () => {
                 toolButtons.forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
-                this.state.activeTool = btn.dataset.tool;
-                if (btn.dataset.tool !== "select") {
+
+                const tool = btn.dataset.tool;
+
+                if (tool === "floor") {
+                    this.state.activeTool = "pencil";
+                    this.state.brushType = "floor";
+                } else if (tool === "wall") {
+                    this.state.activeTool = "pencil";
+                    this.state.brushType = "wall";
+                } else if (tool === "erase-floor") {
+                    this.state.activeTool = "erase-floor";
+                    this.state.brushType = "floor";
+                } else if (tool === "erase-wall") {
+                    this.state.activeTool = "erase-wall";
+                    this.state.brushType = "wall";
+                } else if (tool === "select") {
+                    this.state.activeTool = "select";
+                }
+
+                if (tool !== "select") {
                     this.state.selectedCell = null;
                     this.state.selectionBox = null;
-                    this.state.notifyStateChange();
                 }
+
+                this.state.notifyStateChange();
             });
         });
 
         // 繪製形狀 (Single / Line / Box)
-        const shapeButtons = document.forEach ? document.querySelectorAll(".shape-btn") : [];
         document.querySelectorAll(".shape-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 document.querySelectorAll(".shape-btn").forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
                 this.state.shapeMode = btn.dataset.shape;
-            });
-        });
-
-        // 筆刷類型 (Floor / Wall)
-        document.querySelectorAll(".brush-type-btn").forEach(btn => {
-            btn.addEventListener("click", () => {
-                document.querySelectorAll(".brush-type-btn").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                this.state.brushType = btn.dataset.type;
             });
         });
 
@@ -150,7 +159,6 @@ export class Toolbar {
                     if (this.state.clipboard) {
                         this.state.isPastingMode = true;
                         this.state.notifyStateChange();
-                        console.log("📌 進入貼上預覽模式，請移動滑鼠並點擊目標位置。");
                     }
                 }
             } else if (e.key === "Delete" || e.key === "Backspace") {

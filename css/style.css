@@ -237,6 +237,40 @@ body {
     font-size: calc(1.1rem * var(--ui-scale));
 }
 
+.tool-btn .icon.unicode-icon {
+    font-size: calc(1.35rem * var(--ui-scale));
+    line-height: 1;
+}
+
+.tool-btn .combo-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4em;
+    height: 1.4em;
+}
+
+.tool-btn .combo-icon .base-icon {
+    font-size: calc(1.25rem * var(--ui-scale));
+    opacity: 0.7;
+}
+
+.tool-btn .combo-icon .overlay-icon {
+    position: absolute;
+    color: var(--accent-danger, #ef4444);
+    font-size: calc(1.05rem * var(--ui-scale));
+    font-weight: 900;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.95);
+    line-height: 1;
+}
+
+.unicode-shape {
+    font-size: calc(1.2rem * var(--ui-scale));
+    font-weight: 700;
+    line-height: 1;
+}
+
 .divider {
     width: 32px;
     height: 1px;

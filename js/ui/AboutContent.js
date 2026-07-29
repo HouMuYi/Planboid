@@ -16,8 +16,8 @@ export const ABOUT_HTML = `<h1>Planboid 📐</h1>
   - <strong>2:1 菱形視角 (Isometric)</strong>：北方定為右上角，展現立體空間感。
   - <strong>1:1 正交視角 (Orthogonal)</strong>：北方定為正上方，適合純平面佈局觀察。
   - 切換時以畫面正中央地塊為轉軸平滑過渡旋轉。
-<ul><li><strong>通用調色盤與極簡預設</strong>：預設「道路」與「室內空間」，支援自訂色彩與名稱編輯。</li><li><strong>高畫質雙格式圖檔匯出</strong>：</li></ul>
-  - <strong>SVG 向量圖</strong>：匯出無限放大不失真、超輕量體積的全畫構圖。
+<ul><li><strong>極簡幾何圖示系統</strong>：採用古典幾何 Unicode 符號 (◆ 塊、◇ 邊、• 點、│ 線、■ 面) 與 ✘ 標記圖層疊加圖例，支援滑鼠右鍵快速擦除。</li><li><strong>高畫質雙格式圖檔匯出</strong>：</li></ul>
+  - <strong>SVG 向量圖</strong>：匯出無限放大不失真、超輕量體積的全畫構圖（含調色盤圖例）。
   - <strong>PNG 快照圖</strong>：一鍵產生高畫質圖片，方便分享至 Discord 或社群討論區。
 <ul><li><strong>選區與剪貼簿 (Copy / Paste / Delete)</strong>：支援矩形區域框選，以及 \`Ctrl+C\`、\`Ctrl+V\` (跟隨預覽貼上) 與 \`Delete\` 快捷鍵操作。</li></ul>
 

@@ -51,17 +51,29 @@
 
         <!-- 主視圖區塊 -->
         <main class="app-body">
-            <!-- 左側主要工具列 -->
+            <!-- 左側主要工具列 (極簡 Unicode 圖示體系) -->
             <aside class="toolbar-left panel" id="main-toolbar">
                 <div class="tool-group">
-                    <span class="group-label desktop-only">工具</span>
-                    <button class="tool-btn active" id="tool-pencil" data-tool="pencil" title="畫筆工具">
-                        <span class="icon">✏️</span>
+                    <span class="group-label desktop-only">畫具</span>
+                    <button class="tool-btn active" id="tool-floor" data-tool="floor" title="繪製地塊">
+                        <span class="icon unicode-icon">◆</span>
                     </button>
-                    <button class="tool-btn" id="tool-eraser" data-tool="eraser" title="橡皮擦">
-                        <span class="icon">🧹</span>
+                    <button class="tool-btn" id="tool-wall" data-tool="wall" title="繪製邊線">
+                        <span class="icon unicode-icon">◇</span>
                     </button>
-                    <button class="tool-btn" id="tool-select" data-tool="select" title="選取與剪貼簿">
+                    <button class="tool-btn" id="tool-erase-floor" data-tool="erase-floor" title="清除地塊">
+                        <span class="icon combo-icon">
+                            <span class="base-icon">◆</span>
+                            <span class="overlay-icon">✘</span>
+                        </span>
+                    </button>
+                    <button class="tool-btn" id="tool-erase-wall" data-tool="erase-wall" title="清除邊線">
+                        <span class="icon combo-icon">
+                            <span class="base-icon">◇</span>
+                            <span class="overlay-icon">✘</span>
+                        </span>
+                    </button>
+                    <button class="tool-btn" id="tool-select" data-tool="select" title="選取工具">
                         <span class="icon">👆</span>
                     </button>
                 </div>
@@ -71,25 +83,13 @@
                 <div class="tool-group">
                     <span class="group-label desktop-only">形狀</span>
                     <button class="shape-btn active" id="shape-single" data-shape="single" title="單點 / 自由塗抹">
-                        <span>點/畫</span>
+                        <span class="unicode-shape">•</span>
                     </button>
                     <button class="shape-btn" id="shape-line" data-shape="line" title="起點+終點 自動繪製直線">
-                        <span>直線</span>
+                        <span class="unicode-shape">│</span>
                     </button>
                     <button class="shape-btn" id="shape-box" data-shape="box" title="對角線矩形區域框選">
-                        <span>矩形</span>
-                    </button>
-                </div>
-
-                <div class="divider"></div>
-
-                <div class="tool-group">
-                    <span class="group-label desktop-only">類型</span>
-                    <button class="brush-type-btn active" id="brush-floor" data-type="floor">
-                        <span class="icon">🟩</span> <span class="btn-text">地板</span>
-                    </button>
-                    <button class="brush-type-btn" id="brush-wall" data-type="wall">
-                        <span class="icon">🧱</span> <span class="btn-text">牆面</span>
+                        <span class="unicode-shape">■</span>
                     </button>
                 </div>
 
@@ -184,7 +184,7 @@
         </main>
     </div>
 
-    <!-- 關於 Modal (加大寬度與舒適排版) -->
+    <!-- 關於 Modal -->
     <dialog class="app-modal" id="modal-about">
         <div class="modal-content panel about-modal-content">
             <div class="modal-header">

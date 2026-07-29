@@ -1,8 +1,9 @@
 /**
- * StateManager.js - 核心狀態管理器 (含剪貼簿 Ctrl+C / Ctrl+V / Delete)
+ * StateManager.js - 核心領域模型與持久化狀態管理器
  */
 
 import { StorageManager } from "./StorageManager.js";
+import { UISelectionState } from "./UISelectionState.js";
 
 export class StateManager {
     constructor() {
@@ -17,21 +18,18 @@ export class StateManager {
             this.activeSchemeId = this.scheme.id;
         }
 
+        // 獨立 UI Transient 狀態
+        this.uiState = new UISelectionState();
+
         // 目前編輯狀態
         this.currentZLevel = this.scheme.currentLevel || 0;
-        this.activeTool = "pencil";         // "pencil" | "eraser" | "select"
+        this.activeTool = "pencil";         // "pencil" | "erase-floor" | "erase-wall" | "select"
         this.shapeMode = "single";          // "single" | "line" | "box"
         this.brushType = "floor";           // "floor" | "wall"
-        this.selectedCell = null;           // { x, y }
-        this.selectionBox = null;           // { minX, minY, maxX, maxY }
 
         // 強制預設選取第一個色塊
         const paletteKeys = Object.keys(this.scheme.palette || {});
         this.activeColorId = (paletteKeys.length > 0) ? paletteKeys[0] : "";
-
-        // 剪貼簿 (Clipboard for Copy/Paste)
-        this.clipboard = null;              // { originX, originY, tiles: { "relX,relY": tileData } }
-        this.isPastingMode = false;
 
         // 視覺與遊戲開關
         this.ghostLayerEnabled = true;
@@ -45,6 +43,16 @@ export class StateManager {
 
         this.pushHistory();
     }
+
+    // 快捷 getters/setters 保持相容性
+    get selectedCell() { return this.uiState.selectedCell; }
+    set selectedCell(val) { this.uiState.selectedCell = val; }
+    get selectionBox() { return this.uiState.selectionBox; }
+    set selectionBox(val) { this.uiState.selectionBox = val; }
+    get clipboard() { return this.uiState.clipboard; }
+    set clipboard(val) { this.uiState.clipboard = val; }
+    get isPastingMode() { return this.uiState.isPastingMode; }
+    set isPastingMode(val) { this.uiState.isPastingMode = val; }
 
     pushHistory() {
         const snapshot = JSON.stringify(this.scheme);
@@ -154,9 +162,8 @@ export class StateManager {
     copySelection() {
         if (!this.selectionBox) {
             if (this.selectedCell) {
-                // 單點複製
                 const { x, y } = this.selectedCell;
-                this.selectionBox = { minX: x, minY: y, maxX: x, maxY: y };
+                this.uiState.setBoxSelection(x, y, x, y);
             } else {
                 return false;
             }
@@ -177,13 +184,12 @@ export class StateManager {
             }
         }
 
-        this.clipboard = {
+        this.uiState.setClipboard({
             width: maxX - minX + 1,
             height: maxY - minY + 1,
             tiles: copiedTiles
-        };
+        });
 
-        console.log("📋 成功複製選區至剪貼簿！包含地塊數:", Object.keys(copiedTiles).length);
         return true;
     }
 
@@ -205,7 +211,6 @@ export class StateManager {
         });
 
         this.isPastingMode = false;
-        console.log("📌 成功貼上剪貼簿內容至:", targetX, targetY);
         return true;
     }
 
@@ -230,7 +235,7 @@ export class StateManager {
             }
         });
 
-        this.selectionBox = null;
+        this.uiState.clearSelection();
         return true;
     }
 
@@ -258,6 +263,33 @@ export class StateManager {
             delete this.scheme.tiles[key].walls[edge];
         } else {
             this.scheme.tiles[key].walls[edge] = colorId;
+        }
+    }
+
+    removeFloor(x, y) {
+        const key = `${x},${y},${this.currentZLevel}`;
+        if (this.scheme.tiles[key]) {
+            delete this.scheme.tiles[key].floorColorId;
+            this.cleanupEmptyTile(key);
+        }
+    }
+
+    removeWall(x, y, edge) {
+        const key = `${x},${y},${this.currentZLevel}`;
+        if (this.scheme.tiles[key] && this.scheme.tiles[key].walls) {
+            delete this.scheme.tiles[key].walls[edge];
+            this.cleanupEmptyTile(key);
+        }
+    }
+
+    cleanupEmptyTile(key) {
+        const tile = this.scheme.tiles[key];
+        if (!tile) return;
+        const hasFloor = !!tile.floorColorId;
+        const hasWalls = tile.walls && Object.keys(tile.walls).length > 0;
+        const hasLabel = !!tile.label;
+        if (!hasFloor && !hasWalls && !hasLabel) {
+            delete this.scheme.tiles[key];
         }
     }
 
