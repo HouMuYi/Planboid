@@ -32,7 +32,7 @@
 ## 🚀 快速開始
 
 ### 線上體驗
-直接存取 GitHub Pages 部署頁面即可使用。
+存取 [GitHub Pages 在線部署頁面](https://houmuyi.github.io/Planboid/) 即可直接開啟使用。
 
 ### 本機運行
 複製或下載此專案，直接雙擊 `index.html` 在任何現代瀏覽器中開啟即可！

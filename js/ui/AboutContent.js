@@ -32,7 +32,7 @@ export const ABOUT_HTML = `<h1>Planboid 📐</h1>
 <h2>🚀 快速開始</h2>
 
 <h3>線上體驗</h3>
-直接存取 GitHub Pages 部署頁面即可使用。
+存取 <a href="https://houmuyi.github.io/Planboid/" target="_blank" rel="noopener">GitHub Pages 在線部署頁面</a> 即可直接開啟使用。
 
 <h3>本機運行</h3>
 複製或下載此專案，直接雙擊 \`index.html\` 在任何現代瀏覽器中開啟即可！
