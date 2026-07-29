@@ -1,5 +1,5 @@
 /**
- * SchemeModal.js - 方案管理視窗 (支援自訂尺寸、重新命名與刪除)
+ * SchemeModal.js - 方案管理視窗 (支援自訂尺寸動態調整、重新命名與刪除)
  */
 
 import { StorageManager } from "../core/StorageManager.js";
@@ -29,16 +29,34 @@ export class SchemeModal {
             this.modal?.close();
         });
 
-        // 頂部方案名稱點擊可直接重新命名
+        // 頂部方案名稱與尺寸點擊可直接修改名稱與寬高尺寸
         const activeNameEl = document.getElementById("active-scheme-name");
-        activeNameEl?.addEventListener("click", () => {
+        const activeDimEl = document.getElementById("active-scheme-dim");
+
+        const handleEditCurrentScheme = () => {
             const currentName = this.state.scheme.name;
-            const newName = prompt("請輸入方案新名稱:", currentName);
-            if (newName && newName.trim() !== "") {
-                this.state.renameScheme(this.state.scheme.id, newName.trim());
-                this.updateHeaderInfo();
-            }
-        });
+            const currentW = this.state.scheme.width;
+            const currentH = this.state.scheme.height;
+
+            const newName = prompt("方案名稱:", currentName);
+            if (newName === null) return;
+
+            const newWStr = prompt("方案寬度 (10~300):", currentW);
+            if (newWStr === null) return;
+
+            const newHStr = prompt("方案高度 (10~300):", currentH);
+            if (newHStr === null) return;
+
+            const name = newName.trim() || currentName;
+            const w = Math.max(10, Math.min(300, parseInt(newWStr, 10) || currentW));
+            const h = Math.max(10, Math.min(300, parseInt(newHStr, 10) || currentH));
+
+            this.state.updateSchemeDetails(this.state.scheme.id, name, w, h);
+            this.updateHeaderInfo();
+        };
+
+        activeNameEl?.addEventListener("click", handleEditCurrentScheme);
+        activeDimEl?.addEventListener("click", handleEditCurrentScheme);
 
         // 建立自訂新方案 (可調名稱與尺寸)
         const btnCreate = document.getElementById("btn-create-scheme");
@@ -82,7 +100,7 @@ export class SchemeModal {
             URL.revokeObjectURL(url);
         });
 
-        // 匯入 JSON 檔案
+        // 匯入 JSON 檔案 (支援舊版相容性自動正規化)
         const btnImport = document.getElementById("btn-import");
         btnImport?.addEventListener("click", () => {
             const fileInput = document.createElement("input");
@@ -103,6 +121,8 @@ export class SchemeModal {
                         }
 
                         importedScheme.id = "scheme_" + Date.now();
+                        this.state.normalizeSchemeTiles(importedScheme);
+
                         this.state.schemes.push(importedScheme);
                         this.state.activeSchemeId = importedScheme.id;
                         this.state.scheme = importedScheme;
@@ -148,6 +168,8 @@ export class SchemeModal {
                 const scheme = JSON.parse(jsonStr);
 
                 scheme.id = "shared_" + Date.now();
+                this.state.normalizeSchemeTiles(scheme);
+
                 this.state.schemes.push(scheme);
                 this.state.activeSchemeId = scheme.id;
                 this.state.scheme = scheme;
@@ -185,7 +207,7 @@ export class SchemeModal {
             infoDiv.style.alignItems = "center";
             infoDiv.style.gap = "8px";
             infoDiv.innerHTML = `
-                <strong style="color: var(--text-primary);">${s.name}</strong>
+                <strong style="color: var(--text-primary); cursor: pointer;" title="點擊調整名稱與尺寸">${s.name}</strong>
                 <span style="font-size: 0.75rem; color: var(--text-muted);">(${s.width}x${s.height})</span>
             `;
 
@@ -193,17 +215,25 @@ export class SchemeModal {
             btnGroup.style.display = "flex";
             btnGroup.style.gap = "6px";
 
-            // 重命名按鈕 ✏️
+            // 調整尺寸與名稱按鈕 ✏️
             const btnRename = document.createElement("button");
             btnRename.className = "btn-palette-edit";
-            btnRename.textContent = "✏️ 重新命名";
+            btnRename.textContent = "✏️ 調整名稱/尺寸";
             btnRename.addEventListener("click", () => {
                 const newName = prompt("請輸入方案新名稱:", s.name);
-                if (newName && newName.trim() !== "") {
-                    this.state.renameScheme(s.id, newName.trim());
-                    this.renderSchemeList();
-                    this.updateHeaderInfo();
-                }
+                if (newName === null) return;
+                const newWStr = prompt("方案寬度 (10~300):", s.width);
+                if (newWStr === null) return;
+                const newHStr = prompt("方案高度 (10~300):", s.height);
+                if (newHStr === null) return;
+
+                const name = newName.trim() || s.name;
+                const w = Math.max(10, Math.min(300, parseInt(newWStr, 10) || s.width));
+                const h = Math.max(10, Math.min(300, parseInt(newHStr, 10) || s.height));
+
+                this.state.updateSchemeDetails(s.id, name, w, h);
+                this.renderSchemeList();
+                this.updateHeaderInfo();
             });
 
             // 切換按鈕

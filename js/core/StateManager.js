@@ -1,9 +1,10 @@
 /**
- * StateManager.js - 核心領域模型與持久化狀態管理器
+ * StateManager.js - 核心領域模型與持久化狀態管理器 (支援 PZ 牆面正規化、舊版 4 方向相容與動態方案調整)
  */
 
 import { StorageManager } from "./StorageManager.js";
 import { UISelectionState } from "./UISelectionState.js";
+import { ShapeStrokeEngine } from "../renderer/ShapeStrokeEngine.js";
 
 export class StateManager {
     constructor() {
@@ -17,6 +18,9 @@ export class StateManager {
             this.schemes = [this.scheme];
             this.activeSchemeId = this.scheme.id;
         }
+
+        // 相容性正規化舊版 JSON 牆體
+        this.normalizeSchemeTiles(this.scheme);
 
         // 獨立 UI Transient 狀態
         this.uiState = new UISelectionState();
@@ -44,7 +48,45 @@ export class StateManager {
         this.pushHistory();
     }
 
-    // 快捷 getters/setters 保持相容性
+    // 舊版 4 方向 JSON 相向相容：讀取舊檔案的 south 與 east 時，自動無損轉化為標準的 north 與 west
+    normalizeSchemeTiles(scheme) {
+        if (!scheme || !scheme.tiles) return;
+
+        const updatedTiles = {};
+        Object.entries(scheme.tiles).forEach(([key, tile]) => {
+            const [xStr, yStr, zStr] = key.split(",");
+            const x = parseInt(xStr, 10);
+            const y = parseInt(yStr, 10);
+
+            if (tile.walls) {
+                Object.entries(tile.walls).forEach(([edge, colorId]) => {
+                    if (colorId) {
+                        const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+                        const normKey = `${norm.x},${norm.y},${zStr}`;
+                        if (!updatedTiles[normKey]) {
+                            updatedTiles[normKey] = { walls: {} };
+                        }
+                        if (!updatedTiles[normKey].walls) {
+                            updatedTiles[normKey].walls = {};
+                        }
+                        updatedTiles[normKey].walls[norm.edge] = colorId;
+                    }
+                });
+            }
+
+            if (tile.floorColorId || tile.label) {
+                if (!updatedTiles[key]) {
+                    updatedTiles[key] = { walls: {} };
+                }
+                if (tile.floorColorId) updatedTiles[key].floorColorId = tile.floorColorId;
+                if (tile.label) updatedTiles[key].label = tile.label;
+            }
+        });
+
+        scheme.tiles = updatedTiles;
+    }
+
+    // 快捷 getters/setters
     get selectedCell() { return this.uiState.selectedCell; }
     set selectedCell(val) { this.uiState.selectedCell = val; }
     get selectionBox() { return this.uiState.selectionBox; }
@@ -129,10 +171,13 @@ export class StateManager {
         this.notifyStateChange();
     }
 
-    renameScheme(id, newName) {
+    // 動態調整方案尺寸與名稱
+    updateSchemeDetails(id, newName, newWidth, newHeight) {
         const target = this.schemes.find(s => s.id === id);
         if (target) {
             target.name = newName;
+            target.width = Math.max(10, Math.min(300, newWidth));
+            target.height = Math.max(10, Math.min(300, newHeight));
             this.persist();
             this.notifyStateChange();
         }
@@ -203,7 +248,7 @@ export class StateManager {
                 const destX = targetX + rx;
                 const destY = targetY + ry;
 
-                if (destX >= 0 && destX < this.scheme.width && destY >= 0 && destY < this.scheme.height) {
+                if (destX >= 0 && destX <= this.scheme.width && destY >= 0 && destY <= this.scheme.height) {
                     const destKey = `${destX},${destY},${z}`;
                     this.scheme.tiles[destKey] = JSON.parse(JSON.stringify(tileData));
                 }
@@ -240,10 +285,11 @@ export class StateManager {
     }
 
     // --------------------------------------------------------------------------
-    // Tile Mutations
+    // Tile Mutations (正規化寫入)
     // --------------------------------------------------------------------------
 
     setTileFloor(x, y, colorId) {
+        if (x < 0 || x >= this.scheme.width || y < 0 || y >= this.scheme.height) return;
         const key = `${x},${y},${this.currentZLevel}`;
         if (!this.scheme.tiles[key]) {
             this.scheme.tiles[key] = { walls: {} };
@@ -252,17 +298,23 @@ export class StateManager {
     }
 
     setTileWall(x, y, edge, colorId) {
-        const key = `${x},${y},${this.currentZLevel}`;
+        // PZ 邊界正規化 (South ->下格 North, East ->右格 West)
+        const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+        if (norm.x < 0 || norm.x > this.scheme.width || norm.y < 0 || norm.y > this.scheme.height) return;
+
+        const key = `${norm.x},${norm.y},${this.currentZLevel}`;
         if (!this.scheme.tiles[key]) {
             this.scheme.tiles[key] = { walls: {} };
         }
         if (!this.scheme.tiles[key].walls) {
             this.scheme.tiles[key].walls = {};
         }
+
         if (colorId === null) {
-            delete this.scheme.tiles[key].walls[edge];
+            delete this.scheme.tiles[key].walls[norm.edge];
+            this.cleanupEmptyTile(key);
         } else {
-            this.scheme.tiles[key].walls[edge] = colorId;
+            this.scheme.tiles[key].walls[norm.edge] = colorId;
         }
     }
 
@@ -275,9 +327,10 @@ export class StateManager {
     }
 
     removeWall(x, y, edge) {
-        const key = `${x},${y},${this.currentZLevel}`;
+        const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+        const key = `${norm.x},${norm.y},${this.currentZLevel}`;
         if (this.scheme.tiles[key] && this.scheme.tiles[key].walls) {
-            delete this.scheme.tiles[key].walls[edge];
+            delete this.scheme.tiles[key].walls[norm.edge];
             this.cleanupEmptyTile(key);
         }
     }

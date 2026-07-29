@@ -1,5 +1,5 @@
 /**
- * CanvasRenderer.js - 精確 PZ 幾何重構引擎 (重構使用 ShapeStrokeEngine 與 GeometryPipeline 深模組)
+ * CanvasRenderer.js - 精確 PZ 幾何重構引擎 (支援 PZ 權威牆面規格與最東/最南 +1 格視界)
  */
 
 import { IsoMath } from "./IsoMath.js";
@@ -203,12 +203,13 @@ export class CanvasRenderer {
         // 5. 動態筆刷預覽
         else if (this.shapeStartCell && this.hoveredCell.x >= 0) {
             this.drawShapePreview();
-        } else if (this.hoveredCell.x >= 0 && this.hoveredCell.x < this.state.scheme.width &&
-                   this.hoveredCell.y >= 0 && this.hoveredCell.y < this.state.scheme.height) {
+        } else if (this.hoveredCell.x >= 0 && this.hoveredCell.x <= this.state.scheme.width &&
+                   this.hoveredCell.y >= 0 && this.hoveredCell.y <= this.state.scheme.height) {
             const isWallMode = (this.state.brushType === "wall" || this.state.activeTool === "erase-wall");
             if (isWallMode && this.hoveredCell.edge && this.state.activeTool !== "select") {
-                this.drawWallHighlight(this.hoveredCell.x, this.hoveredCell.y, this.hoveredCell.edge);
-            } else {
+                const norm = ShapeStrokeEngine.normalizeWallEdge(this.hoveredCell.x, this.hoveredCell.y, this.hoveredCell.edge);
+                this.drawWallHighlight(norm.x, norm.y, norm.edge);
+            } else if (this.hoveredCell.x < this.state.scheme.width && this.hoveredCell.y < this.state.scheme.height) {
                 this.drawCellHighlight(this.hoveredCell.x, this.hoveredCell.y, this.state.currentZLevel, "rgba(99, 102, 241, 0.35)", "#6366f1", 1.5);
             }
         }
@@ -275,7 +276,7 @@ export class CanvasRenderer {
             }
         });
 
-        // Pass 2: 無腦將所有牆體 (立體 96px 牆面面片與 2D 邊線) 繪製於地塊之上
+        // Pass 2: 無腦將所有牆體 (立體 96px 牆面面片與 2D 邊線) 繪製於地塊之上 (包含最東與最南 +1 格權威牆面)
         tilesToRender.forEach(item => {
             const { x, y, z, isCurrent, alpha, desatFactor, tile } = item;
             if (tile.walls) {
@@ -325,8 +326,6 @@ export class CanvasRenderer {
 
         if (edge === "north") { p0 = this.getScreenPos(x, y, z); p1 = this.getScreenPos(x + 1, y, z); }
         else if (edge === "west") { p0 = this.getScreenPos(x, y, z); p1 = this.getScreenPos(x, y + 1, z); }
-        else if (edge === "east") { p0 = this.getScreenPos(x + 1, y, z); p1 = this.getScreenPos(x + 1, y + 1, z); }
-        else if (edge === "south") { p0 = this.getScreenPos(x, y + 1, z); p1 = this.getScreenPos(x + 1, y + 1, z); }
 
         if (!p0 || !p1) return;
 
@@ -442,7 +441,7 @@ export class CanvasRenderer {
             const x = targetX + rx;
             const y = targetY + ry;
 
-            if (x >= 0 && x < this.state.scheme.width && y >= 0 && y < this.state.scheme.height) {
+            if (x >= 0 && x <= this.state.scheme.width && y >= 0 && y <= this.state.scheme.height) {
                 if (tileData.floorColorId && palette[tileData.floorColorId]) {
                     this.drawTilePoly(x, y, z, palette[tileData.floorColorId].color, 0.6);
                 }
@@ -467,19 +466,19 @@ export class CanvasRenderer {
         const shape = this.state.shapeMode;
         const brushType = this.state.brushType;
 
-        const minX = Math.min(x1, x2);
-        const maxX = Math.max(x1, x2);
-        const minY = Math.min(y1, y2);
-        const maxY = Math.max(y1, y2);
-
         if (tool === "select" && shape === "box") {
+            const minX = Math.min(x1, x2);
+            const maxX = Math.max(x1, x2);
+            const minY = Math.min(y1, y2);
+            const maxY = Math.max(y1, y2);
             this.drawDashedSelectionBox(minX, minY, maxX, maxY);
             return;
         }
 
         if (shape === "box") {
-            const bounds = ShapeStrokeEngine.getBoxBounds({ x: x1, y: y1 }, { x: x2, y: y2 }, (tool === "erase-wall" ? "wall" : brushType));
-            if (brushType === "wall" || tool === "erase-wall") {
+            const isErasing = (tool === "erase-wall");
+            const bounds = ShapeStrokeEngine.getBoxBounds({ x: x1, y: y1 }, { x: x2, y: y2 }, (isErasing ? "wall" : brushType), isErasing);
+            if (brushType === "wall" || isErasing) {
                 bounds.walls.forEach(w => this.drawWallHighlight(w.x, w.y, w.edge));
             } else {
                 bounds.floors.forEach(f => this.drawCellHighlight(f.x, f.y, z, "rgba(16, 185, 129, 0.3)", "#10b981", 1.5));
@@ -488,12 +487,17 @@ export class CanvasRenderer {
             const points = ShapeStrokeEngine.getBresenhamLine(x1, y1, x2, y2);
             points.forEach(p => {
                 if (brushType === "wall" || tool === "erase-wall") {
-                    this.drawWallHighlight(p.x, p.y, this.shapeStartCell.edge || "north");
+                    const norm = ShapeStrokeEngine.normalizeWallEdge(p.x, p.y, this.shapeStartCell.edge || "north");
+                    this.drawWallHighlight(norm.x, norm.y, norm.edge);
                 } else {
                     this.drawCellHighlight(p.x, p.y, z, "rgba(99, 102, 241, 0.4)", "#6366f1", 1.5);
                 }
             });
         }
+    }
+
+    getBresenhamLine(x0, y0, x1, y1) {
+        return ShapeStrokeEngine.getBresenhamLine(x0, y0, x1, y1);
     }
 
     getMouseGridPos(e) {
@@ -547,6 +551,7 @@ export class CanvasRenderer {
 
             if (e.button === 2) {
                 e.preventDefault();
+                this.state.pushHistory();
                 this.isRightPainting = true;
                 this.applyRightClickErase(cellX, cellY, edge);
                 return;
@@ -590,6 +595,7 @@ export class CanvasRenderer {
                 }
 
                 if (shape === "single") {
+                    this.state.pushHistory();
                     this.isPainting = true;
                     this.applyBrushAt(cellX, cellY, edge);
                 } else if (shape === "line" || shape === "box") {
@@ -645,18 +651,20 @@ export class CanvasRenderer {
             }
         });
 
-        window.addEventListener("mouseup", (e) => {
+        const handleMouseUp = () => {
             if (this.isDraggingCamera) {
                 this.isDraggingCamera = false;
                 el.style.cursor = "default";
             }
-            if (this.isPainting) {
+            if (this.isPainting || this.isRightPainting) {
                 this.isPainting = false;
-            }
-            if (this.isRightPainting) {
                 this.isRightPainting = false;
+                this.state.pushHistory();
             }
-        });
+        };
+
+        window.addEventListener("mouseup", handleMouseUp);
+        el.addEventListener("mouseleave", handleMouseUp);
 
         el.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -681,9 +689,6 @@ export class CanvasRenderer {
     }
 
     applyRightClickErase(x, y, edge) {
-        const scheme = this.state.scheme;
-        if (x < 0 || x >= scheme.width || y < 0 || y >= scheme.height) return;
-
         const brushType = this.state.brushType;
         const tool = this.state.activeTool;
 
@@ -696,9 +701,6 @@ export class CanvasRenderer {
     }
 
     applyBrushAt(x, y, edge) {
-        const scheme = this.state.scheme;
-        if (x < 0 || x >= scheme.width || y < 0 || y >= scheme.height) return;
-
         const tool = this.state.activeTool;
         const brushType = this.state.brushType;
         const colorId = this.state.activeColorId;
@@ -725,8 +727,9 @@ export class CanvasRenderer {
 
         this.state.batchOperation(() => {
             if (shape === "box") {
-                const bounds = ShapeStrokeEngine.getBoxBounds(start, end, (tool === "erase-wall" ? "wall" : brushType));
-                if (brushType === "wall" || tool === "erase-wall") {
+                const isErasing = (tool === "erase-wall");
+                const bounds = ShapeStrokeEngine.getBoxBounds(start, end, (isErasing ? "wall" : brushType), isErasing);
+                if (brushType === "wall" || isErasing) {
                     bounds.walls.forEach(w => {
                         if (tool === "pencil") this.state.setTileWall(w.x, w.y, w.edge, colorId);
                         else if (tool === "erase-wall") this.state.removeWall(w.x, w.y, w.edge);
