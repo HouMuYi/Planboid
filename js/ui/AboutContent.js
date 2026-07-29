@@ -1,0 +1,45 @@
+/**
+ * 自動產生檔 (請勿手動修改，請執行 node scripts/build-about.mjs 重新編譯)
+ */
+export const ABOUT_HTML = `<h1>Planboid 📐</h1>
+
+<blockquote><strong>Project Zomboid (PZ) 線上地塊規劃器</strong> — 專為模組作者、地圖編輯器玩家與生存基地設計師打造的零依賴純前端工具。</blockquote>
+
+<h2>✨ 特色亮點</h2>
+
+<ul><li><strong>零依賴純前端 (Zero-Dependency)</strong>：無需 \`npm\` / \`Vite\` 或任何外部框架，點擊 \`index.html\` 即可在瀏覽器中直接運行。</li><li><strong>PZ 遊戲幾何對齊</strong>：</li></ul>
+  - 預設 64x64 地圖規模與 1-based 座標索引 (\`(1,1)\` 到 \`(64,64)\`)。
+  - 輸入遊戲真實絕對座標原點（例如 \`10500, 9200\`），即時換算地塊對應的 PZ 世界座標。
+  - <strong>恆真樓層視覺偏移</strong>：菱形視角下精確重現 PZ 遊戲引擎每高一層 Z+1 視覺繪製 \`(-3z, -3z)\` 的位移規律。
+  - <strong>96px 半透明立體牆面</strong>：垂直抬升 96px 無縫銜接上下樓層牆體，兼具 3D 立體感與內部空間透視。
+<ul><li><strong>雙視角即時平滑過渡</strong>：</li></ul>
+  - <strong>2:1 菱形視角 (Isometric)</strong>：北方定為右上角，展現立體空間感。
+  - <strong>1:1 正交視角 (Orthogonal)</strong>：北方定為正上方，適合純平面佈局觀察。
+  - 切換時以畫面正中央地塊為轉軸平滑過渡旋轉。
+<ul><li><strong>通用調色盤與極簡預設</strong>：預設「道路」與「室內空間」，支援自訂色彩與名稱編輯。</li><li><strong>高畫質雙格式圖檔匯出</strong>：</li></ul>
+  - <strong>SVG 向量圖</strong>：匯出無限放大不失真、超輕量體積的全畫構圖。
+  - <strong>PNG 快照圖</strong>：一鍵產生高畫質圖片，方便分享至 Discord 或社群討論區。
+<ul><li><strong>選區與剪貼簿 (Copy / Paste / Delete)</strong>：支援矩形區域框選，以及 \`Ctrl+C\`、\`Ctrl+V\` (跟隨預覽貼上) 與 \`Delete\` 快捷鍵操作。</li></ul>
+
+<hr>
+
+<h2>👥 致謝與貢獻者 (Credits)</h2>
+
+<ul><li><strong>設計與需求決策 (出一張嘴)</strong>：<a href="https://github.com/HouMuYi/" target="_blank" rel="noopener">慕儀 (HouMuYi)</a></li><li><strong>具體程式碼實作 (具體做)</strong>：小雙 (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)</li></ul>
+
+<hr>
+
+<h2>🚀 快速開始</h2>
+
+<h3>線上體驗</h3>
+直接存取 GitHub Pages 部署頁面即可使用。
+
+<h3>本機運行</h3>
+複製或下載此專案，直接雙擊 \`index.html\` 在任何現代瀏覽器中開啟即可！
+
+<hr>
+
+<h2>📄 授權條款</h2>
+
+本專案採用 MIT License 授權。
+`;

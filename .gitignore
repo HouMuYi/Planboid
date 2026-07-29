@@ -1,0 +1,19 @@
+# OS / IDE generated files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Agent Scratch & Internal Decision Logs
+.gemini/
+.agents/
+ADRs/
+scripts/
+tickets.md
+CONTEXT.md
+HANDOFF.md
+architecture-review-*.html
+
+# Temporary files
+*.tmp
+*.log

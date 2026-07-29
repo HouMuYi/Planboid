@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Planboid - Project Zomboid 線上地塊規劃器</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- CSS Style -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app-container">
+        <!-- 頂部標題與控制列 -->
+        <header class="app-header">
+            <div class="logo-area">
+                <span class="logo-icon">📐</span>
+                <h1 class="logo-title">Planboid</h1>
+                <span class="badge desktop-only">PZ 地塊規劃器</span>
+            </div>
+
+            <div class="header-center">
+                <span class="scheme-title" id="active-scheme-name" title="點擊重新命名方案">預設規劃方案</span>
+                <span class="scheme-dim" id="active-scheme-dim">(64 x 64)</span>
+                
+                <div class="world-origin-inputs desktop-only" title="設定 (1,1) 對應的 PZ 遊戲真實座標">
+                    <span class="input-prefix">PZ原點 X:</span>
+                    <input type="number" id="input-world-x" class="input-number" value="10500" placeholder="10500">
+                    <span class="input-prefix">Y:</span>
+                    <input type="number" id="input-world-y" class="input-number" value="9200" placeholder="9200">
+                </div>
+
+                <button class="btn btn-icon-text" id="btn-scheme-modal">
+                    <span>📁 <span class="btn-text">方案</span></span>
+                </button>
+            </div>
+
+            <div class="header-actions">
+                <button class="btn btn-secondary" id="btn-about" title="關於專案與團隊致謝">ℹ️ <span class="btn-text">關於</span></button>
+                <button class="btn btn-secondary" id="btn-export-svg" title="匯出高畫質向量 SVG 圖檔">📐 <span class="btn-text">SVG</span></button>
+                <button class="btn btn-secondary" id="btn-export-png" title="匯出全幅 PNG 圖片快照">📷 <span class="btn-text">PNG</span></button>
+                <button class="btn btn-secondary desktop-only" id="btn-export">JSON 備份</button>
+                <button class="btn btn-secondary desktop-only" id="btn-import">匯入 JSON</button>
+                <button class="btn btn-primary" id="btn-share">分享</button>
+            </div>
+        </header>
+
+        <!-- 主視圖區塊 -->
+        <main class="app-body">
+            <!-- 左側主要工具列 -->
+            <aside class="toolbar-left panel" id="main-toolbar">
+                <div class="tool-group">
+                    <span class="group-label desktop-only">工具</span>
+                    <button class="tool-btn active" id="tool-pencil" data-tool="pencil" title="畫筆工具">
+                        <span class="icon">✏️</span>
+                    </button>
+                    <button class="tool-btn" id="tool-eraser" data-tool="eraser" title="橡皮擦">
+                        <span class="icon">🧹</span>
+                    </button>
+                    <button class="tool-btn" id="tool-select" data-tool="select" title="選取與剪貼簿">
+                        <span class="icon">👆</span>
+                    </button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="tool-group">
+                    <span class="group-label desktop-only">形狀</span>
+                    <button class="shape-btn active" id="shape-single" data-shape="single" title="單點 / 自由塗抹">
+                        <span>點/畫</span>
+                    </button>
+                    <button class="shape-btn" id="shape-line" data-shape="line" title="起點+終點 自動繪製直線">
+                        <span>直線</span>
+                    </button>
+                    <button class="shape-btn" id="shape-box" data-shape="box" title="對角線矩形區域框選">
+                        <span>矩形</span>
+                    </button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="tool-group">
+                    <span class="group-label desktop-only">類型</span>
+                    <button class="brush-type-btn active" id="brush-floor" data-type="floor">
+                        <span class="icon">🟩</span> <span class="btn-text">地板</span>
+                    </button>
+                    <button class="brush-type-btn" id="brush-wall" data-type="wall">
+                        <span class="icon">🧱</span> <span class="btn-text">牆面</span>
+                    </button>
+                </div>
+
+                <div class="divider desktop-only"></div>
+
+                <div class="tool-group desktop-only">
+                    <span class="group-label">歷史</span>
+                    <button class="btn btn-icon" id="btn-undo" title="復原 (Ctrl+Z)">↩️</button>
+                    <button class="btn btn-icon" id="btn-redo" title="重做 (Ctrl+Y)">↪️</button>
+                </div>
+            </aside>
+
+            <!-- 中央 Canvas 畫布區塊 -->
+            <section class="canvas-viewport" id="canvas-container">
+                <canvas id="main-canvas"></canvas>
+
+                <div class="view-overlay-controls">
+                    <div class="view-switch-group">
+                        <button class="view-btn active" id="view-iso" title="2:1 菱形視角">
+                            <span>菱形 (2:1)</span>
+                        </button>
+                        <button class="view-btn" id="view-ortho" title="1:1 正交視角">
+                            <span>正交 (1:1)</span>
+                        </button>
+                    </div>
+
+                    <div class="pz-toggle-group desktop-only">
+                        <label class="toggle-pill" title="菱形視角下牆面呈現具備 96px 高度的半透明立體面片">
+                            <input type="checkbox" id="chk-3d-walls" checked>
+                            <span>立體牆面</span>
+                        </label>
+                    </div>
+
+                    <button class="btn btn-circle" id="btn-reset-view" title="重設視角與縮放">🎯</button>
+                </div>
+
+                <div class="canvas-info-overlay">
+                    <span id="info-coords">網格: (1, 1), Z: 0F</span>
+                    <span class="dot desktop-only">•</span>
+                    <span id="info-game-coords" class="desktop-only" style="color: var(--accent-secondary); font-weight: 600;">PZ座標: (10500, 9200)</span>
+                    <span class="dot">•</span>
+                    <span id="info-zoom">Zoom: 100%</span>
+                </div>
+            </section>
+
+            <!-- 右側側邊欄 -->
+            <aside class="sidebar-right panel" id="main-sidebar">
+                <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" title="摺疊/展開側邊欄">
+                    <span class="toggle-icon">➡️</span>
+                </button>
+
+                <div class="sidebar-scroll-content">
+                    <div class="panel-section floor-control-section">
+                        <h3 class="section-title">樓層控制 (Z-Level)</h3>
+                        <div class="floor-selector">
+                            <button class="floor-btn" id="floor-up">▲ 往上一層</button>
+                            <div class="floor-indicator">
+                                <span class="floor-label" id="current-floor-display">0F (地面層)</span>
+                            </div>
+                            <button class="floor-btn" id="floor-down">▼ 往下一層</button>
+                        </div>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chk-ghost-layer" checked>
+                            <span>全樓層動態鬼影 (Ghost Layer)</span>
+                        </label>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="panel-section palette-section">
+                        <div class="section-header">
+                            <h3 class="section-title">通用調色盤</h3>
+                            <button class="btn btn-sm" id="btn-add-palette">+ 新增色塊</button>
+                        </div>
+                        <div class="palette-list" id="palette-container"></div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="panel-section label-section">
+                        <div class="section-header">
+                            <h3 class="section-title">區域與標籤 (Label)</h3>
+                            <button class="btn btn-sm btn-secondary" id="btn-enable-select" title="快捷進入選取模式">👆 點擊選取</button>
+                        </div>
+                        <div class="selected-tile-info" id="selected-tile-info" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; margin-bottom: 6px;">
+                            未選擇地塊 (點擊上方按鈕進入選取)
+                        </div>
+                        <input type="text" id="input-tile-label" class="input-text" placeholder="例如：廚房、主臥室、儲藏室" disabled>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- 關於 Modal (加大寬度與舒適排版) -->
+    <dialog class="app-modal" id="modal-about">
+        <div class="modal-content panel about-modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title-text">關於專案 (About)</h2>
+                <button class="btn-close" id="btn-close-about-modal">✕</button>
+            </div>
+            <div class="modal-body" id="about-markdown-body">
+                <!-- 動態注入 README 內容 -->
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 方案管理 Modal -->
+    <dialog class="app-modal" id="modal-schemes">
+        <div class="modal-content panel" style="width: min(560px, 90vw);">
+            <div class="modal-header">
+                <h2>方案管理</h2>
+                <button class="btn-close" id="btn-close-scheme-modal">✕</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="scheme-create-box" style="background: var(--bg-dark); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--accent-primary);">建立自訂新方案</span>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="new-scheme-name" class="input-text" placeholder="方案名稱" style="flex: 2;">
+                        <input type="number" id="new-scheme-width" class="input-text" placeholder="寬" value="64" style="flex: 1;">
+                        <span style="align-self: center; color: var(--text-muted);">x</span>
+                        <input type="number" id="new-scheme-height" class="input-text" placeholder="高" value="64" style="flex: 1;">
+                    </div>
+                    <button class="btn btn-primary" id="btn-create-scheme" style="width: 100%;">建立新方案</button>
+                </div>
+                <ul class="scheme-list" id="scheme-list-container"></ul>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 色塊 Modal -->
+    <dialog class="app-modal" id="modal-palette-edit">
+        <div class="modal-content panel" style="width: min(380px, 90vw);">
+            <div class="modal-header">
+                <h2 id="palette-modal-title">編輯色塊</h2>
+                <button class="btn-close" id="btn-close-palette-modal">✕</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+                <input type="hidden" id="edit-palette-id">
+                <div>
+                    <label style="font-size: 0.8rem; color: var(--text-secondary);">色塊名稱：</label>
+                    <input type="text" id="edit-palette-name" class="input-text" placeholder="例如：水泥地面">
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem; color: var(--text-secondary);">選擇顏色：</label>
+                    <input type="color" id="edit-palette-color" style="width: 100%; height: 40px; border: none; cursor: pointer; border-radius: 6px;">
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+                    <button class="btn btn-secondary" id="btn-delete-palette" style="color: var(--accent-danger); border-color: var(--accent-danger);">刪除色塊</button>
+                    <button class="btn btn-primary" id="btn-save-palette">儲存變更</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- JS ES Module -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
