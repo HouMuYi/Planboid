@@ -1,22 +1,35 @@
 /**
- * GeometryPipeline.js - 統一幾何投影管線
+ * GeometryPipeline.js - 統一幾何投影管線與樓層視覺偏移 (LevelVisualOffset)
  * 合流 CanvasRenderer 與 SvgExporter 的幾何頂點與多邊形運算邏輯
  */
 
 import { IsoMath } from "./IsoMath.js";
+
+/**
+ * 樓層視覺偏移 (Level Visual Offset) 權威封裝模組
+ */
+export class LevelVisualOffset {
+    static getOffset(z, progress = 1.0) {
+        return progress > 0 ? 3 * z * progress : 0;
+    }
+
+    static toRenderPos(logicX, logicY, z, progress = 1.0) {
+        const offset = LevelVisualOffset.getOffset(z, progress);
+        return { renderX: logicX - offset, renderY: logicY - offset };
+    }
+
+    static toLogicPos(renderCellX, renderCellY, z, progress = 1.0) {
+        const offset = LevelVisualOffset.getOffset(z, progress);
+        return { logicX: Math.round(renderCellX + offset), logicY: Math.round(renderCellY + offset) };
+    }
+}
 
 export class GeometryPipeline {
     /**
      * 計算地塊四個頂點的螢幕投影座標
      */
     static getTilePolyPoints(isoMath, x, y, z, progress = 1.0) {
-        let renderX = x;
-        let renderY = y;
-        if (progress > 0) {
-            const offset = 3 * z * progress;
-            renderX -= offset;
-            renderY -= offset;
-        }
+        const { renderX, renderY } = LevelVisualOffset.toRenderPos(x, y, z, progress);
         return [
             isoMath.gridToScreen(renderX, renderY, progress),
             isoMath.gridToScreen(renderX + 1, renderY, progress),
@@ -29,13 +42,7 @@ export class GeometryPipeline {
      * 計算 96px 3D 牆面立體四邊形頂點
      */
     static getWallQuad96Points(isoMath, x, y, z, edge, progress = 1.0) {
-        let renderX = x;
-        let renderY = y;
-        if (progress > 0) {
-            const offset = 3 * z * progress;
-            renderX -= offset;
-            renderY -= offset;
-        }
+        const { renderX, renderY } = LevelVisualOffset.toRenderPos(x, y, z, progress);
 
         let b0, b1;
         if (edge === "north") { b0 = isoMath.gridToScreen(renderX, renderY, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY, progress); }

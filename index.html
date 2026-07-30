@@ -160,7 +160,7 @@
                         <div class="floor-selector">
                             <button class="floor-btn" id="floor-up" data-i18n="sidebar_floor_up">▲ 上一層</button>
                             <div class="floor-indicator">
-                                <span class="floor-label" id="current-floor-display" data-i18n="sidebar_floor_ground">0F (地面)</span>
+                                <span class="floor-label" id="current-floor-display">1</span>
                             </div>
                             <button class="floor-btn" id="floor-down" data-i18n="sidebar_floor_down">▼ 下一層</button>
                         </div>
@@ -255,7 +255,11 @@
                 </div>
                 <div>
                     <label style="font-size: 0.8rem; color: var(--text-secondary);" data-i18n="modal_palette_label_color">選擇顏色：</label>
-                    <input type="color" id="edit-palette-color" style="width: 100%; height: 40px; border: none; cursor: pointer; border-radius: 6px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="color" id="edit-palette-color" style="width: 48px; height: 38px; border: none; cursor: pointer; border-radius: 6px; padding: 0; background: transparent;">
+                        <input type="text" id="edit-palette-hex" class="input-text" placeholder="#6366F1" style="flex: 1; font-family: monospace; font-weight: 600;">
+                    </div>
+                    <div id="preset-color-swatches" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;"></div>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-top: 10px;">
                     <button class="btn btn-secondary" id="btn-delete-palette" style="color: var(--accent-danger); border-color: var(--accent-danger);" data-i18n="modal_palette_btn_delete">刪除色塊</button>

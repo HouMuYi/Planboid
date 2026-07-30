@@ -1,10 +1,12 @@
 /**
- * CanvasRenderer.js - 精確 PZ 幾何重構引擎 (支援 PZ 權威牆面規格與最東/最南 +1 格視界)
+ * CanvasRenderer.js - 精確 PZ 幾何重構繪繪引擎 (深模組：專注 Canvas 上色與幾何繪製)
  */
 
 import { IsoMath } from "./IsoMath.js";
 import { ShapeStrokeEngine } from "./ShapeStrokeEngine.js";
-import { GeometryPipeline } from "./GeometryPipeline.js";
+import { GeometryPipeline, LevelVisualOffset } from "./GeometryPipeline.js";
+import { BrushActionApplicator } from "./BrushActionApplicator.js";
+import { InputDispatcher } from "./InputDispatcher.js";
 
 export class CanvasRenderer {
     /**
@@ -39,11 +41,13 @@ export class CanvasRenderer {
         this.lastMouseX = 0;
         this.lastMouseY = 0;
 
-        // 多模式繪畫/選區起點
+        // 多模式繪畫/選區起點與懸停狀態
         this.shapeStartCell = null;
-
-        // 懸停地塊
         this.hoveredCell = { x: -1, y: -1, edge: null };
+
+        // 獨立分派器與筆刷器 (Seams)
+        this.applicator = new BrushActionApplicator(this.state);
+        this.dispatcher = new InputDispatcher(this, this.state, this.applicator);
 
         this.init();
     }
@@ -51,7 +55,6 @@ export class CanvasRenderer {
     init() {
         this.resize();
         window.addEventListener("resize", () => this.resize());
-        this.setupEvents();
         this.centerCamera();
 
         window.addEventListener("statechange", () => this.requestRender());
@@ -88,15 +91,7 @@ export class CanvasRenderer {
         const res = this.isoMath.screenToGrid(worldX, worldY, this.currentProgress);
         const z = this.state.currentZLevel;
 
-        let logicX = res.cellX;
-        let logicY = res.cellY;
-
-        if (this.currentProgress > 0) {
-            const offset = 3 * z * this.currentProgress;
-            logicX += offset;
-            logicY += offset;
-        }
-
+        const { logicX, logicY } = LevelVisualOffset.toLogicPos(res.cellX, res.cellY, z, this.currentProgress);
         return { x: logicX, y: logicY };
     }
 
@@ -142,15 +137,7 @@ export class CanvasRenderer {
     }
 
     getScreenPos(logicX, logicY, zLevel) {
-        let renderX = logicX;
-        let renderY = logicY;
-
-        if (this.currentProgress > 0) {
-            const offset = 3 * zLevel * this.currentProgress;
-            renderX -= offset;
-            renderY -= offset;
-        }
-
+        const { renderX, renderY } = LevelVisualOffset.toRenderPos(logicX, logicY, zLevel, this.currentProgress);
         return this.isoMath.gridToScreen(renderX, renderY, this.currentProgress);
     }
 
@@ -276,7 +263,7 @@ export class CanvasRenderer {
             }
         });
 
-        // Pass 2: 無腦將所有牆體 (立體 96px 牆面面片與 2D 邊線) 繪製於地塊之上 (包含最東與最南 +1 格權威牆面)
+        // Pass 2: 無腦將所有牆體 (立體 96px 牆面面片與 2D 邊線) 繪製於地塊之上
         tilesToRender.forEach(item => {
             const { x, y, z, isCurrent, alpha, desatFactor, tile } = item;
             if (tile.walls) {
@@ -494,265 +481,5 @@ export class CanvasRenderer {
                 }
             });
         }
-    }
-
-    getBresenhamLine(x0, y0, x1, y1) {
-        return ShapeStrokeEngine.getBresenhamLine(x0, y0, x1, y1);
-    }
-
-    getMouseGridPos(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const worldX = (mouseX - this.cameraX) / this.zoom;
-        const worldY = (mouseY - this.cameraY) / this.zoom;
-
-        const res = this.isoMath.screenToGrid(worldX, worldY, this.currentProgress);
-        const renderCellX = res.cellX;
-        const renderCellY = res.cellY;
-
-        const z = this.state.currentZLevel;
-
-        let logicX = renderCellX;
-        let logicY = renderCellY;
-        if (this.currentProgress > 0) {
-            const offset = 3 * z * this.currentProgress;
-            logicX = Math.round(renderCellX + offset);
-            logicY = Math.round(renderCellY + offset);
-        }
-
-        const localX = res.gridX - renderCellX;
-        const localY = res.gridY - renderCellY;
-
-        let edge = "north";
-        if (localY < 0.25) edge = "north";
-        else if (localY > 0.75) edge = "south";
-        else if (localX < 0.25) edge = "west";
-        else if (localX > 0.75) edge = "east";
-        else edge = (localY < localX) ? "north" : "west";
-
-        return { cellX: logicX, cellY: logicY, edge };
-    }
-
-    setupEvents() {
-        const el = this.canvas;
-
-        el.addEventListener("mousedown", (e) => {
-            const { cellX, cellY, edge } = this.getMouseGridPos(e);
-
-            if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
-                this.isDraggingCamera = true;
-                this.lastMouseX = e.clientX;
-                this.lastMouseY = e.clientY;
-                el.style.cursor = "grabbing";
-                return;
-            }
-
-            if (e.button === 2) {
-                e.preventDefault();
-                this.state.pushHistory();
-                this.isRightPainting = true;
-                this.applyRightClickErase(cellX, cellY, edge);
-                return;
-            }
-
-            if (e.button === 0) {
-                const tool = this.state.activeTool;
-                const shape = this.state.shapeMode;
-
-                if (this.state.isPastingMode) {
-                    this.state.pasteSelection(cellX, cellY);
-                    this.requestRender();
-                    return;
-                }
-
-                if (tool === "select") {
-                    if (shape === "single") {
-                        if (cellX >= 0 && cellX < this.state.scheme.width &&
-                            cellY >= 0 && cellY < this.state.scheme.height) {
-                            this.state.selectedCell = { x: cellX, y: cellY };
-                            this.state.selectionBox = null;
-                            this.state.notifyStateChange();
-                        }
-                    } else if (shape === "box") {
-                        if (!this.shapeStartCell) {
-                            this.shapeStartCell = { x: cellX, y: cellY };
-                            this.requestRender();
-                        } else {
-                            const minX = Math.min(this.shapeStartCell.x, cellX);
-                            const maxX = Math.max(this.shapeStartCell.x, cellX);
-                            const minY = Math.min(this.shapeStartCell.y, cellY);
-                            const maxY = Math.max(this.shapeStartCell.y, cellY);
-
-                            this.state.selectionBox = { minX, minY, maxX, maxY };
-                            this.state.selectedCell = { x: minX, y: minY };
-                            this.shapeStartCell = null;
-                            this.state.notifyStateChange();
-                        }
-                    }
-                    return;
-                }
-
-                if (shape === "single") {
-                    this.state.pushHistory();
-                    this.isPainting = true;
-                    this.applyBrushAt(cellX, cellY, edge);
-                } else if (shape === "line" || shape === "box") {
-                    if (!this.shapeStartCell) {
-                        this.shapeStartCell = { x: cellX, y: cellY, edge };
-                        this.requestRender();
-                    } else {
-                        const start = this.shapeStartCell;
-                        this.applyShapeBrush(start, { x: cellX, y: cellY, edge });
-                        this.shapeStartCell = null;
-                        this.requestRender();
-                    }
-                }
-            }
-        });
-
-        window.addEventListener("mousemove", (e) => {
-            if (this.isDraggingCamera) {
-                const dx = e.clientX - this.lastMouseX;
-                const dy = e.clientY - this.lastMouseY;
-                this.cameraX += dx;
-                this.cameraY += dy;
-                this.lastMouseX = e.clientX;
-                this.lastMouseY = e.clientY;
-                this.requestRender();
-            } else {
-                const { cellX, cellY, edge } = this.getMouseGridPos(e);
-                if (cellX !== this.hoveredCell.x || cellY !== this.hoveredCell.y || edge !== this.hoveredCell.edge) {
-                    this.hoveredCell = { x: cellX, y: cellY, edge };
-                    this.requestRender();
-
-                    const displayX = cellX + 1;
-                    const displayY = cellY + 1;
-                    const gameX = (this.state.scheme.worldOriginX || 10500) + cellX;
-                    const gameY = (this.state.scheme.worldOriginY || 9200) + cellY;
-
-                    const event = new CustomEvent("gridhover", {
-                        detail: {
-                            x: displayX,
-                            y: displayY,
-                            gameX,
-                            gameY
-                        }
-                    });
-                    window.dispatchEvent(event);
-                }
-
-                if (this.isRightPainting) {
-                    this.applyRightClickErase(cellX, cellY, edge);
-                } else if (this.isPainting && this.state.shapeMode === "single") {
-                    this.applyBrushAt(cellX, cellY, edge);
-                }
-            }
-        });
-
-        const handleMouseUp = () => {
-            if (this.isDraggingCamera) {
-                this.isDraggingCamera = false;
-                el.style.cursor = "default";
-            }
-            if (this.isPainting || this.isRightPainting) {
-                this.isPainting = false;
-                this.isRightPainting = false;
-                this.state.pushHistory();
-            }
-        };
-
-        window.addEventListener("mouseup", handleMouseUp);
-        el.addEventListener("mouseleave", handleMouseUp);
-
-        el.addEventListener("contextmenu", (e) => e.preventDefault());
-
-        el.addEventListener("wheel", (e) => {
-            e.preventDefault();
-            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-            const newZoom = Math.max(0.2, Math.min(5.0, this.zoom * zoomFactor));
-
-            const rect = el.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            this.cameraX = mouseX - (mouseX - this.cameraX) * (newZoom / this.zoom);
-            this.cameraY = mouseY - (mouseY - this.cameraY) * (newZoom / this.zoom);
-            this.zoom = newZoom;
-
-            this.requestRender();
-
-            const event = new CustomEvent("zoomchange", { detail: { zoom: this.zoom } });
-            window.dispatchEvent(event);
-        }, { passive: false });
-    }
-
-    applyRightClickErase(x, y, edge) {
-        const brushType = this.state.brushType;
-        const tool = this.state.activeTool;
-
-        if (brushType === "wall" || tool === "erase-wall") {
-            this.state.removeWall(x, y, edge);
-        } else {
-            this.state.removeFloor(x, y);
-        }
-        this.state.notifyStateChange();
-    }
-
-    applyBrushAt(x, y, edge) {
-        const tool = this.state.activeTool;
-        const brushType = this.state.brushType;
-        const colorId = this.state.activeColorId;
-
-        if (tool === "pencil") {
-            if (brushType === "floor") {
-                this.state.setTileFloor(x, y, colorId);
-            } else if (brushType === "wall") {
-                this.state.setTileWall(x, y, edge, colorId);
-            }
-        } else if (tool === "erase-floor") {
-            this.state.removeFloor(x, y);
-        } else if (tool === "erase-wall") {
-            this.state.removeWall(x, y, edge);
-        }
-        this.state.notifyStateChange();
-    }
-
-    applyShapeBrush(start, end) {
-        const shape = this.state.shapeMode;
-        const tool = this.state.activeTool;
-        const brushType = this.state.brushType;
-        const colorId = this.state.activeColorId;
-
-        this.state.batchOperation(() => {
-            if (shape === "box") {
-                const isErasing = (tool === "erase-wall");
-                const bounds = ShapeStrokeEngine.getBoxBounds(start, end, (isErasing ? "wall" : brushType), isErasing);
-                if (brushType === "wall" || isErasing) {
-                    bounds.walls.forEach(w => {
-                        if (tool === "pencil") this.state.setTileWall(w.x, w.y, w.edge, colorId);
-                        else if (tool === "erase-wall") this.state.removeWall(w.x, w.y, w.edge);
-                    });
-                } else {
-                    bounds.floors.forEach(f => {
-                        if (tool === "pencil") this.state.setTileFloor(f.x, f.y, colorId);
-                        else if (tool === "erase-floor") this.state.removeFloor(f.x, f.y);
-                    });
-                }
-            } else if (shape === "line") {
-                const points = ShapeStrokeEngine.getBresenhamLine(start.x, start.y, end.x, end.y);
-                points.forEach(p => {
-                    if (tool === "pencil") {
-                        if (brushType === "floor") this.state.setTileFloor(p.x, p.y, colorId);
-                        else if (brushType === "wall") this.state.setTileWall(p.x, p.y, start.edge || "north", colorId);
-                    } else if (tool === "erase-floor") {
-                        this.state.removeFloor(p.x, p.y);
-                    } else if (tool === "erase-wall") {
-                        this.state.removeWall(p.x, p.y, start.edge || "north");
-                    }
-                });
-            }
-        });
     }
 }

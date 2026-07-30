@@ -4,6 +4,7 @@
 
 import { StorageManager } from "./StorageManager.js";
 import { UISelectionState } from "./UISelectionState.js";
+import { ToolModeState } from "./ToolModeState.js";
 import { ShapeStrokeEngine } from "../renderer/ShapeStrokeEngine.js";
 
 export class StateManager {
@@ -22,23 +23,18 @@ export class StateManager {
         // 相容性正規化舊版 JSON 牆體
         this.normalizeSchemeTiles(this.scheme);
 
-        // 獨立 UI Transient 狀態
+        // 獨立 UI Transient 狀態與 Tool 狀態
         this.uiState = new UISelectionState();
+        this.toolState = new ToolModeState();
 
         // 目前編輯狀態
         this.currentZLevel = this.scheme.currentLevel || 0;
-        this.activeTool = "pencil";         // "pencil" | "erase-floor" | "erase-wall" | "select"
-        this.shapeMode = "single";          // "single" | "line" | "box"
-        this.brushType = "floor";           // "floor" | "wall"
 
         // 強制預設選取第一個色塊
         const paletteKeys = Object.keys(this.scheme.palette || {});
-        this.activeColorId = (paletteKeys.length > 0) ? paletteKeys[0] : "";
-
-        // 視覺與遊戲開關
-        this.ghostLayerEnabled = true;
-        this.visualOffsetEnabled = true;
-        this.is3DWallsEnabled = true;
+        if (paletteKeys.length > 0) {
+            this.toolState.setActiveColorId(paletteKeys[0]);
+        }
 
         // Undo / Redo
         this.maxHistory = 30;
@@ -86,7 +82,7 @@ export class StateManager {
         scheme.tiles = updatedTiles;
     }
 
-    // 快捷 getters/setters
+    // 快捷 getters/setters 委派
     get selectedCell() { return this.uiState.selectedCell; }
     set selectedCell(val) { this.uiState.selectedCell = val; }
     get selectionBox() { return this.uiState.selectionBox; }
@@ -95,6 +91,21 @@ export class StateManager {
     set clipboard(val) { this.uiState.clipboard = val; }
     get isPastingMode() { return this.uiState.isPastingMode; }
     set isPastingMode(val) { this.uiState.isPastingMode = val; }
+
+    get activeTool() { return this.toolState.activeTool; }
+    set activeTool(val) { this.toolState.setActiveTool(val); }
+    get shapeMode() { return this.toolState.shapeMode; }
+    set shapeMode(val) { this.toolState.setShapeMode(val); }
+    get brushType() { return this.toolState.brushType; }
+    set brushType(val) { this.toolState.setBrushType(val); }
+    get activeColorId() { return this.toolState.activeColorId; }
+    set activeColorId(val) { this.toolState.setActiveColorId(val); }
+    get ghostLayerEnabled() { return this.toolState.ghostLayerEnabled; }
+    set ghostLayerEnabled(val) { this.toolState.ghostLayerEnabled = val; }
+    get visualOffsetEnabled() { return this.toolState.visualOffsetEnabled; }
+    set visualOffsetEnabled(val) { this.toolState.visualOffsetEnabled = val; }
+    get is3DWallsEnabled() { return this.toolState.is3DWallsEnabled; }
+    set is3DWallsEnabled(val) { this.toolState.is3DWallsEnabled = val; }
 
     pushHistory() {
         const snapshot = JSON.stringify(this.scheme);
@@ -156,6 +167,13 @@ export class StateManager {
 
     notifyStateChange() {
         window.dispatchEvent(new CustomEvent("statechange", { detail: { scheme: this.scheme } }));
+    }
+
+    /**
+     * 將內部 Z 座標轉為 PZ權威標準顯示 Z 樓層 (0->1, 1->2, -1->-1, -2->-2，不存在0)
+     */
+    static toDisplayZ(z) {
+        return z >= 0 ? z + 1 : z;
     }
 
     setZLevel(level) {

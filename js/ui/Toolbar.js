@@ -5,6 +5,7 @@
 import { SvgExporter } from "../renderer/SvgExporter.js";
 import { i18n } from "../core/I18nManager.js";
 import { ToastNotification } from "./ToastNotification.js";
+import { StateManager } from "../core/StateManager.js";
 
 export class Toolbar {
     /**
@@ -105,8 +106,7 @@ export class Toolbar {
 
         const updateFloorDisplay = () => {
             if (displayFloor) {
-                const z = this.state.currentZLevel;
-                displayFloor.textContent = z === 0 ? i18n.t("sidebar_floor_ground") : i18n.t("sidebar_floor_level", { z });
+                displayFloor.textContent = StateManager.toDisplayZ(this.state.currentZLevel);
             }
         };
 

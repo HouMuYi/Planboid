@@ -1,9 +1,10 @@
 /**
- * PalettePanel.js - 通用調色盤 (支援拖曳排序與零原生彈窗)
+ * PalettePanel.js - 通用調色盤 (支援拖曳排序、16進位 Hex 色碼輸入與零原生彈窗)
  */
 
 import { i18n } from "../core/I18nManager.js";
 import { ConfirmModal } from "./ConfirmModal.js";
+import { StateManager } from "../core/StateManager.js";
 
 export class PalettePanel {
     /**
@@ -21,6 +22,7 @@ export class PalettePanel {
         this.editIdInput = document.getElementById("edit-palette-id");
         this.editNameInput = document.getElementById("edit-palette-name");
         this.editColorInput = document.getElementById("edit-palette-color");
+        this.editHexInput = document.getElementById("edit-palette-hex");
         this.btnDeletePalette = document.getElementById("btn-delete-palette");
 
         this.draggedKey = null;
@@ -30,6 +32,7 @@ export class PalettePanel {
 
     init() {
         this.renderPalette();
+        this.initPresetSwatches();
 
         window.addEventListener("statechange", () => {
             this.renderPalette();
@@ -52,6 +55,26 @@ export class PalettePanel {
             }
         });
 
+        // 原生色彩選擇器與 16 進位文字輸入框雙向同步
+        this.editColorInput?.addEventListener("input", (e) => {
+            if (this.editHexInput) {
+                this.editHexInput.value = e.target.value.toUpperCase();
+            }
+        });
+
+        this.editHexInput?.addEventListener("input", (e) => {
+            let val = e.target.value.trim();
+            if (val && !val.startsWith("#")) val = "#" + val;
+            if (/^#([0-9A-F]{3}){1,2}$/i.test(val)) {
+                if (val.length === 4) {
+                    val = "#" + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
+                }
+                if (this.editColorInput) {
+                    this.editColorInput.value = val;
+                }
+            }
+        });
+
         const btnAdd = document.getElementById("btn-add-palette");
         btnAdd?.addEventListener("click", () => {
             this.openAddModal();
@@ -61,7 +84,18 @@ export class PalettePanel {
         btnSavePalette?.addEventListener("click", () => {
             const id = this.editIdInput.value;
             const name = this.editNameInput.value.trim() || i18n.t("modal_palette_name_placeholder");
-            const color = this.editColorInput.value;
+            let color = this.editColorInput ? this.editColorInput.value : "#6366F1";
+
+            if (this.editHexInput && this.editHexInput.value) {
+                let hexVal = this.editHexInput.value.trim();
+                if (!hexVal.startsWith("#")) hexVal = "#" + hexVal;
+                if (/^#([0-9A-F]{3}){1,2}$/i.test(hexVal)) {
+                    if (hexVal.length === 4) {
+                        hexVal = "#" + hexVal[1] + hexVal[1] + hexVal[2] + hexVal[2] + hexVal[3] + hexVal[3];
+                    }
+                    color = hexVal;
+                }
+            }
 
             if (!id) {
                 const newId = "color_" + Date.now();
@@ -101,6 +135,40 @@ export class PalettePanel {
         });
     }
 
+    initPresetSwatches() {
+        const presetContainer = document.getElementById("preset-color-swatches");
+        if (!presetContainer) return;
+
+        const presets = [
+            "#64748b", "#334155", "#1e293b", "#f8fafc",
+            "#b91c1c", "#78350f", "#d97706", "#f59e0b",
+            "#15803d", "#0284c7", "#1e40af", "#6b21a8"
+        ];
+        presetContainer.innerHTML = "";
+        presets.forEach(color => {
+            const btn = document.createElement("div");
+            btn.style.cssText = `
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                background-color: ${color};
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                cursor: pointer;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            `;
+            btn.className = "preset-swatch-item";
+            btn.addEventListener("click", () => {
+                if (this.editColorInput) {
+                    this.editColorInput.value = color;
+                }
+                if (this.editHexInput) {
+                    this.editHexInput.value = color.toUpperCase();
+                }
+            });
+            presetContainer.appendChild(btn);
+        });
+    }
+
     updateSelectedTileInfo() {
         if (this.state.activeTool !== "select" && this.btnEnableSelect) {
             this.btnEnableSelect.classList.remove("btn-primary");
@@ -124,7 +192,8 @@ export class PalettePanel {
         const tile = this.state.scheme.tiles[key];
 
         if (this.tileInfoDisplay) {
-            this.tileInfoDisplay.textContent = i18n.t("sidebar_selected_tile_coords", { x: x + 1, y: y + 1, z });
+            const displayZ = StateManager.toDisplayZ(z);
+            this.tileInfoDisplay.textContent = i18n.t("sidebar_selected_tile_coords", { x: x + 1, y: y + 1, z: displayZ });
         }
 
         if (this.labelInput) {
@@ -243,7 +312,9 @@ export class PalettePanel {
         if (this.modalTitle) this.modalTitle.textContent = i18n.t("modal_palette_title_add");
         this.editIdInput.value = "";
         this.editNameInput.value = "";
-        this.editColorInput.value = "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0");
+        const randomColor = "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0").toUpperCase();
+        this.editColorInput.value = randomColor;
+        if (this.editHexInput) this.editHexInput.value = randomColor;
 
         if (this.btnDeletePalette) this.btnDeletePalette.style.display = "none";
         this.editModal.showModal();
@@ -254,7 +325,9 @@ export class PalettePanel {
         if (this.modalTitle) this.modalTitle.textContent = i18n.t("modal_palette_title_edit");
         this.editIdInput.value = id;
         this.editNameInput.value = item.name;
-        this.editColorInput.value = item.color;
+        const colorVal = item.color || "#6366F1";
+        this.editColorInput.value = colorVal;
+        if (this.editHexInput) this.editHexInput.value = colorVal.toUpperCase();
 
         if (this.btnDeletePalette) this.btnDeletePalette.style.display = "inline-flex";
         this.editModal.showModal();

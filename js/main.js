@@ -75,8 +75,9 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("gridhover", (e) => {
         const { x, y, gameX, gameY } = e.detail;
         const z = stateManager.currentZLevel;
+        const displayZ = StateManager.toDisplayZ(z);
         if (infoCoords) {
-            infoCoords.textContent = i18n.t("viewport_info_coords", { x, y, z });
+            infoCoords.textContent = i18n.t("viewport_info_coords", { x, y, z: displayZ });
         }
         if (infoGameCoords) {
             infoGameCoords.textContent = i18n.t("viewport_info_game_coords", { gameX, gameY });
