@@ -70,6 +70,8 @@ window.PLANBOID_LANGUAGES["en"] = {
     "sidebar_no_selected_tile": "No tile selected (click above button)",
     "sidebar_selected_tile_coords": "Selected: ({x}, {y}), Z: {z}",
     "sidebar_label_input_placeholder": "e.g. Kitchen, Master Bedroom, Storage",
+    "sidebar_github_link": "GitHub Repository",
+    "sidebar_github_link_title": "Visit GitHub Repository",
 
     "modal_about_title": "About Project",
 

@@ -70,6 +70,8 @@ window.PLANBOID_LANGUAGES["zh"] = {
     "sidebar_no_selected_tile": "未選擇地塊 (點擊上方按鈕進入選取)",
     "sidebar_selected_tile_coords": "選取地塊: ({x}, {y}), Z: {z}",
     "sidebar_label_input_placeholder": "例如：廚房、主臥室、儲藏室",
+    "sidebar_github_link": "GitHub 專案倉庫",
+    "sidebar_github_link_title": "造訪 GitHub 原始碼倉庫",
 
     "modal_about_title": "關於專案 (About)",
 
