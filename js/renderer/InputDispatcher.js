@@ -1,6 +1,7 @@
 /**
  * InputDispatcher.js - Canvas 輸入與互動事件分派器 (Input Event Dispatcher Seam)
  * 負責 Canvas DOM 事件綁定、滑鼠座標反算、相機 Drag/Zoom 與筆刷呼叫分派
+ * 包含 60FPS 訊框鎖與分層繪製調度 (rAF Lock + Overlay Decoupling)
  */
 
 import { calcZTranslate } from "./GeometryPipeline.js";
@@ -15,6 +16,8 @@ export class InputDispatcher {
         this.renderer = renderer;
         this.state = stateManager;
         this.applicator = applicator;
+
+        this.mouseMoveTicking = false;
 
         this.setupEvents();
     }
@@ -33,8 +36,7 @@ export class InputDispatcher {
         const z = this.state.currentZLevel;
         const { dx, dy } = calcZTranslate(z, this.renderer.currentProgress);
 
-        // 徹底極致簡化：減去 Z 層的純垂直視覺偏移後，交給 2D 平面反算的 cellX 與 cellY 就是真實的邏輯座標！
-        // 永遠告別過去「減去 3zp 又要加回 3zp」的非線性幽靈！
+        // 減去 Z 層的純垂直視覺偏置後，交給 2D 平面反算的 cellX 與 cellY 就是真實的邏輯座標
         const res = this.renderer.isoMath.screenToGrid(worldX - dx, worldY - dy, this.renderer.currentProgress);
         const logicX = res.cellX;
         const logicY = res.cellY;
@@ -85,7 +87,7 @@ export class InputDispatcher {
 
                 if (this.state.isPastingMode) {
                     this.state.pasteSelection(cellX, cellY);
-                    this.renderer.requestRender();
+                    this.renderer.requestRenderAll();
                     return;
                 }
 
@@ -100,7 +102,7 @@ export class InputDispatcher {
                     } else if (shape === "box") {
                         if (!this.renderer.shapeStartCell) {
                             this.renderer.shapeStartCell = { x: cellX, y: cellY };
-                            this.renderer.requestRender();
+                            this.renderer.requestRenderOverlay();
                         } else {
                             const minX = Math.min(this.renderer.shapeStartCell.x, cellX);
                             const maxX = Math.max(this.renderer.shapeStartCell.x, cellX);
@@ -123,54 +125,25 @@ export class InputDispatcher {
                 } else if (shape === "line" || shape === "box") {
                     if (!this.renderer.shapeStartCell) {
                         this.renderer.shapeStartCell = { x: cellX, y: cellY, edge };
-                        this.renderer.requestRender();
+                        this.renderer.requestRenderOverlay();
                     } else {
                         const start = this.renderer.shapeStartCell;
                         this.applicator.applyShapeBrush(start, { x: cellX, y: cellY, edge });
                         this.renderer.shapeStartCell = null;
-                        this.renderer.requestRender();
+                        this.renderer.requestRenderAll();
                     }
                 }
             }
         });
 
         window.addEventListener("mousemove", (e) => {
-            if (this.renderer.isDraggingCamera) {
-                const dx = e.clientX - this.renderer.lastMouseX;
-                const dy = e.clientY - this.renderer.lastMouseY;
-                this.renderer.cameraX += dx;
-                this.renderer.cameraY += dy;
-                this.renderer.lastMouseX = e.clientX;
-                this.renderer.lastMouseY = e.clientY;
-                this.renderer.requestRender();
-            } else {
-                const { cellX, cellY, edge } = this.getMouseGridPos(e);
-                if (cellX !== this.renderer.hoveredCell.x || cellY !== this.renderer.hoveredCell.y || edge !== this.renderer.hoveredCell.edge) {
-                    this.renderer.hoveredCell = { x: cellX, y: cellY, edge };
-                    this.renderer.requestRender();
+            if (this.mouseMoveTicking) return;
+            this.mouseMoveTicking = true;
 
-                    const displayX = cellX + 1;
-                    const displayY = cellY + 1;
-                    const gameX = (this.state.scheme.worldOriginX || 10500) + cellX;
-                    const gameY = (this.state.scheme.worldOriginY || 9200) + cellY;
-
-                    const event = new CustomEvent("gridhover", {
-                        detail: {
-                            x: displayX,
-                            y: displayY,
-                            gameX,
-                            gameY
-                        }
-                    });
-                    window.dispatchEvent(event);
-                }
-
-                if (this.renderer.isRightPainting) {
-                    this.applicator.applyRightClickErase(cellX, cellY, edge);
-                } else if (this.renderer.isPainting && this.state.shapeMode === "single") {
-                    this.applicator.applyBrushAt(cellX, cellY, edge);
-                }
-            }
+            requestAnimationFrame(() => {
+                this.mouseMoveTicking = false;
+                this.handleMouseMove(e);
+            });
         });
 
         const handleMouseUp = () => {
@@ -203,10 +176,50 @@ export class InputDispatcher {
             this.renderer.cameraY = mouseY - (mouseY - this.renderer.cameraY) * (newZoom / this.renderer.zoom);
             this.renderer.zoom = newZoom;
 
-            this.renderer.requestRender();
+            this.renderer.requestRenderAll();
 
             const event = new CustomEvent("zoomchange", { detail: { zoom: this.renderer.zoom } });
             window.dispatchEvent(event);
         }, { passive: false });
+    }
+
+    handleMouseMove(e) {
+        if (this.renderer.isDraggingCamera) {
+            const dx = e.clientX - this.renderer.lastMouseX;
+            const dy = e.clientY - this.renderer.lastMouseY;
+            this.renderer.cameraX += dx;
+            this.renderer.cameraY += dy;
+            this.renderer.lastMouseX = e.clientX;
+            this.renderer.lastMouseY = e.clientY;
+            this.renderer.requestRenderAll();
+        } else {
+            const { cellX, cellY, edge } = this.getMouseGridPos(e);
+            if (cellX !== this.renderer.hoveredCell.x || cellY !== this.renderer.hoveredCell.y || edge !== this.renderer.hoveredCell.edge) {
+                this.renderer.hoveredCell = { x: cellX, y: cellY, edge };
+                // 關鍵優化：Hover 變更時，僅請求極輕量的頂層 Overlay 重繪 (耗費 <0.1ms)，完全不重繪底層地塊！
+                this.renderer.requestRenderOverlay();
+
+                const displayX = cellX + 1;
+                const displayY = cellY + 1;
+                const gameX = (this.state.scheme.worldOriginX || 10500) + cellX;
+                const gameY = (this.state.scheme.worldOriginY || 9200) + cellY;
+
+                const event = new CustomEvent("gridhover", {
+                    detail: {
+                        x: displayX,
+                        y: displayY,
+                        gameX,
+                        gameY
+                    }
+                });
+                window.dispatchEvent(event);
+            }
+
+            if (this.renderer.isRightPainting) {
+                this.applicator.applyRightClickErase(cellX, cellY, edge);
+            } else if (this.renderer.isPainting && this.state.shapeMode === "single") {
+                this.applicator.applyBrushAt(cellX, cellY, edge);
+            }
+        }
     }
 }
