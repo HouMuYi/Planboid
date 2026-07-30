@@ -47,6 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const btnIso = document.getElementById("view-iso");
+    const btnOrtho = document.getElementById("view-ortho");
     const btnFitView = document.getElementById("btn-fit-view");
     const btnResetView = document.getElementById("btn-reset-view");
 
