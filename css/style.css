@@ -1,5 +1,15 @@
-/* Planboid Design System */
+/* ==========================================================================
+   Planboid Design System — 物件導向極簡 CSS (OOCSS Architecture)
+   --------------------------------------------------------------------------
+   【防護規範與核心心法】：
+   1. 本 CSS 採用「物件導向 (Object-Oriented)」而非「區域/內容驅動」架構。
+   2. 嚴禁為特定區域（如 Header/Modal/Sidebar）增補特化重複 Class！
+   3. 圓角與內距統一使用 em 相對單位（基於 --r: 0.5em），自動隨字級縮放包覆。
+   4. 全局互動採用「物理法則級別提亮 (filter: brightness)」，嚴禁手動寫冗長 :hover 換色。
+   5. UI 新增一律組合現有物件（.panel, .box, .stack, .cluster, .btn, .field）。
+   ========================================================================== */
 
+/* ── 1. Design Tokens & Variables ── */
 :root {
 	--bg:      #0b0f19;
 	--bg-p:    rgba(17,24,39,.92);
@@ -16,68 +26,53 @@
 @media (min-width:1920px) { :root { --s:1.15 } }
 @media (min-width:2560px) { :root { --s:1.28 } }
 
-/* Reset */
+/* ── 2. Global Reset & Interactive Physical Rule ── */
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; user-select:none }
 body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; width:100vw }
 
-/* ── 共用 Flex column ── */
-#app-container, .sidebar-right, .sidebar-scroll-content,
-.panel-section, .palette-section, .palette-list,
-.toolbar-left, .tool-group,
-.modal-content, .about-modal-content { display:flex; flex-direction:column }
+/* 物理法則級別全局提亮 (消滅手繪感 :hover 冗餘) */
+:is(.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .palette-item, .checkbox-label, .select-lang, .btn-close, button, a):hover { filter:brightness(1.25); transform:translateY(-1px) }
+:is(.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .checkbox-label, .select-lang, .btn-close, button, a) { cursor:pointer; transition:filter .15s, transform .15s }
 
-/* ── 共用 Flex row + align-items:center ── */
-.app-header, .logo-area, .header-center, .header-actions,
-.section-header, .view-overlay-controls, .floor-selector,
-.world-origin-inputs, .checkbox-label, .palette-item,
-.modal-header, .canvas-info-overlay, .toggle-pill { display:flex; align-items:center }
+/* ── 3. Objects: Layout Primitives (.stack & .cluster) ── */
+.stack, #app-container, .toolbar-left, .tool-group, .sidebar-right, .sidebar-scroll-content, .panel-section, .palette-section, .palette-list, .modal-content { display:flex; flex-direction:column }
+.cluster, .app-header, .logo-area, .header-center, .header-actions, .section-header, .view-overlay-controls, .floor-selector, .world-origin-inputs, .checkbox-label, .palette-item, .scheme-item, .modal-header, .canvas-info-overlay, .toggle-pill { display:flex; align-items:center }
 
-/* ── 全局互動提亮 ── */
-:is(.btn,.tool-btn,.shape-btn,.view-btn,.floor-btn,.palette-item,.checkbox-label,.select-lang,.btn-palette-edit,.btn-close):hover { filter:brightness(1.25) }
-
-/* ── 共用邊框 ── */
-.panel, .view-switch-group, .toggle-pill, .canvas-info-overlay, .floor-selector, .palette-list { border:1px solid var(--bd) }
-
-/* ── 共用玻璃面板背景 ── */
-.panel, .view-switch-group, .toggle-pill, .canvas-info-overlay, .btn-toggle-sidebar { background:var(--bg-p); backdrop-filter:var(--blur) }
-
-/* ── 共用 card 背景 ── */
-:is(.tool-btn,.shape-btn), .palette-item, .floor-selector { background:var(--bg-c) }
-
-/* ── 共用 cursor:pointer ── */
-.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .checkbox-label, .select-lang, .btn-palette-edit, .btn-close, .scheme-title, .scheme-dim { cursor:pointer }
-
-/* 分隔線 */
+/* ── 4. Object: .panel & .box (通用容器物件) ── */
+.panel { background:var(--bg-p); backdrop-filter:var(--blur); border:1px solid var(--bd); border-radius:var(--r) }
+.box { background:var(--bg-c); border:1px solid var(--bd); border-radius:var(--r) }
 .divider { width:32px; height:1px; background:var(--bd); flex-shrink:0 }
 
-/* ======== Layout ======== */
+/* ── 5. Object: .btn (通用按鈕物件，全 em 相對單位) ── */
+.btn { padding:.45em .85em; border-radius:var(--r); font-size:calc(.8rem*var(--s)); font-weight:500; background:var(--bg-c); color:var(--c0); border:1px solid var(--bd); display:inline-flex; align-items:center; justify-content:center; gap:.4em; white-space:nowrap }
+.btn.active { background:var(--ac); border-color:var(--ac); color:#fff; font-weight:600 }
+.btn-primary { background:var(--ac); border-color:var(--ac); color:#fff }
+.btn-danger { background:rgba(239,68,68,.15); border-color:var(--danger); color:var(--danger) }
+
+/* ── 6. Object: .field (通用表單輸入物件) ── */
+:is(.input-text, .input-number, .select-lang, select, textarea) { background:var(--bg); border:1px solid var(--bd); border-radius:var(--r); color:var(--c0); font-size:calc(.85rem*var(--s)); font-family:inherit; padding:.4em .75em; min-width:0; width:100% }
+:is(.input-text, .input-number, .select-lang, select, textarea):focus { outline:none; border-color:var(--ac) }
+.world-origin-inputs .input-number { width:calc(76px*var(--s)); background:transparent; border:none; color:var(--green); font-weight:600; text-align:center }
+
+/* ── 7. Component Structure & Boundaries ── */
 #app-container { height:100vh; width:100vw }
 .app-body { flex:1; min-height:0; display:flex; position:relative; overflow:hidden }
 .app-header { flex-shrink:0; justify-content:space-between; height:calc(56px*var(--s)); border-bottom:1px solid var(--bd); padding:0 calc(16px*var(--s)); z-index:20 }
-
-/* ======== Header ======== */
 .logo-area,.header-actions { gap:calc(8px*var(--s)) }
 .header-center { gap:calc(12px*var(--s)) }
-
 .logo-title { font-family:'Outfit',sans-serif; font-weight:700; font-size:calc(1.25rem*var(--s)); background:linear-gradient(135deg,#a5b4fc,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent }
-.badge { font-size:calc(.7rem*var(--s)); background:rgba(99,102,241,.15); color:#a5b4fc; padding:2px 8px; border-radius:12px; border:1px solid rgba(99,102,241,.3) }
+.badge { font-size:calc(.7rem*var(--s)); background:rgba(99,102,241,.15); color:#a5b4fc; padding:.25em .65em; border-radius:1em; border:1px solid rgba(99,102,241,.3); display:inline-flex; align-items:center; white-space:nowrap; width:auto }
 .scheme-title { font-weight:600; font-size:calc(.95rem*var(--s)); border-bottom:1px dashed var(--ac) }
 .scheme-dim { font-size:calc(.8rem*var(--s)); color:var(--c2) }
-
 .world-origin-inputs { gap:4px; background:rgba(0,0,0,.3); padding:4px 10px; border-radius:var(--r); border:1px solid var(--bd); font-size:calc(.75rem*var(--s)) }
 .input-prefix { color:var(--c2) }
-.input-number { width:calc(60px*var(--s)); background:transparent; border:none; color:var(--green); font-weight:600; font-size:calc(.8rem*var(--s)); text-align:center }
-.input-number:focus { outline:none; background:rgba(255,255,255,.05); border-radius:4px }
-.select-lang { background:var(--bg); color:var(--c1); border:1px solid var(--bd); border-radius:var(--r); padding:3px 8px; font-size:calc(.8rem*var(--s)); font-family:inherit; outline:none; margin-left:6px }
 
-/* ======== Left Toolbar ======== */
+/* 左側工具列 */
 .toolbar-left { width:calc(64px*var(--s)); border-right:1px solid var(--bd); align-items:center; padding:calc(12px*var(--s)) 0; gap:calc(14px*var(--s)); z-index:10; flex-shrink:0 }
 .tool-group { align-items:center; gap:calc(6px*var(--s)); width:100% }
 .group-label { font-size:calc(.65rem*var(--s)); color:var(--c2); text-transform:uppercase }
-
-:is(.tool-btn,.shape-btn) { width:calc(44px*var(--s)); height:calc(44px*var(--s)); border-radius:var(--r); border:1px solid transparent; color:var(--c1); display:flex; align-items:center; justify-content:center; font-size:calc(.7rem*var(--s)); transition:all .2s }
-:is(.tool-btn,.shape-btn).active { background:var(--ac); color:#fff; border-color:#818cf8; box-shadow:0 0 12px rgba(99,102,241,.4) }
-
+:is(.tool-btn, .shape-btn) { width:calc(44px*var(--s)); height:calc(44px*var(--s)); border-radius:var(--r); border:1px solid transparent; color:var(--c1); display:flex; align-items:center; justify-content:center; background:var(--bg-c) }
+:is(.tool-btn, .shape-btn).active { background:var(--ac); color:#fff; border-color:#818cf8; box-shadow:0 0 12px rgba(99,102,241,.4) }
 .tool-btn .icon { font-size:calc(1.1rem*var(--s)) }
 .tool-btn .unicode-icon { font-size:calc(1.35rem*var(--s)); line-height:1 }
 .combo-icon { position:relative; display:inline-flex; align-items:center; justify-content:center; width:1.4em; height:1.4em }
@@ -85,67 +80,52 @@ body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; wid
 .combo-icon .overlay-icon { position:absolute; color:var(--danger); font-size:calc(1.05rem*var(--s)); font-weight:900; text-shadow:0 0 3px rgba(0,0,0,.95); line-height:1 }
 .unicode-shape { font-size:calc(1.2rem*var(--s)); font-weight:700; line-height:1 }
 
-/* ======== Canvas ======== */
+/* Canvas Viewport */
 .canvas-viewport { flex:1; position:relative; background:#080c14; overflow:hidden }
 #main-canvas { width:100%; height:100%; display:block }
 .view-overlay-controls { position:absolute; top:calc(16px*var(--s)); left:calc(16px*var(--s)); gap:calc(12px*var(--s)); z-index:5 }
-.view-switch-group { padding:3px; border-radius:var(--r) }
-.view-btn { padding:calc(6px*var(--s)) calc(14px*var(--s)); font-size:calc(.8rem*var(--s)); border:none; border-radius:6px; background:transparent; color:var(--c1); transition:all .2s }
+.view-switch-group { padding:3px }
+.view-btn { padding:calc(6px*var(--s)) calc(14px*var(--s)); font-size:calc(.8rem*var(--s)); border:none; border-radius:6px; background:transparent; color:var(--c1) }
 .view-btn.active { background:var(--ac); color:#fff; font-weight:600 }
-.toggle-pill { gap:6px; padding:calc(6px*var(--s)) calc(12px*var(--s)); border-radius:var(--r); font-size:calc(.78rem*var(--s)); color:var(--c1) }
+.toggle-pill { gap:6px; padding:calc(6px*var(--s)) calc(12px*var(--s)); color:var(--c1) }
 .toggle-pill input { accent-color:var(--ac) }
-.canvas-info-overlay { position:absolute; bottom:calc(16px*var(--s)); left:calc(16px*var(--s)); padding:calc(6px*var(--s)) calc(14px*var(--s)); border-radius:var(--r); font-size:calc(.75rem*var(--s)); gap:8px }
+.canvas-info-overlay { position:absolute; bottom:calc(16px*var(--s)); left:calc(16px*var(--s)); padding:calc(6px*var(--s)) calc(14px*var(--s)); font-size:calc(.75rem*var(--s)); gap:8px }
 .dot { color:var(--c2) }
 
-/* ======== Sidebar — Flex 高度繼承鏈 ======== */
+/* 右側 Sidebar */
 .sidebar-right { width:calc(280px*var(--s)); border-left:1px solid var(--bd); padding:calc(16px*var(--s)); gap:calc(16px*var(--s)); z-index:10; position:relative; flex-shrink:0; height:100%; min-height:0; overflow:hidden; transition:transform .3s cubic-bezier(.4,0,.2,1) }
 .sidebar-scroll-content { flex:1; min-height:0; gap:calc(14px*var(--s)); overflow:hidden }
 .panel-section { gap:calc(10px*var(--s)); flex-shrink:0 }
 .palette-section { flex:1; min-height:0; gap:calc(8px*var(--s)) }
-.palette-list { flex:1; min-height:0; overflow-y:auto; gap:calc(6px*var(--s)); padding:calc(8px*var(--s)); background:rgba(15,23,42,.4); border-radius:var(--r) }
+.palette-list { flex:1; min-height:0; overflow-y:auto; gap:calc(6px*var(--s)); padding:calc(8px*var(--s)); background:rgba(15,23,42,.4) }
 .label-section { flex-shrink:0 }
-
 .btn-toggle-sidebar { display:none; position:absolute; left:-36px; top:16px; width:36px; height:36px; border:1px solid var(--bd); border-right:none; border-radius:8px 0 0 8px; color:var(--c0); align-items:center; justify-content:center; z-index:101 }
-
-/* ======== Sidebar Components ======== */
 .section-title { font-size:calc(.85rem*var(--s)); font-weight:600; color:var(--c1); text-transform:uppercase; letter-spacing:.5px }
 .section-header { justify-content:space-between }
-.floor-selector { justify-content:space-between; border-radius:var(--r); padding:4px }
+.floor-selector { justify-content:space-between; padding:4px }
 .floor-btn { background:transparent; border:none; color:var(--c0); padding:calc(4px*var(--s)) calc(6px*var(--s)); font-size:calc(.72rem*var(--s)); font-weight:500; border-radius:var(--r); white-space:nowrap }
 .floor-indicator { font-weight:700; color:var(--ac); font-size:calc(.8rem*var(--s)); white-space:nowrap }
-.checkbox-label { gap:8px; font-size:calc(.75rem*var(--s)); color:var(--c1) }
 
-.palette-item { gap:calc(8px*var(--s)); padding:calc(7px*var(--s)) calc(10px*var(--s)); border:1px solid var(--bd); border-radius:var(--r); cursor:grab; transition:border-color .15s; flex-shrink:0 }
+/* 列表通用 ListItem 物件 */
+.palette-item, .scheme-item { gap:calc(8px*var(--s)); padding:calc(7px*var(--s)) calc(10px*var(--s)); border:1px solid var(--bd); border-radius:var(--r); background:var(--bg-c); flex-shrink:0 }
+.palette-item { cursor:grab }
 .palette-item:active { cursor:grabbing }
-.palette-item.active { border-color:var(--ac); background:rgba(99,102,241,.2); box-shadow:0 0 10px rgba(99,102,241,.2) }
+.palette-item.active, .scheme-item.active { border-color:var(--ac); background:rgba(99,102,241,.2); box-shadow:0 0 10px rgba(99,102,241,.2) }
 .palette-item.dragging { opacity:.4; border-style:dashed; border-color:var(--ac) }
 .palette-item.drag-over { border-top:2px solid var(--ac) }
 .palette-swatch { width:calc(20px*var(--s)); height:calc(20px*var(--s)); border-radius:4px; border:1px solid rgba(255,255,255,.2); flex-shrink:0 }
-.palette-name { font-size:calc(.8rem*var(--s)); flex:1 }
+.palette-name, .scheme-name { font-size:calc(.8rem*var(--s)); flex:1 }
 .btn-palette-edit { font-size:calc(.7rem*var(--s)); color:var(--c2); background:transparent; border:none; padding:2px 4px; flex-shrink:0 }
 
-/* ======== Buttons ======== */
-.btn { padding:calc(6px*var(--s)) calc(14px*var(--s)); border-radius:var(--r); font-size:calc(.8rem*var(--s)); font-weight:500; border:1px solid transparent; transition:filter .15s; display:inline-flex; align-items:center; justify-content:center; gap:6px }
-.btn-primary { background:var(--ac); color:#fff }
-.btn-secondary { background:var(--bg-c); color:var(--c0); border-color:var(--bd) }
-.btn-sm { padding:calc(4px*var(--s)) calc(8px*var(--s)); font-size:calc(.75rem*var(--s)) }
-.btn-icon { padding:6px; width:calc(32px*var(--s)); height:calc(32px*var(--s)) }
-.btn-circle { width:calc(36px*var(--s)); height:calc(36px*var(--s)); border-radius:50%; background:var(--bg-p); backdrop-filter:var(--blur); border:1px solid var(--bd); color:var(--c0) }
-
-/* ======== Form ======== */
-.input-text { width:100%; padding:calc(8px*var(--s)) calc(12px*var(--s)); background:var(--bg); border:1px solid var(--bd); border-radius:var(--r); color:var(--c0); font-size:calc(.85rem*var(--s)); font-family:inherit }
-:is(.input-text,.input-number):focus { outline:none; border-color:var(--ac) }
-
-/* ======== Modal ======== */
+/* Modal 彈窗與 Markdown */
 .app-modal { margin:auto; border:none; background:transparent }
 .app-modal::backdrop { background:rgba(0,0,0,.75); backdrop-filter:blur(8px) }
-.modal-content { background:var(--bg-p)!important; backdrop-filter:var(--blur); border:1px solid var(--bd); border-radius:var(--r); box-shadow:var(--shadow); padding:calc(24px*var(--s)); color:var(--c0) }
+.modal-content { box-shadow:var(--shadow); padding:calc(24px*var(--s)); color:var(--c0) }
 .about-modal-content { width:min(720px,92vw); max-height:85vh }
 .modal-header { justify-content:space-between; margin-bottom:16px; flex-shrink:0 }
 .modal-title-text { font-size:calc(1.25rem*var(--s)); font-weight:700 }
 .btn-close { background:transparent; border:none; color:var(--c2); font-size:1.4rem }
 
-/* ======== About Markdown ======== */
 #about-markdown-body { color:var(--c1); font-size:calc(1rem*var(--s)); line-height:1.75; padding-right:8px; overflow-y:auto; flex:1; min-height:0 }
 #about-markdown-body h1 { font-size:calc(1.7rem*var(--s)); font-weight:700; color:#818cf8; margin-bottom:14px; font-family:'Outfit',sans-serif }
 #about-markdown-body h2 { font-size:calc(1.35rem*var(--s)); font-weight:700; color:var(--c0); margin:20px 0 12px; border-bottom:1px solid var(--bd); padding-bottom:6px }
@@ -157,7 +137,7 @@ body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; wid
 #about-markdown-body li { margin-bottom:6px }
 #about-markdown-body hr { border:none; border-top:1px solid var(--bd); margin:20px 0 }
 
-/* ======== RWD ======== */
+/* ── 8. RWD Adaptations ── */
 @media (max-width:1024px) {
 	.btn-toggle-sidebar { display:flex }
 	.sidebar-right { position:absolute; right:0; top:0; bottom:0; box-shadow:-10px 0 30px rgba(0,0,0,.6) }

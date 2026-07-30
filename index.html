@@ -53,12 +53,13 @@
             </div>
 
             <div class="header-actions">
-                <button class="btn btn-secondary" id="btn-about" data-i18n-title="header_btn_about_title" title="關於專案與團隊致謝">ℹ️ <span class="btn-text" data-i18n="header_btn_about">關於</span></button>
-                <button class="btn btn-secondary" id="btn-export-svg" data-i18n-title="header_btn_svg_title" title="匯出高畫質向量 SVG 圖檔 (含圖例)">📐 <span class="btn-text" data-i18n="header_btn_svg">SVG</span></button>
-                <button class="btn btn-secondary" id="btn-export-png" data-i18n-title="header_btn_png_title" title="匯出全幅 PNG 圖片快照">📷 <span class="btn-text" data-i18n="header_btn_png">PNG</span></button>
-                <button class="btn btn-secondary desktop-only" id="btn-export" data-i18n="header_btn_export_json">匯出 JSON</button>
-                <button class="btn btn-secondary desktop-only" id="btn-import" data-i18n="header_btn_import_json">匯入 JSON</button>
-                <button class="btn btn-primary" id="btn-share" data-i18n="header_btn_share">分享</button>
+                <button class="btn" id="btn-about" data-i18n-title="header_btn_about_title" title="關於專案與團隊致謝">ℹ️ <span class="btn-text" data-i18n="header_btn_about">關於</span></button>
+                <button class="btn" id="btn-export-svg" data-i18n-title="header_btn_svg_title" title="匯出高畫質向量 SVG 圖檔 (含圖例)">📐 <span class="btn-text" data-i18n="header_btn_svg">SVG</span></button>
+                <button class="btn" id="btn-export-png" data-i18n-title="header_btn_png_title" title="匯出全幅 PNG 圖片快照">📷 <span class="btn-text" data-i18n="header_btn_png">PNG</span></button>
+                <button class="btn" id="btn-export-json" data-i18n-title="header_btn_export_json_title" title="將方案匯出為 JSON 檔案">💾</button>
+                <button class="btn" id="btn-import-json" data-i18n-title="header_btn_import_json_title" title="從本機讀取 JSON 檔案匯入">📂</button>
+                <button class="btn" id="btn-export-clipboard" data-i18n-title="header_btn_export_clipboard_title" title="將方案極簡文字複製至剪貼簿">📋</button>
+                <button class="btn" id="btn-import-text" data-i18n-title="header_btn_import_text_title" title="貼上或輸入方案極簡文字匯入">📝</button>
             </div>
         </header>
 
@@ -121,10 +122,10 @@
 
                 <div class="view-overlay-controls">
                     <div class="view-switch-group">
-                        <button class="view-btn active" id="view-iso" data-i18n-title="viewport_view_iso_title" title="2:1 菱形視角">
+                        <button class="btn active" id="view-iso" data-i18n-title="viewport_view_iso_title" title="2:1 菱形視角">
                             <span data-i18n="viewport_view_iso">菱形 (2:1)</span>
                         </button>
-                        <button class="view-btn" id="view-ortho" data-i18n-title="viewport_view_ortho_title" title="1:1 正交視角">
+                        <button class="btn" id="view-ortho" data-i18n-title="viewport_view_ortho_title" title="1:1 正交視角">
                             <span data-i18n="viewport_view_ortho">正交 (1:1)</span>
                         </button>
                     </div>
@@ -159,11 +160,11 @@
                     <div class="panel-section floor-control-section">
                         <h3 class="section-title" data-i18n="sidebar_floor_control_title">樓層控制 (Z-Level)</h3>
                         <div class="floor-selector">
-                            <button class="floor-btn" id="floor-up" data-i18n="sidebar_floor_up">▲ 上一層</button>
+                            <button class="btn" id="floor-up" data-i18n="sidebar_floor_up">▲ 上一層</button>
                             <div class="floor-indicator">
                                 <span class="floor-label" id="current-floor-display">1</span>
                             </div>
-                            <button class="floor-btn" id="floor-down" data-i18n="sidebar_floor_down">▼ 下一層</button>
+                            <button class="btn" id="floor-down" data-i18n="sidebar_floor_down">▼ 下一層</button>
                         </div>
                         <label class="checkbox-label">
                             <input type="checkbox" id="chk-ghost-layer" checked>
@@ -177,7 +178,7 @@
                     <div class="panel-section palette-section">
                         <div class="section-header">
                             <h3 class="section-title" data-i18n="sidebar_palette_title">通用調色盤</h3>
-                            <button class="btn btn-sm" id="btn-add-palette" data-i18n="sidebar_btn_add_palette">+ 新增色塊</button>
+                            <button class="btn" id="btn-add-palette" data-i18n="sidebar_btn_add_palette">+ 新增色塊</button>
                         </div>
                         <div class="palette-list" id="palette-container"></div>
                     </div>
@@ -188,7 +189,7 @@
                     <div class="panel-section label-section">
                         <div class="section-header">
                             <h3 class="section-title" data-i18n="sidebar_label_title">區域與標籤 (Label)</h3>
-                            <button class="btn btn-sm btn-secondary" id="btn-enable-select" data-i18n="sidebar_btn_enable_select" data-i18n-title="sidebar_btn_enable_select_title" title="快捷進入選取模式">👆 點擊選取</button>
+                            <button class="btn" id="btn-enable-select" data-i18n="sidebar_btn_enable_select" data-i18n-title="sidebar_btn_enable_select_title" title="快捷進入選取模式">👆 點擊選取</button>
                         </div>
                         <div class="selected-tile-info" id="selected-tile-info" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; margin-bottom: 6px;" data-i18n="sidebar_no_selected_tile">
                             未選擇地塊 (點擊上方按鈕進入選取)
@@ -222,19 +223,28 @@
             </div>
             <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
                 <!-- 方案編輯/建立盒體 -->
-                <div class="scheme-create-box" style="background: var(--bg-dark); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+                <div class="scheme-create-box box stack" style="padding: 12px; gap: 8px;">
                     <input type="hidden" id="scheme-editor-id" value="">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span id="scheme-editor-title" style="font-size: 0.85rem; font-weight: 600; color: var(--accent-primary);" data-i18n="modal_schemes_create_title">建立自訂新方案</span>
-                        <button id="btn-cancel-scheme-editor" class="btn btn-sm btn-secondary" style="display: none; font-size: 0.75rem;" data-i18n="modal_schemes_btn_cancel_edit">取消編輯</button>
+                    <div class="cluster" style="justify-content: space-between;">
+                        <span id="scheme-editor-title" style="font-size: 0.85rem; font-weight: 600; color: var(--ac);" data-i18n="modal_schemes_create_title">建立自訂新方案</span>
+                        <button id="btn-cancel-scheme-editor" class="btn" style="display: none; font-size: 0.75rem;" data-i18n="modal_schemes_btn_cancel_edit">取消編輯</button>
                     </div>
-                    <div style="display: flex; gap: 8px;">
+                    <div class="cluster" style="gap: 8px;">
                         <input type="text" id="new-scheme-name" class="input-text" data-i18n-placeholder="modal_schemes_name_placeholder" placeholder="方案名稱" style="flex: 2;">
                         <input type="number" id="new-scheme-width" class="input-text" data-i18n-placeholder="modal_schemes_width_placeholder" placeholder="寬" value="64" style="flex: 1;">
-                        <span style="align-self: center; color: var(--text-muted);">x</span>
+                        <span style="align-self: center; color: var(--c2);">x</span>
                         <input type="number" id="new-scheme-height" class="input-text" data-i18n-placeholder="modal_schemes_height_placeholder" placeholder="高" value="64" style="flex: 1;">
                     </div>
                     <button class="btn btn-primary" id="btn-save-scheme-editor" style="width: 100%;" data-i18n="modal_schemes_btn_create">建立新方案</button>
+                </div>
+                <!-- 內建文字貼上與匯入盒體 (零原生彈窗) -->
+                <div class="scheme-text-import-box box stack" id="box-text-import" style="display: none; padding: 12px; gap: 8px;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--ac);" data-i18n="prompt_import_text_title">請貼上或輸入方案文字內容：</span>
+                    <textarea id="input-text-scheme-data" class="input-text" rows="3" style="width: 100%; font-family: monospace; font-size: 0.75rem; resize: vertical;" placeholder="{ &quot;n&quot;: &quot;...&quot; }"></textarea>
+                    <div class="cluster" style="gap: 8px; justify-content: flex-end;">
+                        <button id="btn-cancel-text-import" class="btn" data-i18n="modal_confirm_cancel">取消</button>
+                        <button id="btn-submit-text-import" class="btn btn-primary" data-i18n="header_btn_import_text">貼上文字</button>
+                    </div>
                 </div>
                 <ul class="scheme-list" id="scheme-list-container"></ul>
             </div>
@@ -263,7 +273,7 @@
                     <div id="preset-color-swatches" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;"></div>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-                    <button class="btn btn-secondary" id="btn-delete-palette" style="color: var(--accent-danger); border-color: var(--accent-danger);" data-i18n="modal_palette_btn_delete">刪除色塊</button>
+                    <button class="btn" id="btn-delete-palette" style="color: var(--accent-danger); border-color: var(--accent-danger);" data-i18n="modal_palette_btn_delete">刪除色塊</button>
                     <button class="btn btn-primary" id="btn-save-palette" data-i18n="modal_palette_btn_save">儲存變更</button>
                 </div>
             </div>
@@ -280,7 +290,7 @@
             <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
                 <p id="confirm-modal-message" style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.5;"></p>
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                    <button class="btn btn-secondary" id="btn-confirm-cancel" data-i18n="modal_confirm_cancel">取消</button>
+                    <button class="btn" id="btn-confirm-cancel" data-i18n="modal_confirm_cancel">取消</button>
                     <button class="btn btn-primary" id="btn-confirm-ok" style="background: var(--accent-danger); border-color: var(--accent-danger);" data-i18n="modal_confirm_ok">確定刪除</button>
                 </div>
             </div>

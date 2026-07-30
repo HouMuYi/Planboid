@@ -18,8 +18,18 @@ window.PLANBOID_LANGUAGES["zh"] = {
     "header_btn_png": "PNG",
     "header_btn_png_title": "匯出全幅 PNG 圖片快照",
     "header_btn_export_json": "匯出 JSON",
+    "header_btn_export_json_title": "將方案匯出為 JSON 檔案",
     "header_btn_import_json": "匯入 JSON",
-    "header_btn_share": "分享",
+    "header_btn_import_json_title": "從本機讀取 JSON 檔案匯入",
+    "header_btn_export_clipboard": "複製文字",
+    "header_btn_export_clipboard_title": "將方案極簡文字複製至剪貼簿",
+    "header_btn_import_text": "貼上文字",
+    "header_btn_import_text_title": "貼上或輸入方案極簡文字匯入",
+
+    "prompt_import_text_title": "請貼上或輸入方案文字內容:",
+    "toast_clipboard_exported": "已成功將方案文字複製至剪貼簿！",
+    "toast_text_imported": "方案文字匯入成功！",
+    "toast_text_import_invalid": "無效的方案文字內容！",
 
     "toolbar_group_tools": "畫具",
     "toolbar_tool_floor": "繪製地塊",
@@ -85,6 +95,9 @@ window.PLANBOID_LANGUAGES["zh"] = {
     "modal_schemes_alert_import_error": "讀取檔案失敗: {error}",
     "modal_schemes_alert_share_copied": "已將全方案分享連結複製至剪貼簿！可直接傳送給他人開啟。",
     "modal_schemes_prompt_share_url": "請複製以下分享連結:",
+
+    "modal_confirm_cancel": "取消",
+    "modal_confirm_ok": "確定刪除",
 
     "modal_palette_title_edit": "編輯色塊",
     "modal_palette_title_add": "新增色塊",
