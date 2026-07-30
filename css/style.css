@@ -444,10 +444,13 @@ body {
     background: transparent;
     border: none;
     color: var(--text-primary);
-    padding: calc(6px * var(--ui-scale)) calc(10px * var(--ui-scale));
-    font-size: calc(0.75rem * var(--ui-scale));
+    padding: calc(4px * var(--ui-scale)) calc(6px * var(--ui-scale));
+    font-size: calc(0.72rem * var(--ui-scale));
+    font-weight: 500;
     cursor: pointer;
     border-radius: var(--radius-sm);
+    white-space: nowrap;
+    transition: background 0.15s ease;
 }
 
 .floor-btn:hover {
@@ -457,7 +460,8 @@ body {
 .floor-indicator {
     font-weight: 700;
     color: var(--accent-primary);
-    font-size: calc(0.9rem * var(--ui-scale));
+    font-size: calc(0.8rem * var(--ui-scale));
+    white-space: nowrap;
 }
 
 .checkbox-label {
@@ -632,6 +636,25 @@ body {
     align-items: center;
     justify-content: space-between;
     margin-bottom: 16px;
+}
+
+.select-lang {
+    background-color: var(--bg-dark);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 3px 8px;
+    font-size: calc(0.8rem * var(--ui-scale));
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 6px;
+}
+
+.select-lang:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
 }
 
 .modal-title-text {

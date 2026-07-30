@@ -1,8 +1,9 @@
 /**
- * Toolbar.js - 工具列、圖檔雙匯出與全套剪貼簿快捷鍵 (含清除地塊與清除邊線雙擦除工具)
+ * Toolbar.js - 工具列、圖檔雙匯出與全套剪貼簿快捷鍵 (平鋪 i18n 整合)
  */
 
 import { SvgExporter } from "../renderer/SvgExporter.js";
+import { i18n } from "../core/I18nManager.js";
 
 export class Toolbar {
     /**
@@ -14,7 +15,6 @@ export class Toolbar {
     }
 
     init() {
-        // 工具模式切換 (floor / wall / erase-floor / erase-wall / select)
         const toolButtons = document.querySelectorAll(".tool-btn");
         toolButtons.forEach(btn => {
             btn.addEventListener("click", () => {
@@ -48,7 +48,6 @@ export class Toolbar {
             });
         });
 
-        // 繪製形狀 (Single / Line / Box)
         document.querySelectorAll(".shape-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 document.querySelectorAll(".shape-btn").forEach(b => b.classList.remove("active"));
@@ -57,7 +56,6 @@ export class Toolbar {
             });
         });
 
-        // 圖檔匯出 (SVG & PNG)
         const btnSvg = document.getElementById("btn-export-svg");
         const btnPng = document.getElementById("btn-export-png");
 
@@ -76,7 +74,6 @@ export class Toolbar {
             a.click();
         });
 
-        // 遊戲原點
         const inputWorldX = document.getElementById("input-world-x");
         const inputWorldY = document.getElementById("input-world-y");
 
@@ -94,14 +91,12 @@ export class Toolbar {
             inputWorldY.addEventListener("change", handleOriginChange);
         }
 
-        // PZ 3D 牆面顯示開關
         const chk3DWalls = document.getElementById("chk-3d-walls");
         chk3DWalls?.addEventListener("change", (e) => {
             this.state.is3DWallsEnabled = e.target.checked;
             this.state.notifyStateChange();
         });
 
-        // 樓層控制
         const btnFloorUp = document.getElementById("floor-up");
         const btnFloorDown = document.getElementById("floor-down");
         const displayFloor = document.getElementById("current-floor-display");
@@ -110,7 +105,7 @@ export class Toolbar {
         const updateFloorDisplay = () => {
             if (displayFloor) {
                 const z = this.state.currentZLevel;
-                displayFloor.textContent = z === 0 ? "0F (地面層)" : `${z}F`;
+                displayFloor.textContent = z === 0 ? i18n.t("sidebar_floor_ground") : i18n.t("sidebar_floor_level", { z });
             }
         };
 
@@ -129,14 +124,14 @@ export class Toolbar {
             this.state.notifyStateChange();
         });
 
-        // Undo / Redo
+        window.addEventListener("langchange", updateFloorDisplay);
+
         const btnUndo = document.getElementById("btn-undo");
         const btnRedo = document.getElementById("btn-redo");
 
         btnUndo?.addEventListener("click", () => this.state.undo());
         btnRedo?.addEventListener("click", () => this.state.redo());
 
-        // 鍵盤全套快捷鍵
         window.addEventListener("keydown", (e) => {
             if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
 
@@ -152,7 +147,7 @@ export class Toolbar {
                 } else if (key === "c") {
                     e.preventDefault();
                     if (this.state.copySelection()) {
-                        alert("已將選擇範圍複製至剪貼簿 (按 Ctrl+V 貼上)");
+                        alert(i18n.t("export_copy_clipboard_success"));
                     }
                 } else if (key === "v") {
                     e.preventDefault();

@@ -1,9 +1,10 @@
 /**
- * SvgExporter.js - 向量 SVG 圖片繪出器 (共享 GeometryPipeline 幾何投影與圖例繪製)
+ * SvgExporter.js - 向量 SVG 圖片繪出器 (平鋪 i18n 圖例支援)
  */
 
 import { IsoMath } from "./IsoMath.js";
 import { GeometryPipeline } from "./GeometryPipeline.js";
+import { i18n } from "../core/I18nManager.js";
 
 export class SvgExporter {
     /**
@@ -41,7 +42,6 @@ export class SvgExporter {
         let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">\n`;
         svgContent += `<rect width="100%" height="100%" fill="#0b0f19" />\n`;
 
-        // 1. 地圖網格與圖形群組
         svgContent += `<g transform="translate(${offsetX}, ${offsetY})">\n`;
 
         svgContent += `<g stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.75">\n`;
@@ -59,10 +59,8 @@ export class SvgExporter {
 
         svgContent += `<polygon points="${p00.x},${p00.y} ${p10.x},${p10.y} ${p11.x},${p11.y} ${p01.x},${p01.y}" fill="none" stroke="rgba(99, 102, 241, 0.6)" stroke-width="2" />\n`;
 
-        // 共享 GeometryPipeline 過濾與排序
         const tilesToRender = GeometryPipeline.getSortedTilesToRender(scheme.tiles, currentZ, true);
 
-        // Pass 1: 先繪製所有地塊 (塊)
         tilesToRender.forEach(item => {
             const { x, y, z, opacity = item.alpha, tile } = item;
             const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(isoMath, x, y, z, 1.0);
@@ -73,7 +71,6 @@ export class SvgExporter {
             }
         });
 
-        // Pass 2: 將所有邊線牆體 (線) 繪製於地塊之上
         tilesToRender.forEach(item => {
             const { x, y, z, opacity = item.alpha, tile } = item;
             if (tile.walls) {
@@ -90,7 +87,6 @@ export class SvgExporter {
             }
         });
 
-        // Pass 3: 繪製所有區域標籤
         tilesToRender.forEach(item => {
             const { x, y, z, tile } = item;
             if (tile.label && z === currentZ) {
@@ -103,26 +99,29 @@ export class SvgExporter {
 
         svgContent += `</g>\n`;
 
-        // 2. 調色盤圖例
         const paletteEntries = Object.values(palette);
         if (paletteEntries.length > 0) {
             const legendX = 24;
             const legendY = 24;
             const itemHeight = 24;
-            const legendWidth = 230;
+            const legendWidth = 240;
             const legendHeight = 44 + paletteEntries.length * itemHeight;
+
+            const legendTitle = i18n.t("export_svg_legend_title");
+            const legendBlock = i18n.t("export_svg_legend_block");
+            const legendLine = i18n.t("export_svg_legend_line");
 
             svgContent += `<g transform="translate(${legendX}, ${legendY})">\n`;
             svgContent += `<rect width="${legendWidth}" height="${legendHeight}" fill="rgba(17, 24, 39, 0.88)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" rx="8" ry="8" />\n`;
-            svgContent += `<text x="12" y="22" fill="#a5b4fc" font-size="12" font-family="Inter, sans-serif" font-weight="bold">圖例 (地塊/塊 • 邊線/線)</text>\n`;
+            svgContent += `<text x="12" y="22" fill="#a5b4fc" font-size="12" font-family="Inter, sans-serif" font-weight="bold">${legendTitle}</text>\n`;
             svgContent += `<line x1="12" y1="30" x2="${legendWidth - 12}" y2="30" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" />\n`;
 
             paletteEntries.forEach((item, index) => {
                 const itemY = 48 + index * itemHeight;
                 svgContent += `<rect x="14" y="${itemY - 10}" width="12" height="12" fill="${item.color}" rx="2" ry="2" stroke="rgba(255,255,255,0.2)" stroke-width="0.5" />\n`;
-                svgContent += `<text x="29" y="${itemY}" fill="#64748b" font-size="9" font-family="Inter, sans-serif">塊</text>\n`;
+                svgContent += `<text x="29" y="${itemY}" fill="#64748b" font-size="9" font-family="Inter, sans-serif">${legendBlock}</text>\n`;
                 svgContent += `<line x1="42" y1="${itemY - 4}" x2="56" y2="${itemY - 4}" stroke="${item.color}" stroke-width="3" stroke-linecap="round" />\n`;
-                svgContent += `<text x="60" y="${itemY}" fill="#64748b" font-size="9" font-family="Inter, sans-serif">線</text>\n`;
+                svgContent += `<text x="60" y="${itemY}" fill="#64748b" font-size="9" font-family="Inter, sans-serif">${legendLine}</text>\n`;
                 svgContent += `<text x="76" y="${itemY}" fill="#e2e8f0" font-size="11" font-family="Inter, sans-serif">${item.name}</text>\n`;
             });
 

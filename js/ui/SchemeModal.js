@@ -1,8 +1,9 @@
 /**
- * SchemeModal.js - 方案管理視窗 (支援自訂尺寸動態調整、重新命名與刪除)
+ * SchemeModal.js - 方案管理視窗 (平鋪 i18n 整合)
  */
 
 import { StorageManager } from "../core/StorageManager.js";
+import { i18n } from "../core/I18nManager.js";
 
 export class SchemeModal {
     /**
@@ -29,7 +30,6 @@ export class SchemeModal {
             this.modal?.close();
         });
 
-        // 頂部方案名稱與尺寸點擊可直接修改名稱與寬高尺寸
         const activeNameEl = document.getElementById("active-scheme-name");
         const activeDimEl = document.getElementById("active-scheme-dim");
 
@@ -38,13 +38,13 @@ export class SchemeModal {
             const currentW = this.state.scheme.width;
             const currentH = this.state.scheme.height;
 
-            const newName = prompt("方案名稱:", currentName);
+            const newName = prompt(i18n.t("modal_schemes_prompt_scheme_name"), currentName);
             if (newName === null) return;
 
-            const newWStr = prompt("方案寬度 (10~300):", currentW);
+            const newWStr = prompt(i18n.t("modal_schemes_prompt_scheme_width"), currentW);
             if (newWStr === null) return;
 
-            const newHStr = prompt("方案高度 (10~300):", currentH);
+            const newHStr = prompt(i18n.t("modal_schemes_prompt_scheme_height"), currentH);
             if (newHStr === null) return;
 
             const name = newName.trim() || currentName;
@@ -58,14 +58,13 @@ export class SchemeModal {
         activeNameEl?.addEventListener("click", handleEditCurrentScheme);
         activeDimEl?.addEventListener("click", handleEditCurrentScheme);
 
-        // 建立自訂新方案 (可調名稱與尺寸)
         const btnCreate = document.getElementById("btn-create-scheme");
         const inputName = document.getElementById("new-scheme-name");
         const inputW = document.getElementById("new-scheme-width");
         const inputH = document.getElementById("new-scheme-height");
 
         btnCreate?.addEventListener("click", () => {
-            const name = inputName.value.trim() || "自訂規劃方案";
+            const name = inputName.value.trim() || i18n.t("defaults_scheme_name");
             const width = Math.max(10, Math.min(300, parseInt(inputW.value, 10) || 64));
             const height = Math.max(10, Math.min(300, parseInt(inputH.value, 10) || 64));
 
@@ -86,7 +85,6 @@ export class SchemeModal {
             this.state.notifyStateChange();
         });
 
-        // 匯出 JSON 檔案
         const btnExport = document.getElementById("btn-export");
         btnExport?.addEventListener("click", () => {
             const jsonStr = JSON.stringify(this.state.scheme, null, 2);
@@ -100,7 +98,6 @@ export class SchemeModal {
             URL.revokeObjectURL(url);
         });
 
-        // 匯入 JSON 檔案 (支援舊版相容性自動正規化)
         const btnImport = document.getElementById("btn-import");
         btnImport?.addEventListener("click", () => {
             const fileInput = document.createElement("input");
@@ -116,7 +113,7 @@ export class SchemeModal {
                     try {
                         const importedScheme = JSON.parse(event.target.result);
                         if (!importedScheme.tiles || !importedScheme.palette) {
-                            alert("無效的 Planboid JSON 方案檔案格式！");
+                            alert(i18n.t("modal_schemes_alert_import_invalid"));
                             return;
                         }
 
@@ -131,9 +128,9 @@ export class SchemeModal {
 
                         this.updateHeaderInfo();
                         this.state.notifyStateChange();
-                        alert(`成功匯入方案：「${importedScheme.name}」！`);
+                        alert(i18n.t("modal_schemes_alert_import_success", { name: importedScheme.name }));
                     } catch (err) {
-                        alert("讀取檔案失敗：" + err.message);
+                        alert(i18n.t("modal_schemes_alert_import_error", { error: err.message }));
                     }
                 };
                 reader.readAsText(file);
@@ -142,7 +139,6 @@ export class SchemeModal {
             fileInput.click();
         });
 
-        // 分享連結
         const btnShare = document.getElementById("btn-share");
         btnShare?.addEventListener("click", () => {
             const jsonStr = JSON.stringify(this.state.scheme);
@@ -150,9 +146,9 @@ export class SchemeModal {
             const shareUrl = `${location.origin}${location.pathname}#scheme=${base64}`;
 
             navigator.clipboard.writeText(shareUrl).then(() => {
-                alert("已將全方案分享連結複製至剪貼簿！可直接傳送給他人開啟。");
+                alert(i18n.t("modal_schemes_alert_share_copied"));
             }).catch(() => {
-                prompt("請複製以下分享連結：", shareUrl);
+                prompt(i18n.t("modal_schemes_prompt_share_url"), shareUrl);
             });
         });
 
@@ -207,7 +203,7 @@ export class SchemeModal {
             infoDiv.style.alignItems = "center";
             infoDiv.style.gap = "8px";
             infoDiv.innerHTML = `
-                <strong style="color: var(--text-primary); cursor: pointer;" title="點擊調整名稱與尺寸">${s.name}</strong>
+                <strong style="color: var(--text-primary); cursor: pointer;">${s.name}</strong>
                 <span style="font-size: 0.75rem; color: var(--text-muted);">(${s.width}x${s.height})</span>
             `;
 
@@ -215,16 +211,15 @@ export class SchemeModal {
             btnGroup.style.display = "flex";
             btnGroup.style.gap = "6px";
 
-            // 調整尺寸與名稱按鈕 ✏️
             const btnRename = document.createElement("button");
             btnRename.className = "btn-palette-edit";
-            btnRename.textContent = "✏️ 調整名稱/尺寸";
+            btnRename.textContent = i18n.t("modal_schemes_btn_edit_details");
             btnRename.addEventListener("click", () => {
-                const newName = prompt("請輸入方案新名稱:", s.name);
+                const newName = prompt(i18n.t("modal_schemes_prompt_scheme_name"), s.name);
                 if (newName === null) return;
-                const newWStr = prompt("方案寬度 (10~300):", s.width);
+                const newWStr = prompt(i18n.t("modal_schemes_prompt_scheme_width"), s.width);
                 if (newWStr === null) return;
-                const newHStr = prompt("方案高度 (10~300):", s.height);
+                const newHStr = prompt(i18n.t("modal_schemes_prompt_scheme_height"), s.height);
                 if (newHStr === null) return;
 
                 const name = newName.trim() || s.name;
@@ -236,10 +231,9 @@ export class SchemeModal {
                 this.updateHeaderInfo();
             });
 
-            // 切換按鈕
             const btnSwitch = document.createElement("button");
             btnSwitch.className = "btn btn-sm";
-            btnSwitch.textContent = s.id === this.state.activeSchemeId ? "使用中" : "切換";
+            btnSwitch.textContent = s.id === this.state.activeSchemeId ? i18n.t("modal_schemes_btn_using") : i18n.t("modal_schemes_btn_switch");
             btnSwitch.disabled = s.id === this.state.activeSchemeId;
             btnSwitch.addEventListener("click", () => {
                 this.state.activeSchemeId = s.id;
@@ -251,14 +245,13 @@ export class SchemeModal {
                 this.state.notifyStateChange();
             });
 
-            // 刪除按鈕 🗑️
             const btnDelete = document.createElement("button");
             btnDelete.className = "btn-palette-edit";
             btnDelete.style.color = "var(--accent-danger)";
             btnDelete.textContent = "🗑️";
-            btnDelete.title = "刪除方案";
+            btnDelete.title = i18n.t("modal_schemes_btn_delete_title");
             btnDelete.addEventListener("click", () => {
-                if (confirm(`確定要刪除方案「${s.name}」嗎？`)) {
+                if (confirm(i18n.t("modal_schemes_confirm_delete", { name: s.name }))) {
                     if (this.state.deleteScheme(s.id)) {
                         this.renderSchemeList();
                         this.updateHeaderInfo();
