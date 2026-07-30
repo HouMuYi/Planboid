@@ -6,6 +6,7 @@ import { StorageManager } from "./StorageManager.js";
 import { UISelectionState } from "./UISelectionState.js";
 import { ToolModeState } from "./ToolModeState.js";
 import { ShapeStrokeEngine } from "../renderer/ShapeStrokeEngine.js";
+import { eventBus } from "./EventBus.js";
 
 export class StateManager {
     constructor() {
@@ -404,5 +405,18 @@ export class StateManager {
             this.pushHistory();
             this.notifyStateChange();
         }
+    }
+
+    persist() {
+        StorageManager.saveData({
+            activeSchemeId: this.activeSchemeId,
+            schemes: this.schemes
+        });
+    }
+
+    notifyStateChange(eventType = "change") {
+        this.persist();
+        eventBus.emit("state:changed", { type: eventType, state: this });
+        window.dispatchEvent(new CustomEvent("statechange", { detail: { type: eventType, state: this } }));
     }
 }

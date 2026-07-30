@@ -6,6 +6,8 @@ import { StorageManager } from "../core/StorageManager.js";
 import { i18n } from "../core/I18nManager.js";
 import { ToastNotification } from "./ToastNotification.js";
 import { ConfirmModal } from "./ConfirmModal.js";
+import { SchemeSerializer } from "../core/SchemeSerializer.js";
+import { ExportCanvasPipeline } from "../renderer/ExportCanvasPipeline.js";
 
 export class SchemeModal {
     /**
@@ -106,14 +108,16 @@ export class SchemeModal {
             this.updateHeaderInfo();
         });
 
-        // 💾 匯出 JSON 檔案 (採用極簡平鋪結構)
+        // 💾 匯出 JSON 檔案 (採用極簡平鋪結構與單行元組格式)
         const btnExportJson = document.getElementById("btn-export-json") || document.getElementById("btn-export");
         btnExportJson?.addEventListener("click", () => {
-            const compactObj = SchemeModal.compactScheme(this.state.scheme);
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(compactObj, null, 2));
+            const compactObj = SchemeSerializer.serialize(this.state.scheme);
+            const formattedJsonStr = SchemeSerializer.stringifyFormatted(compactObj);
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(formattedJsonStr);
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `${this.state.scheme.name}_planboid.json`);
+            const safeName = ExportCanvasPipeline.getSafeFileName(this.state.scheme.name);
+            downloadAnchor.setAttribute("download", `${safeName}_planboid.json`);
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
@@ -148,7 +152,7 @@ export class SchemeModal {
         const btnExportClip = document.getElementById("btn-export-clipboard");
         btnExportClip?.addEventListener("click", async () => {
             try {
-                const compactObj = SchemeModal.compactScheme(this.state.scheme);
+                const compactObj = SchemeSerializer.serialize(this.state.scheme);
                 const jsonStr = JSON.stringify(compactObj);
                 await navigator.clipboard.writeText(jsonStr);
                 ToastNotification.show(i18n.t("toast_clipboard_exported") || "已成功將方案文字複製至剪貼簿！", "success");
@@ -228,7 +232,7 @@ export class SchemeModal {
     }
 
     processImportSchemeObj(rawObj) {
-        const scheme = SchemeModal.decompactScheme(rawObj);
+        const scheme = SchemeSerializer.deserialize(rawObj);
         scheme.id = "scheme_" + Date.now();
         this.state.normalizeSchemeTiles(scheme);
 
@@ -242,6 +246,12 @@ export class SchemeModal {
         this.state.activeSchemeId = scheme.id;
         this.state.scheme = scheme;
         this.state.currentZLevel = scheme.currentLevel || 0;
+
+        const paletteKeys = Object.keys(scheme.palette || {});
+        if (paletteKeys.length > 0) {
+            this.state.activeColorId = paletteKeys[0];
+        }
+
         this.state.pushHistory();
         this.state.persist();
         this.state.notifyStateChange();

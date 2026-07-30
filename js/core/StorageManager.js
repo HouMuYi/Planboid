@@ -1,14 +1,14 @@
 /**
- * StorageManager.js - 簡化預設調色盤 (道路 / 室內空間)
+ * StorageManager.js - 持久化與預設方案管理 (整合 SchemeSerializer 解碼與標準化)
  */
+
+import { SchemeSerializer } from "./SchemeSerializer.js";
 
 const STORAGE_KEY = "planboid_data_v4";
 
 export class StorageManager {
     /**
      * 取得預設方案
-     * 道路: 深灰 (#334155)
-     * 室內空間: 淺灰 (#94a3b8)
      */
     static getDefaultScheme() {
         return {
@@ -39,7 +39,11 @@ export class StorageManager {
                 this.saveData(initialData);
                 return initialData;
             }
-            return JSON.parse(jsonStr);
+            const data = JSON.parse(jsonStr);
+            if (data && Array.isArray(data.schemes)) {
+                data.schemes = data.schemes.map(s => SchemeSerializer.deserialize(s));
+            }
+            return data;
         } catch (e) {
             console.error("載入本地資料失敗，重置為預設方案:", e);
             const defaultScheme = this.getDefaultScheme();
@@ -52,6 +56,14 @@ export class StorageManager {
 
     static saveData(data) {
         try {
+            if (data && Array.isArray(data.schemes)) {
+                const serializedData = {
+                    activeSchemeId: data.activeSchemeId,
+                    schemes: data.schemes.map(s => SchemeSerializer.serialize(s))
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(serializedData));
+                return;
+            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         } catch (e) {
             console.error("寫入 localStorage 失敗:", e);

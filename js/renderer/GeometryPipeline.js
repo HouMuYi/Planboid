@@ -45,10 +45,11 @@ export class GeometryPipeline {
         const { renderX, renderY } = LevelVisualOffset.toRenderPos(x, y, z, progress);
 
         let b0, b1;
-        if (edge === "north") { b0 = isoMath.gridToScreen(renderX, renderY, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY, progress); }
-        else if (edge === "west") { b0 = isoMath.gridToScreen(renderX, renderY, progress); b1 = isoMath.gridToScreen(renderX, renderY + 1, progress); }
-        else if (edge === "east") { b0 = isoMath.gridToScreen(renderX + 1, renderY, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY + 1, progress); }
-        else if (edge === "south") { b0 = isoMath.gridToScreen(renderX, renderY + 1, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY + 1, progress); }
+        const e = String(edge || "").toLowerCase();
+        if (e === "north" || e === "n") { b0 = isoMath.gridToScreen(renderX, renderY, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY, progress); }
+        else if (e === "west" || e === "w") { b0 = isoMath.gridToScreen(renderX, renderY, progress); b1 = isoMath.gridToScreen(renderX, renderY + 1, progress); }
+        else if (e === "east" || e === "e") { b0 = isoMath.gridToScreen(renderX + 1, renderY, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY + 1, progress); }
+        else if (e === "south" || e === "s") { b0 = isoMath.gridToScreen(renderX, renderY + 1, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY + 1, progress); }
 
         if (!b0 || !b1) return null;
 
@@ -76,7 +77,7 @@ export class GeometryPipeline {
             if (!isCurrent && !ghostEnabled) return;
 
             const dist = Math.abs(z - currentZ);
-            const alpha = isCurrent ? 1.0 : Math.max(0.04, 0.22 / (dist * 1.2));
+            const alpha = isCurrent ? 1.0 : Math.max(0.08, 0.35 / (dist * 1.1));
             const desatFactor = isCurrent ? 0.0 : 0.75;
 
             Object.entries(tiles).forEach(([key, tile]) => {

@@ -60,8 +60,8 @@ window.PLANBOID_LANGUAGES["en"] = {
     "sidebar_btn_toggle_title": "Toggle Sidebar Drawer",
     "sidebar_floor_control_title": "Floor Control (Z-Level)",
     "sidebar_floor_up": "▲ Up",
-    "sidebar_floor_down": "▼ Down",
-    "sidebar_toggle_ghost_layer": "Ghost Layer (All Floors)",
+    "sidebar_floor_down": "▼ Lower",
+    "sidebar_toggle_ghost_layer": "Show Other Floors",
     "sidebar_palette_title": "Palette",
     "sidebar_btn_add_palette": "+ Add Color",
     "sidebar_label_title": "Area Labels",
@@ -114,5 +114,12 @@ window.PLANBOID_LANGUAGES["en"] = {
 
     "defaults_scheme_name": "Default Scheme",
     "defaults_palette_road": "Road / Exterior",
-    "defaults_palette_indoor": "Indoor Space"
+    "defaults_palette_indoor": "Indoor Space",
+
+    "toast_scheme_created": "New scheme created!",
+    "toast_scheme_imported": "Scheme imported successfully!",
+    "toast_clipboard_exported": "Scheme text copied to clipboard!",
+    "toast_text_imported": "Scheme text imported successfully!",
+    "toast_text_import_invalid": "Invalid scheme text payload!",
+    "toast_scheme_deleted": "Scheme deleted"
 };

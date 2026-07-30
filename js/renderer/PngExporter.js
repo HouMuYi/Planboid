@@ -5,6 +5,7 @@
 import { i18n } from "../core/I18nManager.js";
 import { IsoMath } from "./IsoMath.js";
 import { GeometryPipeline } from "./GeometryPipeline.js";
+import { ExportCanvasPipeline } from "./ExportCanvasPipeline.js";
 
 export class PngExporter {
     /**
@@ -183,23 +184,21 @@ export class PngExporter {
             }
         });
 
-        ctx.restore(); // 恢復包覆相機矩陣
+        // 結束地塊與牆面相機變換矩陣
+        ctx.restore();
 
-        // 4. 繪製浮動質感圖例面板
-        if (paletteEntries.length > 0) {
-            const legendX = 24;
-            const legendY = 24;
-            const itemHeight = 24;
-            const legendWidth = 240;
-            const legendHeight = 44 + paletteEntries.length * itemHeight;
+        // 4. Pass 4: 繪製全新 1.2x 大色塊 [色塊]: [名稱] 圖例 (固定於圖片絕對左上角)
+        const legendData = ExportCanvasPipeline.getLegendLayoutData(palette);
+        if (legendData) {
+            const { x: legendX, y: legendY, width: legendWidth, height: legendHeight, swWidth, swHeight, itemHeight, headerHeight, title, items } = legendData;
 
             ctx.fillStyle = "rgba(17, 24, 39, 0.92)";
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+            ctx.lineWidth = 1.2;
 
             if (ctx.roundRect) {
                 ctx.beginPath();
-                ctx.roundRect(legendX, legendY, legendWidth, legendHeight, 8);
+                ctx.roundRect(legendX, legendY, legendWidth, legendHeight, 10);
                 ctx.fill();
                 ctx.stroke();
             } else {
@@ -207,59 +206,47 @@ export class PngExporter {
                 ctx.strokeRect(legendX, legendY, legendWidth, legendHeight);
             }
 
-            const legendTitle = i18n.t("export_svg_legend_title");
             ctx.fillStyle = "#a5b4fc";
-            ctx.font = "bold 12px Inter, sans-serif";
+            ctx.font = "bold 14px Inter, sans-serif";
             ctx.textBaseline = "middle";
-            ctx.fillText(legendTitle, legendX + 12, legendY + 18);
+            ctx.fillText(title, legendX + 18, legendY + 24);
 
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(legendX + 12, legendY + 30);
-            ctx.lineTo(legendX + legendWidth - 12, legendY + 30);
+            ctx.moveTo(legendX + 18, legendY + 38);
+            ctx.lineTo(legendX + legendWidth - 18, legendY + 38);
             ctx.stroke();
 
-            const legendBlock = i18n.t("export_svg_legend_block");
-            const legendLine = i18n.t("export_svg_legend_line");
+            items.forEach(item => {
+                const itemY = legendY + headerHeight + item.index * itemHeight;
 
-            paletteEntries.forEach((item, index) => {
-                const itemY = legendY + 46 + index * itemHeight;
-
+                // 3em 大色塊
                 ctx.fillStyle = item.color;
-                ctx.fillRect(legendX + 14, itemY - 6, 12, 12);
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-                ctx.lineWidth = 0.5;
-                ctx.strokeRect(legendX + 14, itemY - 6, 12, 12);
+                if (ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(legendX + 18, itemY - 7, swWidth, swHeight, 3);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(legendX + 18, itemY - 7, swWidth, swHeight);
+                }
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(legendX + 18, itemY - 7, swWidth, swHeight);
 
-                ctx.fillStyle = "#64748b";
-                ctx.font = "9px Inter, sans-serif";
-                ctx.fillText(legendBlock, legendX + 29, itemY);
-
-                ctx.strokeStyle = item.color;
-                ctx.lineWidth = 3;
-                ctx.lineCap = "round";
-                ctx.beginPath();
-                ctx.moveTo(legendX + 42, itemY);
-                ctx.lineTo(legendX + 56, itemY);
-                ctx.stroke();
-
-                ctx.fillStyle = "#64748b";
-                ctx.font = "9px Inter, sans-serif";
-                ctx.fillText(legendLine, legendX + 60, itemY);
-
+                // 冒號與名稱
                 ctx.fillStyle = "#e2e8f0";
-                ctx.font = "11px Inter, sans-serif";
-                ctx.fillText(item.name, legendX + 76, itemY);
+                ctx.font = "600 13px Inter, sans-serif";
+                ctx.fillText(`: ${item.name}`, legendX + 18 + swWidth + 10, itemY);
             });
         }
-
-        ctx.restore();
 
         // 5. 匯出 PNG 並下載
         const url = offCanvas.toDataURL("image/png");
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${scheme.name}_blueprint_planboid.png`;
+        const safeFileName = ExportCanvasPipeline.getSafeFileName(scheme.name);
+        a.download = `${safeFileName}_blueprint_planboid.png`;
         a.click();
     }
 

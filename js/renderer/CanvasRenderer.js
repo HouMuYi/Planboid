@@ -331,8 +331,9 @@ export class CanvasRenderer {
         const ctx = this.ctx;
         let p0, p1;
 
-        if (edge === "north") { p0 = this.getScreenPos(x, y, z); p1 = this.getScreenPos(x + 1, y, z); }
-        else if (edge === "west") { p0 = this.getScreenPos(x, y, z); p1 = this.getScreenPos(x, y + 1, z); }
+        const e = String(edge || "").toLowerCase();
+        if (e === "north" || e === "n") { p0 = this.getScreenPos(x, y, z); p1 = this.getScreenPos(x + 1, y, z); }
+        else if (e === "west" || e === "w") { p0 = this.getScreenPos(x, y, z); p1 = this.getScreenPos(x, y + 1, z); }
 
         if (!p0 || !p1) return;
 

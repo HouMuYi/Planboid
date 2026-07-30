@@ -60,8 +60,8 @@ window.PLANBOID_LANGUAGES["zh"] = {
     "sidebar_btn_toggle_title": "摺疊/展開側邊欄",
     "sidebar_floor_control_title": "樓層控制 (Z-Level)",
     "sidebar_floor_up": "▲ 上層",
-    "sidebar_floor_down": "▼ 下層",
-    "sidebar_toggle_ghost_layer": "全樓層動態鬼影 (Ghost Layer)",
+    "sidebar_floor_down": "▼ 下一層",
+    "sidebar_toggle_ghost_layer": "顯示其他樓層",
     "sidebar_palette_title": "通用調色盤",
     "sidebar_btn_add_palette": "+ 新增色塊",
     "sidebar_label_title": "區域與標籤 (Label)",
@@ -114,5 +114,12 @@ window.PLANBOID_LANGUAGES["zh"] = {
 
     "defaults_scheme_name": "預設規劃方案",
     "defaults_palette_road": "道路 / 室外",
-    "defaults_palette_indoor": "室內空間"
+    "defaults_palette_indoor": "室內空間",
+
+    "toast_scheme_created": "新方案建立成功！",
+    "toast_scheme_imported": "方案匯入成功！",
+    "toast_clipboard_exported": "已成功將方案文字複製至剪貼簿！",
+    "toast_text_imported": "已成功匯入方案文字！",
+    "toast_text_import_invalid": "無效的方案文字內容！",
+    "toast_scheme_deleted": "方案已刪除"
 };
