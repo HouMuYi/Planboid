@@ -24,12 +24,12 @@ export class BrushActionApplicator {
         if (tool === "pencil") {
             if (brushType === "floor") {
                 this.state.setTileFloor(x, y, colorId);
-            } else if (brushType === "wall") {
+            } else if (brushType === "wall" && edge) {
                 this.state.setTileWall(x, y, edge, colorId);
             }
         } else if (tool === "erase-floor") {
             this.state.removeFloor(x, y);
-        } else if (tool === "erase-wall") {
+        } else if (tool === "erase-wall" && edge) {
             this.state.removeWall(x, y, edge);
         }
         this.state.notifyStateChange();
@@ -43,7 +43,9 @@ export class BrushActionApplicator {
         const tool = this.state.activeTool;
 
         if (brushType === "wall" || tool === "erase-wall") {
-            this.state.removeWall(x, y, edge);
+            if (edge) {
+                this.state.removeWall(x, y, edge);
+            }
         } else {
             this.state.removeFloor(x, y);
         }

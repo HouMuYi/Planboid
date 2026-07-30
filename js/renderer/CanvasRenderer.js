@@ -193,9 +193,11 @@ export class CanvasRenderer {
         } else if (this.hoveredCell.x >= 0 && this.hoveredCell.x <= this.state.scheme.width &&
                    this.hoveredCell.y >= 0 && this.hoveredCell.y <= this.state.scheme.height) {
             const isWallMode = (this.state.brushType === "wall" || this.state.activeTool === "erase-wall");
-            if (isWallMode && this.hoveredCell.edge && this.state.activeTool !== "select") {
-                const norm = ShapeStrokeEngine.normalizeWallEdge(this.hoveredCell.x, this.hoveredCell.y, this.hoveredCell.edge);
-                this.drawWallHighlight(norm.x, norm.y, norm.edge);
+            if (isWallMode) {
+                if (this.hoveredCell.edge && this.state.activeTool !== "select") {
+                    const norm = ShapeStrokeEngine.normalizeWallEdge(this.hoveredCell.x, this.hoveredCell.y, this.hoveredCell.edge);
+                    this.drawWallHighlight(norm.x, norm.y, norm.edge);
+                }
             } else if (this.hoveredCell.x < this.state.scheme.width && this.hoveredCell.y < this.state.scheme.height) {
                 this.drawCellHighlight(this.hoveredCell.x, this.hoveredCell.y, this.state.currentZLevel, "rgba(99, 102, 241, 0.35)", "#6366f1", 1.5);
             }

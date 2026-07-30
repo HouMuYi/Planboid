@@ -38,12 +38,17 @@ export class InputDispatcher {
         const localX = res.gridX - res.cellX;
         const localY = res.gridY - res.cellY;
 
-        let edge = "north";
-        if (localY < 0.25) edge = "north";
-        else if (localY > 0.75) edge = "south";
-        else if (localX < 0.25) edge = "west";
-        else if (localX > 0.75) edge = "east";
-        else edge = (localY < localX) ? "north" : "west";
+        let edge = null;
+        // 邊緣吸附需在 25% 帶內，且必須位於邊長度方向的中央 50% (0.25 ~ 0.75，忽略兩端各 25% 角落交錯區)
+        if (localY < 0.25 && localX >= 0.25 && localX <= 0.75) {
+            edge = "north";
+        } else if (localY > 0.75 && localX >= 0.25 && localX <= 0.75) {
+            edge = "south";
+        } else if (localX < 0.25 && localY >= 0.25 && localY <= 0.75) {
+            edge = "west";
+        } else if (localX > 0.75 && localY >= 0.25 && localY <= 0.75) {
+            edge = "east";
+        }
 
         return { cellX: logicX, cellY: logicY, edge };
     }
