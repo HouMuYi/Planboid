@@ -158,11 +158,11 @@
                     <div class="panel-section floor-control-section">
                         <h3 class="section-title" data-i18n="sidebar_floor_control_title">樓層控制 (Z-Level)</h3>
                         <div class="floor-selector">
-                            <button class="floor-btn" id="floor-up" data-i18n="sidebar_floor_up">▲ 往上一層</button>
+                            <button class="floor-btn" id="floor-up" data-i18n="sidebar_floor_up">▲ 上一層</button>
                             <div class="floor-indicator">
-                                <span class="floor-label" id="current-floor-display" data-i18n="sidebar_floor_ground">0F (地面層)</span>
+                                <span class="floor-label" id="current-floor-display" data-i18n="sidebar_floor_ground">0F (地面)</span>
                             </div>
-                            <button class="floor-btn" id="floor-down" data-i18n="sidebar_floor_down">▼ 往下一層</button>
+                            <button class="floor-btn" id="floor-down" data-i18n="sidebar_floor_down">▼ 下一層</button>
                         </div>
                         <label class="checkbox-label">
                             <input type="checkbox" id="chk-ghost-layer" checked>
@@ -172,6 +172,7 @@
 
                     <div class="divider"></div>
 
+                    <!-- 調色盤區塊：彈性延伸佔據主要剩餘空間 -->
                     <div class="panel-section palette-section">
                         <div class="section-header">
                             <h3 class="section-title" data-i18n="sidebar_palette_title">通用調色盤</h3>
@@ -182,6 +183,7 @@
 
                     <div class="divider"></div>
 
+                    <!-- 區域與標籤區塊：固定觸底 -->
                     <div class="panel-section label-section">
                         <div class="section-header">
                             <h3 class="section-title" data-i18n="sidebar_label_title">區域與標籤 (Label)</h3>
@@ -210,7 +212,7 @@
         </div>
     </dialog>
 
-    <!-- 方案管理 Modal -->
+    <!-- 方案管理 Modal (與建立/編輯方案同 UI 盒體) -->
     <dialog class="app-modal" id="modal-schemes">
         <div class="modal-content panel" style="width: min(560px, 90vw);">
             <div class="modal-header">
@@ -218,15 +220,20 @@
                 <button class="btn-close" id="btn-close-scheme-modal">✕</button>
             </div>
             <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- 方案編輯/建立盒體 -->
                 <div class="scheme-create-box" style="background: var(--bg-dark); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--accent-primary);" data-i18n="modal_schemes_create_title">建立自訂新方案</span>
+                    <input type="hidden" id="scheme-editor-id" value="">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span id="scheme-editor-title" style="font-size: 0.85rem; font-weight: 600; color: var(--accent-primary);" data-i18n="modal_schemes_create_title">建立自訂新方案</span>
+                        <button id="btn-cancel-scheme-editor" class="btn btn-sm btn-secondary" style="display: none; font-size: 0.75rem;" data-i18n="modal_schemes_btn_cancel_edit">取消編輯</button>
+                    </div>
                     <div style="display: flex; gap: 8px;">
                         <input type="text" id="new-scheme-name" class="input-text" data-i18n-placeholder="modal_schemes_name_placeholder" placeholder="方案名稱" style="flex: 2;">
                         <input type="number" id="new-scheme-width" class="input-text" data-i18n-placeholder="modal_schemes_width_placeholder" placeholder="寬" value="64" style="flex: 1;">
                         <span style="align-self: center; color: var(--text-muted);">x</span>
                         <input type="number" id="new-scheme-height" class="input-text" data-i18n-placeholder="modal_schemes_height_placeholder" placeholder="高" value="64" style="flex: 1;">
                     </div>
-                    <button class="btn btn-primary" id="btn-create-scheme" style="width: 100%;" data-i18n="modal_schemes_btn_create">建立新方案</button>
+                    <button class="btn btn-primary" id="btn-save-scheme-editor" style="width: 100%;" data-i18n="modal_schemes_btn_create">建立新方案</button>
                 </div>
                 <ul class="scheme-list" id="scheme-list-container"></ul>
             </div>
@@ -253,6 +260,23 @@
                 <div style="display: flex; justify-content: space-between; margin-top: 10px;">
                     <button class="btn btn-secondary" id="btn-delete-palette" style="color: var(--accent-danger); border-color: var(--accent-danger);" data-i18n="modal_palette_btn_delete">刪除色塊</button>
                     <button class="btn btn-primary" id="btn-save-palette" data-i18n="modal_palette_btn_save">儲存變更</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 全站通用二次確認 Modal (替代原生 confirm) -->
+    <dialog class="app-modal" id="modal-confirm">
+        <div class="modal-content panel" style="width: min(400px, 90vw);">
+            <div class="modal-header">
+                <h2 id="confirm-modal-title" style="font-size: 1.1rem; color: var(--accent-danger);">⚠️ 操作確認</h2>
+                <button class="btn-close" id="btn-close-confirm-modal">✕</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+                <p id="confirm-modal-message" style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.5;"></p>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="btn btn-secondary" id="btn-confirm-cancel" data-i18n="modal_confirm_cancel">取消</button>
+                    <button class="btn btn-primary" id="btn-confirm-ok" style="background: var(--accent-danger); border-color: var(--accent-danger);" data-i18n="modal_confirm_ok">確定刪除</button>
                 </div>
             </div>
         </div>

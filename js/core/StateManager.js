@@ -185,7 +185,6 @@ export class StateManager {
 
     deleteScheme(id) {
         if (this.schemes.length <= 1) {
-            alert("必須保留至少一個方案！");
             return false;
         }
         this.schemes = this.schemes.filter(s => s.id !== id);

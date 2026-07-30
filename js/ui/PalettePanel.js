@@ -1,8 +1,9 @@
 /**
- * PalettePanel.js - 通用調色盤 (平鋪 i18n 整合)
+ * PalettePanel.js - 通用調色盤 (支援拖曳排序與零原生彈窗)
  */
 
 import { i18n } from "../core/I18nManager.js";
+import { ConfirmModal } from "./ConfirmModal.js";
 
 export class PalettePanel {
     /**
@@ -21,6 +22,8 @@ export class PalettePanel {
         this.editNameInput = document.getElementById("edit-palette-name");
         this.editColorInput = document.getElementById("edit-palette-color");
         this.btnDeletePalette = document.getElementById("btn-delete-palette");
+
+        this.draggedKey = null;
 
         this.init();
     }
@@ -73,11 +76,15 @@ export class PalettePanel {
             this.editModal?.close();
         });
 
-        this.btnDeletePalette?.addEventListener("click", () => {
+        // 二次確認零原生彈窗刪除色塊
+        this.btnDeletePalette?.addEventListener("click", async () => {
             const id = this.editIdInput.value;
-            if (id && confirm("確定要刪除此色塊嗎？")) {
-                this.state.deletePaletteItem(id);
-                this.editModal?.close();
+            if (id) {
+                const confirmed = await ConfirmModal.show(i18n.t("modal_palette_confirm_delete", {}, "zh") || "確定要刪除此色塊嗎？");
+                if (confirmed) {
+                    this.state.deletePaletteItem(id);
+                    this.editModal?.close();
+                }
             }
         });
 
@@ -141,6 +148,8 @@ export class PalettePanel {
             const isSelected = (id === this.state.activeColorId);
             const div = document.createElement("div");
             div.className = `palette-item ${isSelected ? "active" : ""}`;
+            div.setAttribute("draggable", "true");
+            div.dataset.id = id;
 
             const swatch = document.createElement("div");
             swatch.className = "palette-swatch";
@@ -163,6 +172,38 @@ export class PalettePanel {
             div.appendChild(name);
             div.appendChild(btnEdit);
 
+            // 拖曳事件綁定
+            div.addEventListener("dragstart", (e) => {
+                this.draggedKey = id;
+                div.classList.add("dragging");
+                e.dataTransfer.effectAllowed = "move";
+            });
+
+            div.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                if (this.draggedKey && this.draggedKey !== id) {
+                    div.classList.add("drag-over");
+                }
+            });
+
+            div.addEventListener("dragleave", () => {
+                div.classList.remove("drag-over");
+            });
+
+            div.addEventListener("drop", (e) => {
+                e.preventDefault();
+                div.classList.remove("drag-over");
+                if (this.draggedKey && this.draggedKey !== id) {
+                    this.reorderPalette(this.draggedKey, id);
+                }
+            });
+
+            div.addEventListener("dragend", () => {
+                div.classList.remove("dragging");
+                document.querySelectorAll(".palette-item").forEach(el => el.classList.remove("drag-over"));
+                this.draggedKey = null;
+            });
+
             div.addEventListener("click", () => {
                 this.state.activeColorId = id;
                 if (this.state.activeTool === "select") {
@@ -174,6 +215,27 @@ export class PalettePanel {
 
             this.container.appendChild(div);
         });
+    }
+
+    reorderPalette(sourceId, targetId) {
+        const palette = this.state.scheme.palette;
+        const keys = Object.keys(palette);
+        const sourceIndex = keys.indexOf(sourceId);
+        const targetIndex = keys.indexOf(targetId);
+
+        if (sourceIndex === -1 || targetIndex === -1) return;
+
+        keys.splice(sourceIndex, 1);
+        keys.splice(targetIndex, 0, sourceId);
+
+        const newPalette = {};
+        keys.forEach(k => {
+            newPalette[k] = palette[k];
+        });
+
+        this.state.scheme.palette = newPalette;
+        this.state.pushHistory();
+        this.state.notifyStateChange();
     }
 
     openAddModal() {

@@ -4,6 +4,7 @@
 
 import { SvgExporter } from "../renderer/SvgExporter.js";
 import { i18n } from "../core/I18nManager.js";
+import { ToastNotification } from "./ToastNotification.js";
 
 export class Toolbar {
     /**
@@ -147,7 +148,7 @@ export class Toolbar {
                 } else if (key === "c") {
                     e.preventDefault();
                     if (this.state.copySelection()) {
-                        alert(i18n.t("export_copy_clipboard_success"));
+                        ToastNotification.show(i18n.t("export_copy_clipboard_success"));
                     }
                 } else if (key === "v") {
                     e.preventDefault();

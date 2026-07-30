@@ -1,9 +1,11 @@
 /**
- * SchemeModal.js - 方案管理視窗 (平鋪 i18n 整合)
+ * SchemeModal.js - 方案管理視窗 (零原生彈窗，與建立/編輯方案同 UI 盒體)
  */
 
 import { StorageManager } from "../core/StorageManager.js";
 import { i18n } from "../core/I18nManager.js";
+import { ToastNotification } from "./ToastNotification.js";
+import { ConfirmModal } from "./ConfirmModal.js";
 
 export class SchemeModal {
     /**
@@ -14,6 +16,17 @@ export class SchemeModal {
         this.modal = document.getElementById("modal-schemes");
         this.schemeListContainer = document.getElementById("scheme-list-container");
 
+        // 方案編輯/建立盒體控制元素
+        this.editorIdInput = document.getElementById("scheme-editor-id");
+        this.editorTitle = document.getElementById("scheme-editor-title");
+        this.btnCancelEdit = document.getElementById("btn-cancel-scheme-editor");
+        this.inputName = document.getElementById("new-scheme-name");
+        this.inputW = document.getElementById("new-scheme-width");
+        this.inputH = document.getElementById("new-scheme-height");
+        this.btnSaveEditor = document.getElementById("btn-save-scheme-editor");
+
+        this.editingSchemeId = null; // null 表示建立新方案模式
+
         this.init();
     }
 
@@ -22,6 +35,7 @@ export class SchemeModal {
         const btnCloseModal = document.getElementById("btn-close-scheme-modal");
 
         btnOpenModal?.addEventListener("click", () => {
+            this.resetEditorToCreateMode();
             this.renderSchemeList();
             this.modal?.showModal();
         });
@@ -30,61 +44,57 @@ export class SchemeModal {
             this.modal?.close();
         });
 
+        // 頂部方案名稱與尺寸點擊直接切換為編輯模式並開啟 Modal
         const activeNameEl = document.getElementById("active-scheme-name");
         const activeDimEl = document.getElementById("active-scheme-dim");
 
-        const handleEditCurrentScheme = () => {
-            const currentName = this.state.scheme.name;
-            const currentW = this.state.scheme.width;
-            const currentH = this.state.scheme.height;
-
-            const newName = prompt(i18n.t("modal_schemes_prompt_scheme_name"), currentName);
-            if (newName === null) return;
-
-            const newWStr = prompt(i18n.t("modal_schemes_prompt_scheme_width"), currentW);
-            if (newWStr === null) return;
-
-            const newHStr = prompt(i18n.t("modal_schemes_prompt_scheme_height"), currentH);
-            if (newHStr === null) return;
-
-            const name = newName.trim() || currentName;
-            const w = Math.max(10, Math.min(300, parseInt(newWStr, 10) || currentW));
-            const h = Math.max(10, Math.min(300, parseInt(newHStr, 10) || currentH));
-
-            this.state.updateSchemeDetails(this.state.scheme.id, name, w, h);
-            this.updateHeaderInfo();
+        const handleOpenCurrentSchemeEdit = () => {
+            this.setEditorToEditMode(this.state.scheme.id);
+            this.renderSchemeList();
+            this.modal?.showModal();
         };
 
-        activeNameEl?.addEventListener("click", handleEditCurrentScheme);
-        activeDimEl?.addEventListener("click", handleEditCurrentScheme);
+        activeNameEl?.addEventListener("click", handleOpenCurrentSchemeEdit);
+        activeDimEl?.addEventListener("click", handleOpenCurrentSchemeEdit);
 
-        const btnCreate = document.getElementById("btn-create-scheme");
-        const inputName = document.getElementById("new-scheme-name");
-        const inputW = document.getElementById("new-scheme-width");
-        const inputH = document.getElementById("new-scheme-height");
+        // 取消編輯按鈕
+        this.btnCancelEdit?.addEventListener("click", () => {
+            this.resetEditorToCreateMode();
+        });
 
-        btnCreate?.addEventListener("click", () => {
-            const name = inputName.value.trim() || i18n.t("defaults_scheme_name");
-            const width = Math.max(10, Math.min(300, parseInt(inputW.value, 10) || 64));
-            const height = Math.max(10, Math.min(300, parseInt(inputH.value, 10) || 64));
+        // 建立或儲存方案按鈕 (同 UI 盒體)
+        this.btnSaveEditor?.addEventListener("click", () => {
+            const name = this.inputName.value.trim() || i18n.t("defaults_scheme_name");
+            const width = Math.max(10, Math.min(300, parseInt(this.inputW.value, 10) || 64));
+            const height = Math.max(10, Math.min(300, parseInt(this.inputH.value, 10) || 64));
 
-            const newScheme = StorageManager.getDefaultScheme();
-            newScheme.name = name;
-            newScheme.width = width;
-            newScheme.height = height;
+            if (!this.editingSchemeId) {
+                // 建立新方案模式
+                const newScheme = StorageManager.getDefaultScheme();
+                newScheme.name = name;
+                newScheme.width = width;
+                newScheme.height = height;
 
-            this.state.schemes.push(newScheme);
-            this.state.activeSchemeId = newScheme.id;
-            this.state.scheme = newScheme;
-            this.state.currentZLevel = 0;
-            this.state.pushHistory();
+                this.state.schemes.push(newScheme);
+                this.state.activeSchemeId = newScheme.id;
+                this.state.scheme = newScheme;
+                this.state.currentZLevel = 0;
+                this.state.pushHistory();
 
-            inputName.value = "";
+                ToastNotification.show(i18n.t("modal_schemes_alert_create_success", {}, "zh") || `已成功建立方案：「${name}」！`, "success");
+            } else {
+                // 編輯既有方案模式
+                this.state.updateSchemeDetails(this.editingSchemeId, name, width, height);
+                ToastNotification.show(i18n.t("modal_schemes_alert_save_success", {}, "zh") || `已更新方案：「${name}」！`, "success");
+            }
+
+            this.resetEditorToCreateMode();
             this.renderSchemeList();
             this.updateHeaderInfo();
             this.state.notifyStateChange();
         });
 
+        // 匯出 JSON 檔案
         const btnExport = document.getElementById("btn-export");
         btnExport?.addEventListener("click", () => {
             const jsonStr = JSON.stringify(this.state.scheme, null, 2);
@@ -96,8 +106,10 @@ export class SchemeModal {
             a.download = `${this.state.scheme.name}_planboid.json`;
             a.click();
             URL.revokeObjectURL(url);
+            ToastNotification.show("已匯出方案 JSON 檔案！");
         });
 
+        // 匯入 JSON 檔案
         const btnImport = document.getElementById("btn-import");
         btnImport?.addEventListener("click", () => {
             const fileInput = document.createElement("input");
@@ -113,7 +125,7 @@ export class SchemeModal {
                     try {
                         const importedScheme = JSON.parse(event.target.result);
                         if (!importedScheme.tiles || !importedScheme.palette) {
-                            alert(i18n.t("modal_schemes_alert_import_invalid"));
+                            ToastNotification.show(i18n.t("modal_schemes_alert_import_invalid"), "error");
                             return;
                         }
 
@@ -128,9 +140,9 @@ export class SchemeModal {
 
                         this.updateHeaderInfo();
                         this.state.notifyStateChange();
-                        alert(i18n.t("modal_schemes_alert_import_success", { name: importedScheme.name }));
+                        ToastNotification.show(i18n.t("modal_schemes_alert_import_success", { name: importedScheme.name }), "success");
                     } catch (err) {
-                        alert(i18n.t("modal_schemes_alert_import_error", { error: err.message }));
+                        ToastNotification.show(i18n.t("modal_schemes_alert_import_error", { error: err.message }), "error");
                     }
                 };
                 reader.readAsText(file);
@@ -139,6 +151,7 @@ export class SchemeModal {
             fileInput.click();
         });
 
+        // 分享連結 (ToastNotification 提示，無原生 alert/prompt)
         const btnShare = document.getElementById("btn-share");
         btnShare?.addEventListener("click", () => {
             const jsonStr = JSON.stringify(this.state.scheme);
@@ -146,14 +159,42 @@ export class SchemeModal {
             const shareUrl = `${location.origin}${location.pathname}#scheme=${base64}`;
 
             navigator.clipboard.writeText(shareUrl).then(() => {
-                alert(i18n.t("modal_schemes_alert_share_copied"));
+                ToastNotification.show(i18n.t("modal_schemes_alert_share_copied"), "success");
             }).catch(() => {
-                prompt(i18n.t("modal_schemes_prompt_share_url"), shareUrl);
+                ToastNotification.show("無法自動寫入剪貼簿，請查看控制台網址", "error");
+                console.log("Planboid 分享網址:", shareUrl);
             });
         });
 
         this.checkUrlHashImport();
         this.updateHeaderInfo();
+    }
+
+    resetEditorToCreateMode() {
+        this.editingSchemeId = null;
+        if (this.editorIdInput) this.editorIdInput.value = "";
+        if (this.editorTitle) this.editorTitle.textContent = i18n.t("modal_schemes_create_title");
+        if (this.btnSaveEditor) this.btnSaveEditor.textContent = i18n.t("modal_schemes_btn_create");
+        if (this.btnCancelEdit) this.btnCancelEdit.style.display = "none";
+
+        if (this.inputName) this.inputName.value = "";
+        if (this.inputW) this.inputW.value = 64;
+        if (this.inputH) this.inputH.value = 64;
+    }
+
+    setEditorToEditMode(schemeId) {
+        const target = this.state.schemes.find(s => s.id === schemeId);
+        if (!target) return;
+
+        this.editingSchemeId = schemeId;
+        if (this.editorIdInput) this.editorIdInput.value = schemeId;
+        if (this.editorTitle) this.editorTitle.textContent = i18n.t("modal_schemes_edit_title", {}, "zh") || "編輯方案";
+        if (this.btnSaveEditor) this.btnSaveEditor.textContent = i18n.t("modal_palette_btn_save", {}, "zh") || "儲存變更";
+        if (this.btnCancelEdit) this.btnCancelEdit.style.display = "inline-flex";
+
+        if (this.inputName) this.inputName.value = target.name;
+        if (this.inputW) this.inputW.value = target.width;
+        if (this.inputH) this.inputH.value = target.height;
     }
 
     checkUrlHashImport() {
@@ -189,14 +230,15 @@ export class SchemeModal {
         this.schemeListContainer.innerHTML = "";
 
         this.state.schemes.forEach(s => {
+            const isEditingThis = (this.editingSchemeId === s.id);
             const li = document.createElement("li");
             li.style.display = "flex";
             li.style.alignItems = "center";
             li.style.justifyContent = "space-between";
             li.style.padding = "10px 14px";
-            li.style.backgroundColor = s.id === this.state.activeSchemeId ? "rgba(99,102,241,0.2)" : "var(--bg-dark)";
+            li.style.backgroundColor = isEditingThis ? "rgba(245,158,11,0.18)" : (s.id === this.state.activeSchemeId ? "rgba(99,102,241,0.2)" : "var(--bg-dark)");
             li.style.borderRadius = "var(--radius-sm)";
-            li.style.border = s.id === this.state.activeSchemeId ? "1px solid var(--accent-primary)" : "1px solid var(--border-color)";
+            li.style.border = isEditingThis ? "1px solid var(--accent-secondary)" : (s.id === this.state.activeSchemeId ? "1px solid var(--accent-primary)" : "1px solid var(--border-color)");
 
             const infoDiv = document.createElement("div");
             infoDiv.style.display = "flex";
@@ -211,26 +253,16 @@ export class SchemeModal {
             btnGroup.style.display = "flex";
             btnGroup.style.gap = "6px";
 
+            // 編輯按鈕 (切換同 UI 盒體)
             const btnRename = document.createElement("button");
             btnRename.className = "btn-palette-edit";
             btnRename.textContent = i18n.t("modal_schemes_btn_edit_details");
             btnRename.addEventListener("click", () => {
-                const newName = prompt(i18n.t("modal_schemes_prompt_scheme_name"), s.name);
-                if (newName === null) return;
-                const newWStr = prompt(i18n.t("modal_schemes_prompt_scheme_width"), s.width);
-                if (newWStr === null) return;
-                const newHStr = prompt(i18n.t("modal_schemes_prompt_scheme_height"), s.height);
-                if (newHStr === null) return;
-
-                const name = newName.trim() || s.name;
-                const w = Math.max(10, Math.min(300, parseInt(newWStr, 10) || s.width));
-                const h = Math.max(10, Math.min(300, parseInt(newHStr, 10) || s.height));
-
-                this.state.updateSchemeDetails(s.id, name, w, h);
+                this.setEditorToEditMode(s.id);
                 this.renderSchemeList();
-                this.updateHeaderInfo();
             });
 
+            // 切換按鈕
             const btnSwitch = document.createElement("button");
             btnSwitch.className = "btn btn-sm";
             btnSwitch.textContent = s.id === this.state.activeSchemeId ? i18n.t("modal_schemes_btn_using") : i18n.t("modal_schemes_btn_switch");
@@ -245,16 +277,25 @@ export class SchemeModal {
                 this.state.notifyStateChange();
             });
 
+            // 刪除按鈕 🗑️ (ConfirmModal 二次確認)
             const btnDelete = document.createElement("button");
             btnDelete.className = "btn-palette-edit";
             btnDelete.style.color = "var(--accent-danger)";
             btnDelete.textContent = "🗑️";
             btnDelete.title = i18n.t("modal_schemes_btn_delete_title");
-            btnDelete.addEventListener("click", () => {
-                if (confirm(i18n.t("modal_schemes_confirm_delete", { name: s.name }))) {
+            btnDelete.addEventListener("click", async () => {
+                if (this.state.schemes.length <= 1) {
+                    ToastNotification.show(i18n.t("modal_schemes_alert_keep_one"), "error");
+                    return;
+                }
+
+                const confirmed = await ConfirmModal.show(i18n.t("modal_schemes_confirm_delete", { name: s.name }));
+                if (confirmed) {
                     if (this.state.deleteScheme(s.id)) {
+                        this.resetEditorToCreateMode();
                         this.renderSchemeList();
                         this.updateHeaderInfo();
+                        ToastNotification.show(`已刪除方案：「${s.name}」`, "info");
                     }
                 }
             });
