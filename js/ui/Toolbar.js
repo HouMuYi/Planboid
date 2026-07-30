@@ -160,6 +160,12 @@ export class Toolbar {
                 if (this.state.deleteSelection()) {
                     e.preventDefault();
                 }
+            } else if (e.key === "PageUp") {
+                e.preventDefault();
+                btnFloorUp?.click();
+            } else if (e.key === "PageDown") {
+                e.preventDefault();
+                btnFloorDown?.click();
             }
         });
     }
