@@ -4,7 +4,7 @@
 
 import { IsoMath } from "./IsoMath.js";
 import { ShapeStrokeEngine } from "./ShapeStrokeEngine.js";
-import { GeometryPipeline, LevelVisualOffset } from "./GeometryPipeline.js";
+import { GeometryPipeline, calcZTranslate } from "./GeometryPipeline.js";
 import { BrushActionApplicator } from "./BrushActionApplicator.js";
 import { InputDispatcher } from "./InputDispatcher.js";
 
@@ -28,7 +28,7 @@ export class CanvasRenderer {
         // 視角過渡 (0 = 正交, 1 = 菱形)
         this.currentProgress = 1.0;
         this.targetProgress = 1.0;
-        this.transitionSpeed = 0.08;
+        this.transitionSpeed = 0.16;
         this.isAnimating = false;
 
         // 動態錨定點：切換視角時鎖定的畫面中心網格座標
@@ -76,9 +76,11 @@ export class CanvasRenderer {
 
     centerCamera() {
         const scheme = this.state.scheme;
-        const centerPos = this.getScreenPos(scheme.width / 2, scheme.height / 2, this.state.currentZLevel);
-        this.cameraX = this.viewportWidth / 2 - centerPos.x * this.zoom;
-        this.cameraY = this.viewportHeight / 2 - centerPos.y * this.zoom;
+        const z = this.state.currentZLevel;
+        const basePos = this.isoMath.gridToScreen(scheme.width / 2, scheme.height / 2, this.currentProgress);
+        const { dx, dy } = calcZTranslate(z, this.currentProgress);
+        this.cameraX = this.viewportWidth / 2 - (basePos.x + dx) * this.zoom;
+        this.cameraY = this.viewportHeight / 2 - (basePos.y + dy) * this.zoom;
     }
 
     fitView(padding = 40) {
@@ -99,6 +101,15 @@ export class CanvasRenderer {
         window.dispatchEvent(event);
     }
 
+    /**
+     * 取得指定邏輯座標 (含 Z 層偏移) 的最終螢幕座標，供相機錨點計算使用
+     */
+    getScreenPos(logicX, logicY, zLevel) {
+        const base = this.isoMath.gridToScreen(logicX, logicY, this.currentProgress);
+        const { dx, dy } = calcZTranslate(zLevel, this.currentProgress);
+        return { x: base.x + dx, y: base.y + dy };
+    }
+
     getCurrentCenterGridCell() {
         const centerScreenX = this.viewportWidth / 2;
         const centerScreenY = this.viewportHeight / 2;
@@ -106,11 +117,12 @@ export class CanvasRenderer {
         const worldX = (centerScreenX - this.cameraX) / this.zoom;
         const worldY = (centerScreenY - this.cameraY) / this.zoom;
 
-        const res = this.isoMath.screenToGrid(worldX, worldY, this.currentProgress);
         const z = this.state.currentZLevel;
+        const { dx, dy } = calcZTranslate(z, this.currentProgress);
 
-        const { logicX, logicY } = LevelVisualOffset.toLogicPos(res.cellX, res.cellY, z, this.currentProgress);
-        return { x: logicX, y: logicY };
+        // 先減去此層的視覺偏移，再做 2D 反算
+        const res = this.isoMath.screenToGrid(worldX - dx, worldY - dy, this.currentProgress);
+        return { x: Math.round(res.cellX), y: Math.round(res.cellY) };
     }
 
     setViewMode(mode) {
@@ -154,11 +166,6 @@ export class CanvasRenderer {
         }
     }
 
-    getScreenPos(logicX, logicY, zLevel) {
-        const { renderX, renderY } = LevelVisualOffset.toRenderPos(logicX, logicY, zLevel, this.currentProgress);
-        return this.isoMath.gridToScreen(renderX, renderY, this.currentProgress);
-    }
-
     desaturateHex(hex, factor = 0.7) {
         if (!hex || hex.length < 7) return "#64748b";
         let r = parseInt(hex.substring(1, 3), 16);
@@ -186,19 +193,24 @@ export class CanvasRenderer {
         ctx.translate(this.cameraX, this.cameraY);
         ctx.scale(this.zoom, this.zoom);
 
-        // 1. 網格
+        // 1. 網格 (於當前 Z 層的座標系下繪製)
         this.drawGrid();
 
-        // 2. 全樓層與鬼影淡出渲染
+        // 2. 全樓層與鬼影淡出渲染 (每層套用 ctx.translate 統一偏置)
         this.drawAllFloors();
 
-        // 3. 單點與矩形選區
+        // 3. 單點與矩形選區 (在當前 Z 層座標系下)
+        const currentZ = this.state.currentZLevel;
+        const { dx: selDx, dy: selDy } = calcZTranslate(currentZ, this.currentProgress);
+        ctx.save();
+        ctx.translate(selDx, selDy);
+
         if (this.state.selectionBox) {
             const { minX, minY, maxX, maxY } = this.state.selectionBox;
             this.drawDashedSelectionBox(minX, minY, maxX, maxY);
         } else if (this.state.selectedCell) {
             const sel = this.state.selectedCell;
-            this.drawCellHighlight(sel.x, sel.y, this.state.currentZLevel, "rgba(245, 158, 11, 0.4)", "#f59e0b", 3);
+            this.drawCellHighlight(sel.x, sel.y, "rgba(245, 158, 11, 0.4)", "#f59e0b", 3);
         }
 
         // 4. 貼上跟隨預覽
@@ -217,24 +229,29 @@ export class CanvasRenderer {
                     this.drawWallHighlight(norm.x, norm.y, norm.edge);
                 }
             } else if (this.hoveredCell.x < this.state.scheme.width && this.hoveredCell.y < this.state.scheme.height) {
-                this.drawCellHighlight(this.hoveredCell.x, this.hoveredCell.y, this.state.currentZLevel, "rgba(99, 102, 241, 0.35)", "#6366f1", 1.5);
+                this.drawCellHighlight(this.hoveredCell.x, this.hoveredCell.y, "rgba(99, 102, 241, 0.35)", "#6366f1", 1.5);
             }
         }
 
-        ctx.restore();
+        ctx.restore(); // 結束當前 Z 層偏移
+
+        ctx.restore(); // 結束相機變換
     }
 
     drawGrid() {
         const ctx = this.ctx;
         const scheme = this.state.scheme;
         const z = this.state.currentZLevel;
+        const { dx, dy } = calcZTranslate(z, this.currentProgress);
 
+        ctx.save();
+        ctx.translate(dx, dy);
         ctx.lineWidth = 1 / this.zoom;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
 
         for (let x = 0; x <= scheme.width; x++) {
-            const start = this.getScreenPos(x, 0, z);
-            const end = this.getScreenPos(x, scheme.height, z);
+            const start = this.isoMath.gridToScreen(x, 0, this.currentProgress);
+            const end = this.isoMath.gridToScreen(x, scheme.height, this.currentProgress);
             ctx.beginPath();
             ctx.moveTo(start.x, start.y);
             ctx.lineTo(end.x, end.y);
@@ -242,8 +259,8 @@ export class CanvasRenderer {
         }
 
         for (let y = 0; y <= scheme.height; y++) {
-            const start = this.getScreenPos(0, y, z);
-            const end = this.getScreenPos(scheme.width, y, z);
+            const start = this.isoMath.gridToScreen(0, y, this.currentProgress);
+            const end = this.isoMath.gridToScreen(scheme.width, y, this.currentProgress);
             ctx.beginPath();
             ctx.moveTo(start.x, start.y);
             ctx.lineTo(end.x, end.y);
@@ -252,10 +269,10 @@ export class CanvasRenderer {
 
         ctx.strokeStyle = "rgba(99, 102, 241, 0.5)";
         ctx.lineWidth = 2 / this.zoom;
-        const p00 = this.getScreenPos(0, 0, z);
-        const p10 = this.getScreenPos(scheme.width, 0, z);
-        const p11 = this.getScreenPos(scheme.width, scheme.height, z);
-        const p01 = this.getScreenPos(0, scheme.height, z);
+        const p00 = this.isoMath.gridToScreen(0, 0, this.currentProgress);
+        const p10 = this.isoMath.gridToScreen(scheme.width, 0, this.currentProgress);
+        const p11 = this.isoMath.gridToScreen(scheme.width, scheme.height, this.currentProgress);
+        const p01 = this.isoMath.gridToScreen(0, scheme.height, this.currentProgress);
 
         ctx.beginPath();
         ctx.moveTo(p00.x, p00.y);
@@ -264,6 +281,7 @@ export class CanvasRenderer {
         ctx.lineTo(p01.x, p01.y);
         ctx.closePath();
         ctx.stroke();
+        ctx.restore();
     }
 
     drawAllFloors() {
@@ -271,51 +289,61 @@ export class CanvasRenderer {
         const currentZ = this.state.currentZLevel;
         const palette = scheme.palette;
 
-        const tilesToRender = GeometryPipeline.getSortedTilesToRender(scheme.tiles, currentZ, this.state.ghostLayerEnabled);
+        const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, this.state.ghostLayerEnabled);
 
-        // Pass 1: 無腦先繪製所有地塊 (塊/Floor Polygons)
-        tilesToRender.forEach(item => {
-            const { x, y, z, isCurrent, alpha, desatFactor, tile } = item;
-            if (tile.floorColorId && palette[tile.floorColorId]) {
-                const rawColor = palette[tile.floorColorId].color;
-                const finalColor = isCurrent ? rawColor : this.desaturateHex(rawColor, desatFactor);
-                this.drawTilePoly(x, y, z, finalColor, alpha);
-            }
-        });
+        layers.forEach(layer => {
+            const { z, isCurrent, alpha, desatFactor, items } = layer;
+            const { dx, dy } = calcZTranslate(z, this.currentProgress);
 
-        // Pass 2: 無腦將所有牆體 (立體 96px 牆面面片與 2D 邊線) 繪製於地塊之上
-        tilesToRender.forEach(item => {
-            const { x, y, z, isCurrent, alpha, desatFactor, tile } = item;
-            if (tile.walls) {
-                Object.entries(tile.walls).forEach(([edge, colorId]) => {
-                    if (colorId && palette[colorId]) {
-                        const rawColor = palette[colorId].color;
-                        const finalColor = isCurrent ? rawColor : this.desaturateHex(rawColor, desatFactor);
-                        if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
-                            this.drawWallQuad96px(x, y, z, edge, finalColor, alpha * 0.4);
-                        } else {
-                            this.drawWallLine2D(x, y, z, edge, finalColor, alpha);
+            this.ctx.save();
+            this.ctx.translate(dx, dy);
+            this.ctx.globalAlpha = alpha;
+
+            // Pass 1: 地塊多邊形
+            items.forEach(({ x, y, tile }) => {
+                if (tile.floorColorId && palette[tile.floorColorId]) {
+                    const rawColor = palette[tile.floorColorId].color;
+                    const finalColor = isCurrent ? rawColor : this.desaturateHex(rawColor, desatFactor);
+                    this.drawTilePoly(x, y, finalColor);
+                }
+            });
+
+            // Pass 2: 牆體
+            items.forEach(({ x, y, tile }) => {
+                if (tile.walls) {
+                    Object.entries(tile.walls).forEach(([edge, colorId]) => {
+                        if (colorId && palette[colorId]) {
+                            const rawColor = palette[colorId].color;
+                            const finalColor = isCurrent ? rawColor : this.desaturateHex(rawColor, desatFactor);
+                            if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
+                                this.drawWallQuad96px(x, y, edge, finalColor, 0.4);
+                            } else {
+                                this.drawWallLine2D(x, y, edge, finalColor);
+                            }
                         }
+                    });
+                }
+            });
+
+            // Pass 3: 文字標籤
+            if (isCurrent) {
+                items.forEach(({ x, y, tile }) => {
+                    if (tile.label) {
+                        this.drawTileText(x, y, tile.label);
                     }
                 });
             }
-        });
 
-        // Pass 3: 繪製所有文字標籤
-        tilesToRender.forEach(item => {
-            const { x, y, z, isCurrent, tile } = item;
-            if (tile.label && isCurrent) {
-                this.drawTileText(x, y, z, tile.label);
-            }
+            this.ctx.restore();
         });
     }
 
-    drawTilePoly(x, y, z, colorHex, alpha = 1.0) {
-        const ctx = this.ctx;
-        const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(this.isoMath, x, y, z, this.currentProgress);
+    // 以下繪製方法接受純粹的邏輯 (x, y)，Z 層偏移已由 drawAllFloors 的 ctx.translate 統一套用
 
-        ctx.save();
-        ctx.globalAlpha = alpha;
+    drawTilePoly(x, y, colorHex) {
+        const ctx = this.ctx;
+        const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(this.isoMath, x, y, this.currentProgress);
+
         ctx.fillStyle = colorHex;
         ctx.beginPath();
         ctx.moveTo(p0.x, p0.y);
@@ -324,21 +352,18 @@ export class CanvasRenderer {
         ctx.lineTo(p3.x, p3.y);
         ctx.closePath();
         ctx.fill();
-        ctx.restore();
     }
 
-    drawWallLine2D(x, y, z, edge, colorHex, alpha = 1.0) {
+    drawWallLine2D(x, y, edge, colorHex) {
         const ctx = this.ctx;
         let p0, p1;
 
         const e = String(edge || "").toLowerCase();
-        if (e === "north" || e === "n") { p0 = this.getScreenPos(x, y, z); p1 = this.getScreenPos(x + 1, y, z); }
-        else if (e === "west" || e === "w") { p0 = this.getScreenPos(x, y, z); p1 = this.getScreenPos(x, y + 1, z); }
+        if (e === "north" || e === "n") { p0 = this.isoMath.gridToScreen(x, y, this.currentProgress); p1 = this.isoMath.gridToScreen(x + 1, y, this.currentProgress); }
+        else if (e === "west" || e === "w") { p0 = this.isoMath.gridToScreen(x, y, this.currentProgress); p1 = this.isoMath.gridToScreen(x, y + 1, this.currentProgress); }
 
         if (!p0 || !p1) return;
 
-        ctx.save();
-        ctx.globalAlpha = alpha;
         ctx.strokeStyle = colorHex;
         ctx.lineWidth = 5 / this.zoom;
         ctx.lineCap = "round";
@@ -347,18 +372,17 @@ export class CanvasRenderer {
         ctx.moveTo(p0.x, p0.y);
         ctx.lineTo(p1.x, p1.y);
         ctx.stroke();
-        ctx.restore();
     }
 
-    drawWallQuad96px(x, y, z, edge, colorHex, fillAlpha = 0.45) {
+    drawWallQuad96px(x, y, edge, colorHex, fillAlpha = 0.45) {
         const ctx = this.ctx;
-        const quad = GeometryPipeline.getWallQuad96Points(this.isoMath, x, y, z, edge, this.currentProgress);
+        const quad = GeometryPipeline.getWallQuad96Points(this.isoMath, x, y, edge, this.currentProgress);
         if (!quad) return;
 
         const [b0, b1, t1, t0] = quad;
+        const savedAlpha = ctx.globalAlpha;
 
-        ctx.save();
-        ctx.globalAlpha = fillAlpha;
+        ctx.globalAlpha = savedAlpha * fillAlpha;
         ctx.fillStyle = colorHex;
         ctx.beginPath();
         ctx.moveTo(b0.x, b0.y);
@@ -368,19 +392,18 @@ export class CanvasRenderer {
         ctx.closePath();
         ctx.fill();
 
-        ctx.globalAlpha = fillAlpha * 1.8;
+        ctx.globalAlpha = savedAlpha * fillAlpha * 1.8;
         ctx.strokeStyle = colorHex;
         ctx.lineWidth = 2 / this.zoom;
         ctx.stroke();
 
-        ctx.restore();
+        ctx.globalAlpha = savedAlpha;
     }
 
-    drawTileText(x, y, z, text) {
+    drawTileText(x, y, text) {
         const ctx = this.ctx;
-        const center = this.getScreenPos(x + 0.5, y + 0.5, z);
+        const center = this.isoMath.gridToScreen(x + 0.5, y + 0.5, this.currentProgress);
 
-        ctx.save();
         ctx.fillStyle = "#ffffff";
         ctx.font = `bold ${Math.max(10, 12 / this.zoom)}px Inter, sans-serif`;
         ctx.textAlign = "center";
@@ -388,14 +411,15 @@ export class CanvasRenderer {
         ctx.shadowColor = "rgba(0,0,0,0.9)";
         ctx.shadowBlur = 4;
         ctx.fillText(text, center.x, center.y);
-        ctx.restore();
+        ctx.shadowBlur = 0;
     }
 
-    drawCellHighlight(x, y, z, fillColor, strokeColor = "#6366f1", strokeWidth = 1.5) {
-        const ctx = this.ctx;
-        const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(this.isoMath, x, y, z, this.currentProgress);
+    // 以下方法在當前 Z 層的偏移 ctx 下調用 (render() 中已 translate)
 
-        ctx.save();
+    drawCellHighlight(x, y, fillColor, strokeColor = "#6366f1", strokeWidth = 1.5) {
+        const ctx = this.ctx;
+        const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(this.isoMath, x, y, this.currentProgress);
+
         ctx.fillStyle = fillColor;
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = strokeWidth / this.zoom;
@@ -408,19 +432,16 @@ export class CanvasRenderer {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.restore();
     }
 
     drawDashedSelectionBox(minX, minY, maxX, maxY) {
         const ctx = this.ctx;
-        const z = this.state.currentZLevel;
 
-        const p0 = this.getScreenPos(minX, minY, z);
-        const p1 = this.getScreenPos(maxX + 1, minY, z);
-        const p2 = this.getScreenPos(maxX + 1, maxY + 1, z);
-        const p3 = this.getScreenPos(minX, maxY + 1, z);
+        const p0 = this.isoMath.gridToScreen(minX, minY, this.currentProgress);
+        const p1 = this.isoMath.gridToScreen(maxX + 1, minY, this.currentProgress);
+        const p2 = this.isoMath.gridToScreen(maxX + 1, maxY + 1, this.currentProgress);
+        const p3 = this.isoMath.gridToScreen(minX, maxY + 1, this.currentProgress);
 
-        ctx.save();
         ctx.fillStyle = "rgba(245, 158, 11, 0.25)";
         ctx.strokeStyle = "#f59e0b";
         ctx.lineWidth = 2.5 / this.zoom;
@@ -434,14 +455,13 @@ export class CanvasRenderer {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.restore();
+        ctx.setLineDash([]);
     }
 
     drawPastePreview(targetX, targetY) {
         const clip = this.state.clipboard;
         if (!clip || !clip.tiles) return;
 
-        const z = this.state.currentZLevel;
         const palette = this.state.scheme.palette;
 
         Object.entries(clip.tiles).forEach(([relKey, tileData]) => {
@@ -451,15 +471,18 @@ export class CanvasRenderer {
 
             if (x >= 0 && x <= this.state.scheme.width && y >= 0 && y <= this.state.scheme.height) {
                 if (tileData.floorColorId && palette[tileData.floorColorId]) {
-                    this.drawTilePoly(x, y, z, palette[tileData.floorColorId].color, 0.6);
+                    const savedAlpha = this.ctx.globalAlpha;
+                    this.ctx.globalAlpha = savedAlpha * 0.6;
+                    this.drawTilePoly(x, y, palette[tileData.floorColorId].color);
+                    this.ctx.globalAlpha = savedAlpha;
                 }
-                this.drawCellHighlight(x, y, z, "rgba(16, 185, 129, 0.2)", "#10b981", 1.5);
+                this.drawCellHighlight(x, y, "rgba(16, 185, 129, 0.2)", "#10b981", 1.5);
             }
         });
     }
 
     drawWallHighlight(x, y, edge) {
-        this.drawWallLine2D(x, y, this.state.currentZLevel, edge, "#10b981", 1.0);
+        this.drawWallLine2D(x, y, edge, "#10b981");
     }
 
     drawShapePreview() {
@@ -469,7 +492,6 @@ export class CanvasRenderer {
         const y1 = this.shapeStartCell.y;
         const x2 = this.hoveredCell.x;
         const y2 = this.hoveredCell.y;
-        const z = this.state.currentZLevel;
         const tool = this.state.activeTool;
         const shape = this.state.shapeMode;
         const brushType = this.state.brushType;
@@ -489,7 +511,7 @@ export class CanvasRenderer {
             if (brushType === "wall" || isErasing) {
                 bounds.walls.forEach(w => this.drawWallHighlight(w.x, w.y, w.edge));
             } else {
-                bounds.floors.forEach(f => this.drawCellHighlight(f.x, f.y, z, "rgba(16, 185, 129, 0.3)", "#10b981", 1.5));
+                bounds.floors.forEach(f => this.drawCellHighlight(f.x, f.y, "rgba(16, 185, 129, 0.3)", "#10b981", 1.5));
             }
         } else if (shape === "line") {
             const points = ShapeStrokeEngine.getBresenhamLine(x1, y1, x2, y2);
@@ -498,7 +520,7 @@ export class CanvasRenderer {
                     const norm = ShapeStrokeEngine.normalizeWallEdge(p.x, p.y, this.shapeStartCell.edge || "north");
                     this.drawWallHighlight(norm.x, norm.y, norm.edge);
                 } else {
-                    this.drawCellHighlight(p.x, p.y, z, "rgba(99, 102, 241, 0.4)", "#6366f1", 1.5);
+                    this.drawCellHighlight(p.x, p.y, "rgba(99, 102, 241, 0.4)", "#6366f1", 1.5);
                 }
             });
         }

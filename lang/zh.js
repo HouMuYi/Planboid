@@ -107,7 +107,7 @@ window.PLANBOID_LANGUAGES["zh"] = {
     "modal_palette_btn_delete": "刪除色塊",
     "modal_palette_btn_save": "儲存變更",
 
-    "export_svg_legend_title": "圖例 (地塊/塊 • 邊線/線)",
+    "export_svg_legend_title": "圖例",
     "export_svg_legend_block": "塊",
     "export_svg_legend_line": "線",
     "export_copy_clipboard_success": "已將選擇範圍複製至剪貼簿 (按 Ctrl+V 貼上)",

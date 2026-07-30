@@ -387,11 +387,15 @@ export class SchemeModal {
         if (this.inputH) this.inputH.value = target.height;
     }
 
+    static formatDimension(width, height) {
+        return `(${width} x ${height})`;
+    }
+
     updateHeaderInfo() {
         const nameEl = document.getElementById("active-scheme-name");
         const dimEl = document.getElementById("active-scheme-dim");
         if (nameEl) nameEl.textContent = this.state.scheme.name;
-        if (dimEl) dimEl.textContent = `(${this.state.scheme.width} x ${this.state.scheme.height})`;
+        if (dimEl) dimEl.textContent = SchemeModal.formatDimension(this.state.scheme.width, this.state.scheme.height);
     }
 
     renderSchemeList() {
@@ -412,7 +416,7 @@ export class SchemeModal {
 
             const sizeSpan = document.createElement("span");
             sizeSpan.className = "scheme-size";
-            sizeSpan.textContent = `${scheme.width} x ${scheme.height}`;
+            sizeSpan.textContent = ` ${SchemeModal.formatDimension(scheme.width, scheme.height)}`;
 
             infoDiv.appendChild(nameSpan);
             infoDiv.appendChild(sizeSpan);

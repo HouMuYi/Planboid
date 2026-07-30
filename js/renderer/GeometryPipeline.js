@@ -1,55 +1,54 @@
 /**
  * GeometryPipeline.js - 統一幾何投影管線與樓層視覺偏移 (LevelVisualOffset)
  * 合流 CanvasRenderer 與 SvgExporter 的幾何頂點與多邊形運算邏輯
+ *
+ * 架構原則 (重構後)：
+ * - getTilePolyPoints / getWallQuad96Points 只接受純邏輯 (x, y) 座標，不再套用 Z 軸視覺偏移。
+ * - Z 軸視覺偏移 (螢幕像素量) 由 calcZTranslate 計算，交給繪製端 (ctx.translate / SVG <g transform>) 統一套用。
+ * - LevelVisualOffset 僅保留給 InputDispatcher 逆算滑鼠座標時使用。
  */
 
 import { IsoMath } from "./IsoMath.js";
 
 /**
- * 樓層視覺偏移 (Level Visual Offset) 權威封裝模組
+ * 計算第 z 層樓相對於 z=0 的螢幕像素偏移量
+ * 數學推導 (2:1 IsoMath 線性性)：
+ *   gridToScreen(x - 3zp, y - 3zp) = gridToScreen(x, y) + gridToScreen(-3zp, -3zp)
+ *   ΔsX = -3zp * (64-32p) + 3zp * 32p = -192zp(1-p)
+ *   ΔsY = -3zp * 16p + (-3zp) * (32-16p) = -96zp
+ * @param {number} z 
+ * @param {number} progress 視角插值 [0, 1]
+ * @returns {{ dx: number, dy: number }}
  */
-export class LevelVisualOffset {
-    static getOffset(z, progress = 1.0) {
-        return progress > 0 ? 3 * z * progress : 0;
-    }
-
-    static toRenderPos(logicX, logicY, z, progress = 1.0) {
-        const offset = LevelVisualOffset.getOffset(z, progress);
-        return { renderX: logicX - offset, renderY: logicY - offset };
-    }
-
-    static toLogicPos(renderCellX, renderCellY, z, progress = 1.0) {
-        const offset = LevelVisualOffset.getOffset(z, progress);
-        return { logicX: Math.round(renderCellX + offset), logicY: Math.round(renderCellY + offset) };
-    }
+export function calcZTranslate(z, progress = 1.0) {
+    if (z === 0 || progress === 0) return { dx: 0, dy: 0 };
+    // 純螢幕空間高程映射：永遠只有垂直向上的位移！徹底消滅水平拋物線錯位。
+    return { dx: 0, dy: -96 * z * progress };
 }
 
 export class GeometryPipeline {
     /**
-     * 計算地塊四個頂點的螢幕投影座標
+     * 計算地塊四個頂點的螢幕投影座標 (純邏輯座標，不含 Z 軸偏移)
      */
-    static getTilePolyPoints(isoMath, x, y, z, progress = 1.0) {
-        const { renderX, renderY } = LevelVisualOffset.toRenderPos(x, y, z, progress);
+    static getTilePolyPoints(isoMath, x, y, progress = 1.0) {
         return [
-            isoMath.gridToScreen(renderX, renderY, progress),
-            isoMath.gridToScreen(renderX + 1, renderY, progress),
-            isoMath.gridToScreen(renderX + 1, renderY + 1, progress),
-            isoMath.gridToScreen(renderX, renderY + 1, progress)
+            isoMath.gridToScreen(x, y, progress),
+            isoMath.gridToScreen(x + 1, y, progress),
+            isoMath.gridToScreen(x + 1, y + 1, progress),
+            isoMath.gridToScreen(x, y + 1, progress)
         ];
     }
 
     /**
-     * 計算 96px 3D 牆面立體四邊形頂點
+     * 計算 96px 3D 牆面立體四邊形頂點 (純邏輯座標，不含 Z 軸偏移)
      */
-    static getWallQuad96Points(isoMath, x, y, z, edge, progress = 1.0) {
-        const { renderX, renderY } = LevelVisualOffset.toRenderPos(x, y, z, progress);
-
+    static getWallQuad96Points(isoMath, x, y, edge, progress = 1.0) {
         let b0, b1;
         const e = String(edge || "").toLowerCase();
-        if (e === "north" || e === "n") { b0 = isoMath.gridToScreen(renderX, renderY, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY, progress); }
-        else if (e === "west" || e === "w") { b0 = isoMath.gridToScreen(renderX, renderY, progress); b1 = isoMath.gridToScreen(renderX, renderY + 1, progress); }
-        else if (e === "east" || e === "e") { b0 = isoMath.gridToScreen(renderX + 1, renderY, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY + 1, progress); }
-        else if (e === "south" || e === "s") { b0 = isoMath.gridToScreen(renderX, renderY + 1, progress); b1 = isoMath.gridToScreen(renderX + 1, renderY + 1, progress); }
+        if (e === "north" || e === "n") { b0 = isoMath.gridToScreen(x, y, progress); b1 = isoMath.gridToScreen(x + 1, y, progress); }
+        else if (e === "west" || e === "w") { b0 = isoMath.gridToScreen(x, y, progress); b1 = isoMath.gridToScreen(x, y + 1, progress); }
+        else if (e === "east" || e === "e") { b0 = isoMath.gridToScreen(x + 1, y, progress); b1 = isoMath.gridToScreen(x + 1, y + 1, progress); }
+        else if (e === "south" || e === "s") { b0 = isoMath.gridToScreen(x, y + 1, progress); b1 = isoMath.gridToScreen(x + 1, y + 1, progress); }
 
         if (!b0 || !b1) return null;
 
@@ -61,16 +60,17 @@ export class GeometryPipeline {
     }
 
     /**
-     * 排序並過濾指定 Z 軸視角下的 Tile 渲染陣列
+     * 排序並過濾指定 Z 軸視角下的 Tile 渲染陣列，按樓層分組回傳
+     * @returns {{ z: number, alpha: number, desatFactor: number, isCurrent: boolean, items: Array }[]}
      */
-    static getSortedTilesToRender(tiles, currentZ, ghostEnabled = true) {
+    static getSortedLayersToRender(tiles, currentZ, ghostEnabled = true) {
         const zSet = new Set([currentZ]);
         Object.keys(tiles).forEach(k => {
             zSet.add(parseInt(k.split(",")[2], 10));
         });
 
         const sortedZLevels = Array.from(zSet).sort((a, b) => a - b);
-        const result = [];
+        const layers = [];
 
         sortedZLevels.forEach(z => {
             const isCurrent = (z === currentZ);
@@ -80,23 +80,23 @@ export class GeometryPipeline {
             const alpha = isCurrent ? 1.0 : Math.max(0.08, 0.35 / (dist * 1.1));
             const desatFactor = isCurrent ? 0.0 : 0.75;
 
+            const items = [];
             Object.entries(tiles).forEach(([key, tile]) => {
                 const [xStr, yStr, zStr] = key.split(",");
                 if (parseInt(zStr, 10) !== z) return;
-
-                result.push({
+                items.push({
                     x: parseInt(xStr, 10),
                     y: parseInt(yStr, 10),
-                    z,
-                    isCurrent,
-                    alpha,
-                    desatFactor,
                     tile
                 });
             });
+
+            if (items.length > 0 || isCurrent) {
+                layers.push({ z, isCurrent, alpha, desatFactor, items });
+            }
         });
 
-        return result;
+        return layers;
     }
 
     /**
@@ -118,15 +118,14 @@ export class GeometryPipeline {
 
         const samplePoints = [];
         [minZ, maxZ].forEach(z => {
-            samplePoints.push(
-                ...GeometryPipeline.getTilePolyPoints(isoMath, 0, 0, z, currentProgress),
-                ...GeometryPipeline.getTilePolyPoints(isoMath, w, 0, z, currentProgress),
-                ...GeometryPipeline.getTilePolyPoints(isoMath, w, h, z, currentProgress),
-                ...GeometryPipeline.getTilePolyPoints(isoMath, 0, h, z, currentProgress)
-            );
-            const wallOffset = 96 * currentProgress;
-            const pTop = isoMath.gridToScreen(-3 * z * currentProgress, -3 * z * currentProgress, currentProgress);
-            samplePoints.push({ x: pTop.x, y: pTop.y - wallOffset });
+            const { dx, dy } = calcZTranslate(z, currentProgress);
+            // 四個角落 + Z 偏移
+            [[0, 0], [w, 0], [w, h], [0, h]].forEach(([gx, gy]) => {
+                const p = isoMath.gridToScreen(gx, gy, currentProgress);
+                samplePoints.push({ x: p.x + dx, y: p.y + dy });
+                // 牆面頂端再往上 96px
+                samplePoints.push({ x: p.x + dx, y: p.y + dy - 96 * currentProgress });
+            });
         });
 
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

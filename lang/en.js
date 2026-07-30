@@ -107,7 +107,7 @@ window.PLANBOID_LANGUAGES["en"] = {
     "modal_palette_btn_delete": "Delete Swatch",
     "modal_palette_btn_save": "Save Changes",
 
-    "export_svg_legend_title": "Legend (Floor • Wall)",
+    "export_svg_legend_title": "Legend",
     "export_svg_legend_block": "Floor",
     "export_svg_legend_line": "Wall",
     "export_copy_clipboard_success": "Selection copied to clipboard (Press Ctrl+V to paste)",

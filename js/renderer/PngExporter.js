@@ -1,10 +1,11 @@
 /**
  * PngExporter.js - 帶全包覆視角與質感圖例的 PNG 圖片快照匯出器 (100% 離線純靜態相容)
+ * 架構原則：按樓層分組 ctx.translate 統一套用位移，子元素使用純邏輯座標繪製。
  */
 
 import { i18n } from "../core/I18nManager.js";
 import { IsoMath } from "./IsoMath.js";
-import { GeometryPipeline } from "./GeometryPipeline.js";
+import { GeometryPipeline, calcZTranslate } from "./GeometryPipeline.js";
 import { ExportCanvasPipeline } from "./ExportCanvasPipeline.js";
 
 export class PngExporter {
@@ -20,7 +21,6 @@ export class PngExporter {
         const scheme = stateManager.scheme;
         const currentZ = stateManager.currentZLevel;
         const palette = scheme.palette || {};
-        const paletteEntries = Object.values(palette);
         const isoMath = new IsoMath(32);
 
         // 離屏 Canvas 尺寸同目前主畫布
@@ -33,7 +33,7 @@ export class PngExporter {
         const viewportH = mainCanvas.height / (window.devicePixelRatio || 1);
         const currentProgress = renderer ? renderer.currentProgress : 1.0;
 
-        // 全自動計算恰恰好包覆全畫布與地塊的最佳 Zoom 與 Camera 位移 (包含 1:1 正交與 2:1 菱形)
+        // 全自動計算恰恰好包覆全畫布與地塊的最佳 Zoom 與 Camera 位移
         const fit = GeometryPipeline.calculateFitCameraPos(
             isoMath,
             scheme,
@@ -55,20 +55,23 @@ export class PngExporter {
         ctx.translate(fit.cameraX, fit.cameraY);
         ctx.scale(fit.zoom, fit.zoom);
 
-        // 2. 繪製底層網格 (Grid)
+        // 2. 繪製底層網格 (Grid) (在當前 Z 層的座標系下)
+        const { dx: gridDx, dy: gridDy } = calcZTranslate(currentZ, currentProgress);
+        ctx.save();
+        ctx.translate(gridDx, gridDy);
         ctx.lineWidth = 1 / fit.zoom;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
         for (let x = 0; x <= scheme.width; x++) {
-            const start = GeometryPipeline.getTilePolyPoints(isoMath, x, 0, currentZ, currentProgress)[0];
-            const end = GeometryPipeline.getTilePolyPoints(isoMath, x, scheme.height, currentZ, currentProgress)[0];
+            const start = isoMath.gridToScreen(x, 0, currentProgress);
+            const end = isoMath.gridToScreen(x, scheme.height, currentProgress);
             ctx.beginPath();
             ctx.moveTo(start.x, start.y);
             ctx.lineTo(end.x, end.y);
             ctx.stroke();
         }
         for (let y = 0; y <= scheme.height; y++) {
-            const start = GeometryPipeline.getTilePolyPoints(isoMath, 0, y, currentZ, currentProgress)[0];
-            const end = GeometryPipeline.getTilePolyPoints(isoMath, scheme.width, y, currentZ, currentProgress)[0];
+            const start = isoMath.gridToScreen(0, y, currentProgress);
+            const end = isoMath.gridToScreen(scheme.width, y, currentProgress);
             ctx.beginPath();
             ctx.moveTo(start.x, start.y);
             ctx.lineTo(end.x, end.y);
@@ -78,10 +81,10 @@ export class PngExporter {
         // 外邊界紫線
         ctx.strokeStyle = "rgba(99, 102, 241, 0.6)";
         ctx.lineWidth = 2 / fit.zoom;
-        const p00 = GeometryPipeline.getTilePolyPoints(isoMath, 0, 0, currentZ, currentProgress)[0];
-        const p10 = GeometryPipeline.getTilePolyPoints(isoMath, scheme.width, 0, currentZ, currentProgress)[0];
-        const p11 = GeometryPipeline.getTilePolyPoints(isoMath, scheme.width, scheme.height, currentZ, currentProgress)[2];
-        const p01 = GeometryPipeline.getTilePolyPoints(isoMath, 0, scheme.height, currentZ, currentProgress)[0];
+        const p00 = isoMath.gridToScreen(0, 0, currentProgress);
+        const p10 = isoMath.gridToScreen(scheme.width, 0, currentProgress);
+        const p11 = isoMath.gridToScreen(scheme.width, scheme.height, currentProgress);
+        const p01 = isoMath.gridToScreen(0, scheme.height, currentProgress);
         ctx.beginPath();
         ctx.moveTo(p00.x, p00.y);
         ctx.lineTo(p10.x, p10.y);
@@ -89,99 +92,109 @@ export class PngExporter {
         ctx.lineTo(p01.x, p01.y);
         ctx.closePath();
         ctx.stroke();
+        ctx.restore();
 
-        // 3. 渲染所有樓層 (地塊 -> 牆面 -> 標籤)，過濾選區與 Hover 雜點
-        const tilesToRender = GeometryPipeline.getSortedTilesToRender(scheme.tiles, currentZ, stateManager.ghostLayerEnabled);
+        // 3. 渲染所有樓層 (按層分組 ctx.translate 統一偏置)
+        const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, stateManager.ghostLayerEnabled);
 
-        // Pass 1: Floor Polygons
-        tilesToRender.forEach(item => {
-            const { x, y, z, isCurrent, alpha, desatFactor, tile } = item;
-            if (tile.floorColorId && palette[tile.floorColorId]) {
-                const rawColor = palette[tile.floorColorId].color;
-                const finalColor = isCurrent ? rawColor : PngExporter.desaturateHex(rawColor, desatFactor);
-                const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(isoMath, x, y, z, currentProgress);
+        layers.forEach(layer => {
+            const { z, isCurrent, alpha, desatFactor, items } = layer;
+            const { dx, dy } = calcZTranslate(z, currentProgress);
 
-                ctx.save();
-                ctx.globalAlpha = alpha;
-                ctx.fillStyle = finalColor;
-                ctx.beginPath();
-                ctx.moveTo(p0.x, p0.y);
-                ctx.lineTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.lineTo(p3.x, p3.y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.restore();
-            }
-        });
+            ctx.save();
+            ctx.translate(dx, dy);
 
-        // Pass 2: Wall Quads & Lines
-        tilesToRender.forEach(item => {
-            const { x, y, z, isCurrent, alpha, desatFactor, tile } = item;
-            if (tile.walls) {
-                Object.entries(tile.walls).forEach(([edge, colorId]) => {
-                    if (colorId && palette[colorId]) {
-                        const rawColor = palette[colorId].color;
-                        const finalColor = isCurrent ? rawColor : PngExporter.desaturateHex(rawColor, desatFactor);
-                        if (stateManager.is3DWallsEnabled && currentProgress > 0) {
-                            const quad = GeometryPipeline.getWallQuad96Points(isoMath, x, y, z, edge, currentProgress);
-                            if (quad) {
-                                const [b0, b1, t1, t0] = quad;
-                                ctx.save();
-                                ctx.globalAlpha = alpha * 0.45;
-                                ctx.fillStyle = finalColor;
-                                ctx.beginPath();
-                                ctx.moveTo(b0.x, b0.y);
-                                ctx.lineTo(b1.x, b1.y);
-                                ctx.lineTo(t1.x, t1.y);
-                                ctx.lineTo(t0.x, t0.y);
-                                ctx.closePath();
-                                ctx.fill();
+            // Pass 1: Floor Polygons
+            items.forEach(({ x, y, tile }) => {
+                if (tile.floorColorId && palette[tile.floorColorId]) {
+                    const rawColor = palette[tile.floorColorId].color;
+                    const finalColor = isCurrent ? rawColor : PngExporter.desaturateHex(rawColor, desatFactor);
+                    const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(isoMath, x, y, currentProgress);
 
-                                ctx.globalAlpha = alpha * 0.8;
-                                ctx.strokeStyle = finalColor;
-                                ctx.lineWidth = 2 / fit.zoom;
-                                ctx.stroke();
-                                ctx.restore();
-                            }
-                        } else {
-                            let p0, p1;
-                            const offset = GeometryPipeline.getTilePolyPoints(isoMath, x, y, z, currentProgress);
-                            if (edge === "north") { p0 = offset[0]; p1 = offset[1]; }
-                            else if (edge === "west") { p0 = offset[0]; p1 = offset[3]; }
-                            if (p0 && p1) {
-                                ctx.save();
-                                ctx.globalAlpha = alpha;
-                                ctx.strokeStyle = finalColor;
-                                ctx.lineWidth = 5 / fit.zoom;
-                                ctx.lineCap = "round";
-                                ctx.beginPath();
-                                ctx.moveTo(p0.x, p0.y);
-                                ctx.lineTo(p1.x, p1.y);
-                                ctx.stroke();
-                                ctx.restore();
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = finalColor;
+                    ctx.beginPath();
+                    ctx.moveTo(p0.x, p0.y);
+                    ctx.lineTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.lineTo(p3.x, p3.y);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                }
+            });
+
+            // Pass 2: Wall Quads & Lines
+            items.forEach(({ x, y, tile }) => {
+                if (tile.walls) {
+                    Object.entries(tile.walls).forEach(([edge, colorId]) => {
+                        if (colorId && palette[colorId]) {
+                            const rawColor = palette[colorId].color;
+                            const finalColor = isCurrent ? rawColor : PngExporter.desaturateHex(rawColor, desatFactor);
+                            if (stateManager.is3DWallsEnabled && currentProgress > 0) {
+                                const quad = GeometryPipeline.getWallQuad96Points(isoMath, x, y, edge, currentProgress);
+                                if (quad) {
+                                    const [b0, b1, t1, t0] = quad;
+                                    ctx.save();
+                                    ctx.globalAlpha = alpha * 0.45;
+                                    ctx.fillStyle = finalColor;
+                                    ctx.beginPath();
+                                    ctx.moveTo(b0.x, b0.y);
+                                    ctx.lineTo(b1.x, b1.y);
+                                    ctx.lineTo(t1.x, t1.y);
+                                    ctx.lineTo(t0.x, t0.y);
+                                    ctx.closePath();
+                                    ctx.fill();
+
+                                    ctx.globalAlpha = alpha * 0.8;
+                                    ctx.strokeStyle = finalColor;
+                                    ctx.lineWidth = 2 / fit.zoom;
+                                    ctx.stroke();
+                                    ctx.restore();
+                                }
+                            } else {
+                                let p0, p1;
+                                const e = String(edge || "").toLowerCase();
+                                if (e === "north" || e === "n") { p0 = isoMath.gridToScreen(x, y, currentProgress); p1 = isoMath.gridToScreen(x + 1, y, currentProgress); }
+                                else if (e === "west" || e === "w") { p0 = isoMath.gridToScreen(x, y, currentProgress); p1 = isoMath.gridToScreen(x, y + 1, currentProgress); }
+                                if (p0 && p1) {
+                                    ctx.save();
+                                    ctx.globalAlpha = alpha;
+                                    ctx.strokeStyle = finalColor;
+                                    ctx.lineWidth = 5 / fit.zoom;
+                                    ctx.lineCap = "round";
+                                    ctx.beginPath();
+                                    ctx.moveTo(p0.x, p0.y);
+                                    ctx.lineTo(p1.x, p1.y);
+                                    ctx.stroke();
+                                    ctx.restore();
+                                }
                             }
                         }
+                    });
+                }
+            });
+
+            // Pass 3: Labels
+            if (isCurrent) {
+                items.forEach(({ x, y, tile }) => {
+                    if (tile.label) {
+                        const center = isoMath.gridToScreen(x + 0.5, y + 0.5, currentProgress);
+                        ctx.save();
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = `bold ${Math.max(10, 12 / fit.zoom)}px Inter, sans-serif`;
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.shadowColor = "rgba(0,0,0,0.9)";
+                        ctx.shadowBlur = 4;
+                        ctx.fillText(tile.label, center.x, center.y);
+                        ctx.restore();
                     }
                 });
             }
-        });
 
-        // Pass 3: Labels
-        tilesToRender.forEach(item => {
-            const { x, y, z, isCurrent, tile } = item;
-            if (tile.label && isCurrent) {
-                const center = GeometryPipeline.getTilePolyPoints(isoMath, x + 0.5, y + 0.5, z, currentProgress)[0];
-                ctx.save();
-                ctx.fillStyle = "#ffffff";
-                ctx.font = `bold ${Math.max(10, 12 / fit.zoom)}px Inter, sans-serif`;
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.shadowColor = "rgba(0,0,0,0.9)";
-                ctx.shadowBlur = 4;
-                ctx.fillText(tile.label, center.x, center.y);
-                ctx.restore();
-            }
+            ctx.restore();
         });
 
         // 結束地塊與牆面相機變換矩陣

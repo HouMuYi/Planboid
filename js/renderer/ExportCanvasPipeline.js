@@ -64,6 +64,26 @@ export class ExportCanvasPipeline {
     }
 
     /**
+     * 計算全幅 ViewBox 與包覆相機 bounds (供 SvgExporter 與 PngExporter 通用呼叫)
+     * @param {Object} scheme 
+     * @param {Object} isoMath 
+     * @param {number} currentZ 
+     * @returns {Object} { minX, minY, contentW, contentH, cameraX, cameraY, zoom }
+     */
+    static calculateFitCamera(scheme, isoMath, currentZ = 0) {
+        const bounds = this.calculateExportBounds(scheme);
+        return {
+            minX: -bounds.offsetX,
+            minY: -bounds.offsetY,
+            contentW: bounds.width,
+            contentH: bounds.height,
+            cameraX: bounds.offsetX,
+            cameraY: bounds.offsetY,
+            zoom: 1.0
+        };
+    }
+
+    /**
      * 導出放大 1.2 倍、且為 [大色塊]: [名稱] 格式的圖例 (Legend) 排版數據
      * @param {Object} palette 
      * @returns {Object} 图例排版規格與條目
@@ -93,7 +113,7 @@ export class ExportCanvasPipeline {
             swHeight,
             itemHeight,
             headerHeight,
-            title: i18n.t("export_svg_legend_title") || "圖例 (Legend)",
+            title: i18n.t("export_svg_legend_title") || "圖例",
             items: paletteEntries.map((item, index) => ({
                 index,
                 color: item.color,

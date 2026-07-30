@@ -3,7 +3,7 @@
  * 負責 Canvas DOM 事件綁定、滑鼠座標反算、相機 Drag/Zoom 與筆刷呼叫分派
  */
 
-import { LevelVisualOffset } from "./GeometryPipeline.js";
+import { calcZTranslate } from "./GeometryPipeline.js";
 
 export class InputDispatcher {
     /**
@@ -30,10 +30,14 @@ export class InputDispatcher {
         const worldX = (mouseX - this.renderer.cameraX) / this.renderer.zoom;
         const worldY = (mouseY - this.renderer.cameraY) / this.renderer.zoom;
 
-        const res = this.renderer.isoMath.screenToGrid(worldX, worldY, this.renderer.currentProgress);
         const z = this.state.currentZLevel;
+        const { dx, dy } = calcZTranslate(z, this.renderer.currentProgress);
 
-        const { logicX, logicY } = LevelVisualOffset.toLogicPos(res.cellX, res.cellY, z, this.renderer.currentProgress);
+        // 徹底極致簡化：減去 Z 層的純垂直視覺偏移後，交給 2D 平面反算的 cellX 與 cellY 就是真實的邏輯座標！
+        // 永遠告別過去「減去 3zp 又要加回 3zp」的非線性幽靈！
+        const res = this.renderer.isoMath.screenToGrid(worldX - dx, worldY - dy, this.renderer.currentProgress);
+        const logicX = res.cellX;
+        const logicY = res.cellY;
 
         const localX = res.gridX - res.cellX;
         const localY = res.gridY - res.cellY;
