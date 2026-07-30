@@ -30,9 +30,11 @@ export const ABOUT_HTML = `<h1>Planboid 📐</h1>
 <h2>🚀 快速開始</h2>
 
 <h3>線上體驗與原始碼</h3>
+
 <ul><li>🌐 <a href="https://houmuyi.github.io/Planboid/" target="_blank" rel="noopener">GitHub Pages 線上部署頁面</a></li><li>📦 <a href="https://github.com/HouMuYi/Planboid" target="_blank" rel="noopener">GitHub 原始碼專案倉庫</a></li></ul>
 
 <h3>本機運行</h3>
+
 複製或下載此專案，透過任何本地 HTTP 伺服器，如 VS Code Live Server、\`npx serve\`，或 \`python -m http.server\`（小雙無情加上）開啟 \`index.html\` 即可！
 
 <hr>

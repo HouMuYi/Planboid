@@ -4,30 +4,30 @@
  */
 
 export class UISelectionState {
-    constructor() {
-        this.selectedCell = null;   // { x, y }
-        this.selectionBox = null;   // { minX, minY, maxX, maxY }
-        this.clipboard = null;      // { width, height, tiles: {} }
-        this.isPastingMode = false;
-    }
+	constructor() {
+		this.selectedCell = null; // { x, y }
+		this.selectionBox = null; // { minX, minY, maxX, maxY }
+		this.clipboard = null; // { width, height, tiles: {} }
+		this.isPastingMode = false;
+	}
 
-    clearSelection() {
-        this.selectedCell = null;
-        this.selectionBox = null;
-    }
+	clearSelection() {
+		this.selectedCell = null;
+		this.selectionBox = null;
+	}
 
-    setSingleSelection(x, y) {
-        this.selectedCell = { x, y };
-        this.selectionBox = null;
-    }
+	setSingleSelection(x, y) {
+		this.selectedCell = { x, y };
+		this.selectionBox = null;
+	}
 
-    setBoxSelection(minX, minY, maxX, maxY) {
-        this.selectionBox = { minX, minY, maxX, maxY };
-        this.selectedCell = { x: minX, y: minY };
-    }
+	setBoxSelection(minX, minY, maxX, maxY) {
+		this.selectionBox = { minX, minY, maxX, maxY };
+		this.selectedCell = { x: minX, y: minY };
+	}
 
-    setClipboard(data) {
-        this.clipboard = data;
-        console.log("📋 剪貼簿更新，包含地塊數:", Object.keys(data.tiles || {}).length);
-    }
+	setClipboard(data) {
+		this.clipboard = data;
+		console.log('📋 剪貼簿更新，包含地塊數:', Object.keys(data.tiles || {}).length);
+	}
 }

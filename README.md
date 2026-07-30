@@ -29,10 +29,12 @@
 ## 🚀 快速開始
 
 ### 線上體驗與原始碼
+
 - 🌐 [GitHub Pages 線上部署頁面](https://houmuyi.github.io/Planboid/)
 - 📦 [GitHub 原始碼專案倉庫](https://github.com/HouMuYi/Planboid)
 
 ### 本機運行
+
 複製或下載此專案，透過任何本地 HTTP 伺服器，如 VS Code Live Server、`npx serve`，或 `python -m http.server`（小雙無情加上）開啟 `index.html` 即可！
 
 ---
