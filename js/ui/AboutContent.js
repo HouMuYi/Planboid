@@ -10,14 +10,12 @@ export const ABOUT_HTML = `<h1>Planboid 📐</h1>
 <ul><li><strong>零依賴純前端 (Zero-Dependency)</strong>：無需 \`npm\` / \`Vite\` 或任何外部框架，點擊 \`index.html\` 即可在瀏覽器中直接運行。</li><li><strong>PZ 遊戲幾何對齊</strong>：</li></ul>
   - 預設 64x64 地圖規模與 1-based 座標索引 (\`(1,1)\` 到 \`(64,64)\`)。
   - 輸入遊戲真實絕對座標原點（例如 \`10500, 9200\`），即時換算地塊對應的 PZ 世界座標。
-  - <strong>恆真樓層視覺偏移</strong>：菱形視角下精確重現 PZ 遊戲引擎每高一層 Z+1 視覺繪製 \`(-3z, -3z)\` 的位移規律。
-  - <strong>96px 半透明立體牆面</strong>：垂直抬升 96px 無縫銜接上下樓層牆體，兼具 3D 立體感與內部空間透視。
 <ul><li><strong>雙視角即時平滑過渡</strong>：</li></ul>
   - <strong>2:1 菱形視角 (Isometric)</strong>：北方定為右上角，展現立體空間感。
   - <strong>1:1 正交視角 (Orthogonal)</strong>：北方定為正上方，適合純平面佈局觀察。
   - 切換時以畫面正中央地塊為轉軸平滑過渡旋轉。
-<ul><li><strong>極簡幾何圖示系統</strong>：採用古典幾何 Unicode 符號 (◆ 塊、◇ 邊、• 點、│ 線、■ 面) 與 ✘ 標記圖層疊加圖例，支援滑鼠右鍵快速擦除。</li><li><strong>高畫質雙格式圖檔匯出</strong>：</li></ul>
-  - <strong>SVG 向量圖</strong>：匯出無限放大不失真、超輕量體積的全畫構圖（含調色盤圖例）。
+<ul><li><strong>高畫質雙格式圖檔匯出</strong>：</li></ul>
+  - <strong>SVG 向量圖</strong>：匯出無限放大不失真、超輕量體積的全畫構圖。
   - <strong>PNG 快照圖</strong>：一鍵產生高畫質圖片，方便分享至 Discord 或社群討論區。
 <ul><li><strong>選區與剪貼簿 (Copy / Paste / Delete)</strong>：支援矩形區域框選，以及 \`Ctrl+C\`、\`Ctrl+V\` (跟隨預覽貼上) 與 \`Delete\` 快捷鍵操作。</li></ul>
 
@@ -25,7 +23,7 @@ export const ABOUT_HTML = `<h1>Planboid 📐</h1>
 
 <h2>👥 致謝與貢獻者 (Credits)</h2>
 
-<ul><li><strong>設計與需求決策 (出一張嘴)</strong>：<a href="https://github.com/HouMuYi/" target="_blank" rel="noopener">慕儀 (HouMuYi)</a></li><li><strong>具體程式碼實作 (具體做)</strong>：小雙 (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)</li></ul>
+<ul><li><strong>出一張嘴</strong>：<a href="https://github.com/HouMuYi/" target="_blank" rel="noopener">慕儀 (HouMuYi)</a></li><li><strong>具體實作</strong>：小雙 (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)</li></ul>
 
 <hr>
 

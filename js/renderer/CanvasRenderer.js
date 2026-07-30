@@ -81,6 +81,24 @@ export class CanvasRenderer {
         this.cameraY = this.viewportHeight / 2 - centerPos.y * this.zoom;
     }
 
+    fitView(padding = 40) {
+        const fit = GeometryPipeline.calculateFitCameraPos(
+            this.isoMath,
+            this.state.scheme,
+            this.currentProgress,
+            this.viewportWidth,
+            this.viewportHeight,
+            padding
+        );
+        this.zoom = fit.zoom;
+        this.cameraX = fit.cameraX;
+        this.cameraY = fit.cameraY;
+        this.requestRender();
+
+        const event = new CustomEvent("zoomchange", { detail: { zoom: this.zoom } });
+        window.dispatchEvent(event);
+    }
+
     getCurrentCenterGridCell() {
         const centerScreenX = this.viewportWidth / 2;
         const centerScreenY = this.viewportHeight / 2;

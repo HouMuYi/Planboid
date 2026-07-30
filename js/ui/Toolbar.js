@@ -3,6 +3,7 @@
  */
 
 import { SvgExporter } from "../renderer/SvgExporter.js";
+import { PngExporter } from "../renderer/PngExporter.js";
 import { i18n } from "../core/I18nManager.js";
 import { ToastNotification } from "./ToastNotification.js";
 import { StateManager } from "../core/StateManager.js";
@@ -10,9 +11,11 @@ import { StateManager } from "../core/StateManager.js";
 export class Toolbar {
     /**
      * @param {import("../core/StateManager.js").StateManager} stateManager 
+     * @param {import("../renderer/CanvasRenderer.js").CanvasRenderer} [renderer]
      */
-    constructor(stateManager) {
+    constructor(stateManager, renderer) {
         this.state = stateManager;
+        this.renderer = renderer;
         this.init();
     }
 
@@ -66,14 +69,7 @@ export class Toolbar {
         });
 
         btnPng?.addEventListener("click", () => {
-            const canvas = document.getElementById("main-canvas");
-            if (!canvas) return;
-
-            const url = canvas.toDataURL("image/png");
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${this.state.scheme.name}_snapshot_planboid.png`;
-            a.click();
+            PngExporter.exportToPng(this.state, this.renderer);
         });
 
         const inputWorldX = document.getElementById("input-world-x");

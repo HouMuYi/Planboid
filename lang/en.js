@@ -42,6 +42,7 @@ window.PLANBOID_LANGUAGES["en"] = {
     "viewport_toggle_3d_walls": "3D Walls",
     "viewport_toggle_3d_walls_title": "Display semi-transparent 96px 3D wall quads in isometric mode",
     "viewport_btn_reset_view_title": "Reset view zoom and position",
+    "viewport_btn_fit_view_title": "Fit view to show all canvas tiles",
     "viewport_info_coords": "Grid: ({x}, {y}), Z: {z}",
     "viewport_info_game_coords": "PZ Coords: ({gameX}, {gameY})",
     "viewport_info_zoom": "Zoom: {zoom}%",

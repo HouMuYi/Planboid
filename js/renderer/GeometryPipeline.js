@@ -97,4 +97,58 @@ export class GeometryPipeline {
 
         return result;
     }
+
+    /**
+     * 計算能夠在指定 Viewport 下「恰恰好包覆全畫布與所有樓層地塊」的最佳 Camera X, Y 與 Zoom
+     */
+    static calculateFitCameraPos(isoMath, scheme, currentProgress, viewportWidth, viewportHeight, padding = 40) {
+        const w = scheme.width;
+        const h = scheme.height;
+
+        const zSet = new Set([0]);
+        if (scheme && scheme.tiles) {
+            Object.keys(scheme.tiles).forEach(k => {
+                const zVal = parseInt(k.split(",")[2], 10);
+                if (!isNaN(zVal)) zSet.add(zVal);
+            });
+        }
+        const maxZ = Math.max(...Array.from(zSet));
+        const minZ = Math.min(...Array.from(zSet));
+
+        const samplePoints = [];
+        [minZ, maxZ].forEach(z => {
+            samplePoints.push(
+                ...GeometryPipeline.getTilePolyPoints(isoMath, 0, 0, z, currentProgress),
+                ...GeometryPipeline.getTilePolyPoints(isoMath, w, 0, z, currentProgress),
+                ...GeometryPipeline.getTilePolyPoints(isoMath, w, h, z, currentProgress),
+                ...GeometryPipeline.getTilePolyPoints(isoMath, 0, h, z, currentProgress)
+            );
+            const wallOffset = 96 * currentProgress;
+            const pTop = isoMath.gridToScreen(-3 * z * currentProgress, -3 * z * currentProgress, currentProgress);
+            samplePoints.push({ x: pTop.x, y: pTop.y - wallOffset });
+        });
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        samplePoints.forEach(p => {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+        });
+
+        const boundsW = Math.max(10, maxX - minX);
+        const boundsH = Math.max(10, maxY - minY);
+
+        const zoomX = (viewportWidth - padding * 2) / boundsW;
+        const zoomY = (viewportHeight - padding * 2) / boundsH;
+        const fitZoom = Math.max(0.15, Math.min(4.0, Math.min(zoomX, zoomY)));
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        const cameraX = viewportWidth / 2 - centerX * fitZoom;
+        const cameraY = viewportHeight / 2 - centerY * fitZoom;
+
+        return { zoom: fitZoom, cameraX, cameraY, minX, minY, maxX, maxY };
+    }
 }

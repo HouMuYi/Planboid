@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const canvas = document.getElementById("main-canvas");
     const renderer = new CanvasRenderer(canvas, stateManager);
 
-    const toolbar = new Toolbar(stateManager);
+    const toolbar = new Toolbar(stateManager, renderer);
     const palettePanel = new PalettePanel(stateManager);
     const schemeModal = new SchemeModal(stateManager);
     const aboutModal = new AboutModal();
@@ -47,8 +47,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const btnIso = document.getElementById("view-iso");
-    const btnOrtho = document.getElementById("view-ortho");
+    const btnFitView = document.getElementById("btn-fit-view");
     const btnResetView = document.getElementById("btn-reset-view");
+
+    btnFitView?.addEventListener("click", () => {
+        renderer.fitView();
+    });
 
     btnIso?.addEventListener("click", () => {
         btnIso.classList.add("active");
