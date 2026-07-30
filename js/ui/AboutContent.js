@@ -7,7 +7,7 @@ export const ABOUT_HTML = `<h1>Planboid 📐</h1>
 
 <h2>✨ 特色亮點</h2>
 
-<ul><li><strong>零依賴純前端 (Zero-Dependency)</strong>：無需 \`npm\` / \`Vite\` 或任何外部框架，點擊 \`index.html\` 即可在瀏覽器中直接運行。</li><li><strong>PZ 遊戲幾何對齊</strong>：</li></ul>
+<ul><li><strong>零依賴純前端 (Zero-Dependency)</strong>：無需 \`npm\` / \`Vite\` 等打包工具或建置步驟，以任何 HTTP 伺服器開啟即可在瀏覽器中直接運行。</li><li><strong>PZ 遊戲幾何對齊</strong>：</li></ul>
   - 預設 64x64 地圖規模與 1-based 座標索引 (\`(1,1)\` 到 \`(64,64)\`)。
   - 輸入遊戲真實絕對座標原點（例如 \`10500, 9200\`），即時換算地塊對應的 PZ 世界座標。
 <ul><li><strong>雙視角即時平滑過渡</strong>：</li></ul>
@@ -33,7 +33,7 @@ export const ABOUT_HTML = `<h1>Planboid 📐</h1>
 存取 <a href="https://houmuyi.github.io/Planboid/" target="_blank" rel="noopener">GitHub Pages 線上部署頁面</a> 即可直接開啟使用。
 
 <h3>本機運行</h3>
-複製或下載此專案，直接雙擊 \`index.html\` 在任何現代瀏覽器中開啟即可！
+複製或下載此專案，透過任何本地 HTTP 伺服器，如 VS Code Live Server、\`npx serve\`，或 \`python -m http.server\`（小雙無情加上）開啟 \`index.html\` 即可！
 
 <hr>
 
