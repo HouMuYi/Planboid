@@ -31,10 +31,10 @@
 body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; height:100dvh; width:100vw }
 a { text-decoration:none; color:inherit }
 
-/* 防止 Canvas 畫布與 UI 按鈕/工具列在操作時被誤選取反藍 */
-:is(#main-canvas, .canvas-viewport, .toolbar-left, .sidebar-right, .btn, button, .palette-item, .scheme-item, .toggle-pill) { user-select:none }
-/* 確保 Modal 彈窗內容、關於 Markdown 文件與輸入框文字可正常滑鼠選取複製 */
-:is(.modal-content, #about-markdown-body, input, textarea, p, span, code) { user-select:text }
+/* 取消文字選取 (全局 UI 元件防禦，傳統平鋪) */
+#main-canvas, .canvas-viewport, .toolbar-left, .sidebar-right, .btn, button, .palette-item, .scheme-item, .toggle-pill { user-select:none }
+/* 保留特定元素文字選取能力 */
+.modal-content, #about-markdown-body, input, textarea, p, span, code { user-select:text }
 
 /* 通用修飾符 (Utility Modifiers) */
 .w-full { width:100% }
@@ -46,7 +46,7 @@ a { text-decoration:none; color:inherit }
 
 /* 物理法則級別全局提亮 (消滅手繪感 :hover 冗餘) */
 :is(.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .palette-item, .checkbox-label, .select-lang, .btn-close, button, a):hover { filter:brightness(1.25); transform:translateY(-1px) }
-:is(.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .checkbox-label, .select-lang, .btn-close, button, a) { cursor:pointer; transition:filter .15s, transform .15s }
+.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .checkbox-label, .select-lang, .btn-close, button, a { cursor:pointer; transition:filter .15s, transform .15s }
 
 /* ── 3. Objects: Layout Primitives (.stack & .cluster) ── */
 .stack, #app-container, .toolbar-left, .tool-group, .sidebar-right, .sidebar-scroll-content, .panel-section, .palette-section, .palette-list, .modal-content { display:flex; flex-direction:column }
@@ -67,7 +67,7 @@ a { text-decoration:none; color:inherit }
 .btn-danger { background:rgba(239,68,68,.15); border-color:var(--danger); color:var(--danger) }
 
 /* ── 6. Object: .field (通用表單輸入物件) ── */
-:is(.input-text, .input-number, .select-lang, select, textarea) { background:var(--bg); border:1px solid var(--bd); border-radius:var(--r); color:var(--c0); font-size:calc(.85rem*var(--s)); font-family:inherit; padding:.4em .75em; min-width:0; width:100% }
+.input-text, .input-number, .select-lang, select, textarea { background:var(--bg); border:1px solid var(--bd); border-radius:var(--r); color:var(--c0); font-size:calc(.85rem*var(--s)); font-family:inherit; padding:.4em .75em; min-width:0; width:100% }
 :is(.input-text, .input-number, .select-lang, select, textarea):focus { outline:none; border-color:var(--ac) }
 .world-origin-inputs .input-number { width:calc(76px*var(--s)); background:transparent; border:none; color:var(--green); font-weight:600; text-align:center }
 .field-label { font-size:calc(.8rem*var(--s)); color:var(--c2) }

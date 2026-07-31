@@ -73,7 +73,7 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'sidebar_other_floors_solid_title': '以完整實心呈現其他樓層',
 	'sidebar_palette_title': '通用調色盤',
 	'sidebar_btn_add_palette': '+ 新增色塊',
-	'sidebar_label_title': '區域與標籤（Label）',
+	'sidebar_label_title': '區域與標籤',
 	'sidebar_btn_enable_select': '👆 點擊選取',
 	'sidebar_btn_enable_select_title': '快捷進入選取模式',
 	'sidebar_no_selected_tile': '未選擇地塊（點擊上方按鈕進入選取）',
