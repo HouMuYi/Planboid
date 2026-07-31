@@ -34,8 +34,8 @@ export const CONFIG = {
 	COLOR_BG: '#0b0f19', // 底層 Canvas 純黑主背景色
 	COLOR_GRID_NORMAL: 'rgba(255, 255, 255, 0.08)', // 畫布輔助網格線顏色
 	COLOR_GRID_BOUNDS: 'rgba(99, 102, 241, 0.5)', // 地塊外框邊界網格線顏色
-	WALL_FILL_ALPHA: 0.55, // 3D 牆面面片基礎不透明度
-	GHOST_BASE_ALPHA: 0.45, // 相隔 1 層鬼影之基礎不透明度
-	GHOST_ALPHA_DECAY: 0.8, // 鬼影跨層不透明度衰減率 (每多相隔 1 層)
+	WALL_FILL_ALPHA: 0.6, // 3D 牆面面片基礎不透明度
+	GHOST_BASE_ALPHA: 0.4, // 相隔 1 層鬼影之基礎不透明度
+	GHOST_ALPHA_DECAY: 0.75, // 鬼影跨層不透明度衰減率 (每多相隔 1 層)
 	GHOST_SATURATION_DECAY: 0.8, // 鬼影跨層彩度/飽和度留存率 (每多相隔 1 層)
 };
