@@ -27,9 +27,14 @@
 @media (min-width:2560px) { :root { --s:1.28 } }
 
 /* ── 2. Global Reset & Interactive Physical Rule ── */
-*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; user-select:none }
-body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; width:100vw }
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif }
+body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; height:100dvh; width:100vw }
 a { text-decoration:none; color:inherit }
+
+/* 防止 Canvas 畫布與 UI 按鈕/工具列在操作時被誤選取反藍 */
+:is(#main-canvas, .canvas-viewport, .toolbar-left, .sidebar-right, .btn, button, .palette-item, .scheme-item, .toggle-pill) { user-select:none }
+/* 確保 Modal 彈窗內容、關於 Markdown 文件與輸入框文字可正常滑鼠選取複製 */
+:is(.modal-content, #about-markdown-body, input, textarea, p, span, code) { user-select:text }
 
 /* 通用修飾符 (Utility Modifiers) */
 .w-full { width:100% }
@@ -70,15 +75,18 @@ a { text-decoration:none; color:inherit }
 .input-color { width:48px; height:38px; border:none; cursor:pointer; border-radius:6px; padding:0; background:transparent }
 
 /* ── 7. Component Structure & Boundaries ── */
-#app-container { height:100vh; width:100vw }
+#app-container { height:100vh; height:100dvh; width:100vw }
 .app-body { flex:1; min-height:0; display:flex; position:relative; overflow:hidden }
 .app-header { flex-shrink:0; justify-content:space-between; height:calc(56px*var(--s)); border-bottom:1px solid var(--bd); padding:0 calc(16px*var(--s)); z-index:20 }
-.logo-area,.header-actions { gap:calc(8px*var(--s)) }
-.header-center { gap:calc(12px*var(--s)) }
+.logo-area { flex-shrink:0; gap:calc(8px*var(--s)) }
+.header-actions { flex-shrink:0; gap:calc(8px*var(--s)) }
+.logo-icon { width:calc(32px*var(--s)); height:calc(32px*var(--s)); flex-shrink:0; object-fit:contain }
+.header-center { flex:1; min-width:0; justify-content:center; gap:calc(8px*var(--s)) }
 .logo-title { font-family:'Outfit',sans-serif; font-weight:700; font-size:calc(1.25rem*var(--s)); background:linear-gradient(135deg,#a5b4fc,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent }
 .badge { font-size:calc(.7rem*var(--s)); background:rgba(99,102,241,.15); color:#a5b4fc; padding:.25em .65em; border-radius:1em; border:1px solid rgba(99,102,241,.3); display:inline-flex; align-items:center; white-space:nowrap; width:auto }
-.scheme-title { font-weight:600; font-size:calc(.95rem*var(--s)); border-bottom:1px dashed var(--ac) }
-.scheme-dim { font-size:calc(.8rem*var(--s)); color:var(--c2) }
+.scheme-title { max-width:min(300px,28vw); font-weight:600; font-size:calc(.95rem*var(--s)); border-bottom:1px dashed var(--ac); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right }
+#btn-scheme-modal { flex-shrink:0 }
+.scheme-dim { font-size:calc(.7rem*var(--s)); color:var(--c2); white-space:nowrap; flex-shrink:0 }
 .world-origin-inputs { gap:4px; background:rgba(0,0,0,.3); padding:4px 10px; border-radius:var(--r); border:1px solid var(--bd); font-size:calc(.75rem*var(--s)) }
 .input-prefix { color:var(--c2) }
 
@@ -108,13 +116,16 @@ a { text-decoration:none; color:inherit }
 .dot { color:var(--c2) }
 
 /* 右側 Sidebar */
-.sidebar-right { width:calc(280px*var(--s)); border-left:1px solid var(--bd); padding:calc(16px*var(--s)); gap:calc(16px*var(--s)); z-index:10; position:relative; flex-shrink:0; height:100%; min-height:0; overflow:hidden; transition:transform .3s cubic-bezier(.4,0,.2,1) }
+.sidebar-right { width:calc(280px*var(--s)); border-left:1px solid var(--bd); padding:calc(16px*var(--s)); gap:calc(16px*var(--s)); z-index:10; position:absolute; right:0; top:0; bottom:0; flex-shrink:0; min-height:0; box-shadow:-10px 0 30px rgba(0,0,0,.4); transition:transform .3s cubic-bezier(.4,0,.2,1) }
+.sidebar-right.collapsed { transform:translateX(100%) }
+.sidebar-right.collapsed .toggle-icon { transform:rotate(180deg) }
 .sidebar-scroll-content { flex:1; min-height:0; gap:calc(14px*var(--s)); overflow:hidden }
 .panel-section { gap:calc(10px*var(--s)); flex-shrink:0 }
 .palette-section { flex:1; min-height:0; gap:calc(8px*var(--s)) }
 .palette-list { flex:1; min-height:0; overflow-y:auto; gap:calc(6px*var(--s)); padding:calc(8px*var(--s)); background:rgba(15,23,42,.4) }
 .label-section { flex-shrink:0 }
-.btn-toggle-sidebar { display:none; position:absolute; left:-36px; top:16px; width:36px; height:36px; border:1px solid var(--bd); border-right:none; border-radius:8px 0 0 8px; color:var(--c0); align-items:center; justify-content:center; z-index:101 }
+.btn-toggle-sidebar { display:flex; position:absolute; left:-32px; top:16px; width:32px; height:auto; padding:8px 2px; border-right:none; border-radius:8px 0 0 8px; flex-direction:column; gap:6px; font-size:calc(.72rem*var(--s)); line-height:1.2; z-index:101 }
+.toggle-text { writing-mode: vertical-rl; text-orientation: mixed; letter-spacing:1px; font-weight:500; font-size:calc(.72rem*var(--s)) }
 .section-title { font-size:calc(.85rem*var(--s)); font-weight:600; color:var(--c1); text-transform:uppercase; letter-spacing:.5px }
 .section-header { justify-content:space-between }
 .floor-selector { justify-content:space-between; padding:4px }
@@ -163,15 +174,17 @@ a { text-decoration:none; color:inherit }
 
 /* ── 8. RWD Adaptations ── */
 @media (max-width:1024px) {
-	.btn-toggle-sidebar { display:flex }
-	.sidebar-right { position:absolute; right:0; top:0; bottom:0; box-shadow:-10px 0 30px rgba(0,0,0,.6) }
-	.sidebar-right.collapsed { transform:translateX(100%) }
-	.sidebar-right.collapsed .toggle-icon { transform:rotate(180deg) }
+	.sidebar-right { box-shadow:-10px 0 30px rgba(0,0,0,.6) }
 }
 @media (max-width:768px) {
 	.desktop-only { display:none!important }
 	.btn-text { display:none }
-	.toolbar-left { width:auto; height:56px; position:absolute; bottom:16px; left:50%; transform:translateX(-50%); flex-direction:row; border-radius:var(--r); border:1px solid var(--bd); padding:0 12px; gap:8px; box-shadow:0 10px 30px rgba(0,0,0,.6) }
+	.app-header { display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; height:auto; padding:8px 12px; gap:6px 12px; align-items:center }
+	.logo-area { grid-column:1; grid-row:1 }
+	.header-center { grid-column:2; grid-row:1; justify-self:stretch; width:100%; min-width:0 }
+	.scheme-title { flex:1; max-width:none }
+	.header-actions { grid-column:1 / -1; grid-row:2; justify-content:center; width:100% }
+	.toolbar-left { width:auto; height:56px; position:absolute; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); left:50%; transform:translateX(-50%); flex-direction:row; border-radius:var(--r); border:1px solid var(--bd); padding:0 12px; gap:8px; box-shadow:0 10px 30px rgba(0,0,0,.6) }
 	.tool-group { flex-direction:row; gap:4px }
 	.divider { width:1px; height:24px }
 	:is(.tool-btn,.shape-btn) { width:38px; height:38px }

@@ -28,8 +28,8 @@
 			<!-- 頂部標題與控制列 -->
 			<header class="app-header">
 				<div class="logo-area">
-					<span class="logo-icon">📐</span>
-					<h1 class="logo-title">Planboid</h1>
+					<img class="logo-icon" src="img/logo.svg" alt="Planboid Logo">
+					<h1 class="logo-title desktop-only">Planboid</h1>
 					<span class="badge desktop-only" data-i18n="header_badge">PZ 地塊規劃器</span>
 
 					<!-- 語言切換選單 (置於 logo-area 區塊右側) -->
@@ -42,18 +42,7 @@
 				<div class="header-center">
 					<span class="scheme-title" id="active-scheme-name" data-i18n-title="header_scheme_name_tooltip" title="點擊重新命名與調整尺寸"
 					>預設規劃方案</span>
-					<span class="scheme-dim" id="active-scheme-dim">(64 x 64)</span>
-
-					<div
-						class="world-origin-inputs desktop-only"
-						data-i18n-title="header_world_origin_title"
-						title="設定 (1,1) 對應的 PZ 遊戲真實座標"
-					>
-						<span class="input-prefix" data-i18n="header_world_origin_x">PZ原點 X:</span>
-						<input type="number" id="input-world-x" class="input-number" value="10500" placeholder="10500">
-						<span class="input-prefix" data-i18n="header_world_origin_y">Y:</span>
-						<input type="number" id="input-world-y" class="input-number" value="9200" placeholder="9200">
-					</div>
+					<span class="scheme-dim desktop-only" id="active-scheme-dim">(64 x 64)</span>
 
 					<button class="btn btn-icon-text" id="btn-scheme-modal">
 						<span>📁 <span class="btn-text" data-i18n="header_btn_scheme">方案</span></span>
@@ -197,19 +186,36 @@
 
 				<!-- 右側側邊欄 -->
 				<aside class="sidebar-right panel" id="main-sidebar">
-					<button class="btn-toggle-sidebar" id="btn-toggle-sidebar" data-i18n-title="sidebar_btn_toggle_title" title="摺疊/展開側邊欄">
-						<span class="toggle-icon">➡️</span>
+					<button class="btn btn-toggle-sidebar" id="btn-toggle-sidebar" data-i18n-title="sidebar_btn_toggle_title" title="摺疊/展開側邊欄">
+						<span class="toggle-icon">⇄</span>
+						<span class="toggle-text" data-i18n="sidebar_btn_toggle">側邊欄</span>
 					</button>
 
 					<div class="sidebar-scroll-content">
 						<div class="panel-section floor-control-section">
 							<h3 class="section-title" data-i18n="sidebar_floor_control_title">樓層控制 (Z-Level)</h3>
 							<div class="floor-selector">
-								<button class="btn" id="floor-up" data-i18n="sidebar_floor_up">▲ 上一層</button>
+								<button
+									class="btn"
+									id="floor-up"
+									data-i18n="sidebar_floor_up"
+									data-i18n-title="sidebar_floor_up_title"
+									title="▲ 上層（Z）"
+								>
+									▲ 上層
+								</button>
 								<div class="floor-indicator">
 									<span class="floor-label" id="current-floor-display">1</span>
 								</div>
-								<button class="btn" id="floor-down" data-i18n="sidebar_floor_down">▼ 下一層</button>
+								<button
+									class="btn"
+									id="floor-down"
+									data-i18n="sidebar_floor_down"
+									data-i18n-title="sidebar_floor_down_title"
+									title="▼ 下層（X）"
+								>
+									▼ 下層
+								</button>
 							</div>
 							<label class="checkbox-label">
 								<input type="checkbox" id="chk-ghost-layer" checked>
@@ -329,6 +335,12 @@
 								placeholder="高"
 								value="64"
 							>
+						</div>
+						<div class="cluster">
+							<span class="input-prefix" data-i18n="header_world_origin_x">PZ原點 X:</span>
+							<input type="number" id="new-scheme-world-x" class="input-text flex-1" placeholder="10500" value="10500">
+							<span class="input-prefix" data-i18n="header_world_origin_y">Y:</span>
+							<input type="number" id="new-scheme-world-y" class="input-text flex-1" placeholder="9200" value="9200">
 						</div>
 						<div class="cluster">
 							<button class="btn btn-primary flex-1" id="btn-save-scheme-editor" data-i18n="modal_schemes_btn_create">

@@ -25,6 +25,8 @@ export class SchemeModal {
 		this.inputName = document.getElementById('new-scheme-name');
 		this.inputW = document.getElementById('new-scheme-width');
 		this.inputH = document.getElementById('new-scheme-height');
+		this.inputWorldX = document.getElementById('new-scheme-world-x');
+		this.inputWorldY = document.getElementById('new-scheme-world-y');
 		this.btnSaveEditor = document.getElementById('btn-save-scheme-editor');
 		this.btnSaveAsNew = document.getElementById('btn-save-as-new-scheme');
 
@@ -73,9 +75,19 @@ export class SchemeModal {
 			const name = this.inputName.value.trim() || i18n.t('modal_schemes_name_placeholder');
 			const width = parseInt(this.inputW.value, 10) || 64;
 			const height = parseInt(this.inputH.value, 10) || 64;
+			const worldX = parseInt(this.inputWorldX?.value, 10) || 10500;
+			const worldY = parseInt(this.inputWorldY?.value, 10) || 9200;
 
 			if (this.editingSchemeId) {
 				this.state.updateSchemeDetails(this.editingSchemeId, name, width, height);
+				const target = this.state.schemes.find(s => s.id === this.editingSchemeId);
+				if (target) {
+					target.worldOriginX = worldX;
+					target.worldOriginY = worldY;
+				}
+				if (this.editingSchemeId === this.state.activeSchemeId) {
+					this.state.setWorldOrigin(worldX, worldY);
+				}
 				ToastNotification.show(i18n.t('toast_scheme_updated') || '方案更新成功！', 'success');
 			} else {
 				const newScheme = {
@@ -84,6 +96,8 @@ export class SchemeModal {
 					width: Math.max(10, Math.min(300, width)),
 					height: Math.max(10, Math.min(300, height)),
 					currentLevel: 0,
+					worldOriginX: worldX,
+					worldOriginY: worldY,
 					palette: StorageManager.getDefaultScheme().palette,
 					tiles: {},
 				};
@@ -107,6 +121,8 @@ export class SchemeModal {
 			const name = this.inputName.value.trim() || i18n.t('modal_schemes_name_placeholder');
 			const width = parseInt(this.inputW.value, 10) || 64;
 			const height = parseInt(this.inputH.value, 10) || 64;
+			const worldX = parseInt(this.inputWorldX?.value, 10) || 10500;
+			const worldY = parseInt(this.inputWorldY?.value, 10) || 9200;
 
 			const sourceScheme = this.state.schemes.find(s => s.id === this.editingSchemeId) || this.state.scheme;
 			const newScheme = {
@@ -115,8 +131,8 @@ export class SchemeModal {
 				width: Math.max(10, Math.min(300, width)),
 				height: Math.max(10, Math.min(300, height)),
 				currentLevel: sourceScheme ? sourceScheme.currentLevel || 0 : 0,
-				worldOriginX: sourceScheme ? sourceScheme.worldOriginX || 10500 : 10500,
-				worldOriginY: sourceScheme ? sourceScheme.worldOriginY || 9200 : 9200,
+				worldOriginX: worldX,
+				worldOriginY: worldY,
 				palette: JSON.parse(JSON.stringify(sourceScheme ? sourceScheme.palette : StorageManager.getDefaultScheme().palette)),
 				tiles: JSON.parse(JSON.stringify(sourceScheme ? sourceScheme.tiles : {})),
 			};
@@ -406,17 +422,41 @@ export class SchemeModal {
 		if (this.inputName) this.inputName.value = target.name;
 		if (this.inputW) this.inputW.value = target.width;
 		if (this.inputH) this.inputH.value = target.height;
+		if (this.inputWorldX) this.inputWorldX.value = target.worldOriginX || 10500;
+		if (this.inputWorldY) this.inputWorldY.value = target.worldOriginY || 9200;
 	}
 
-	static formatDimension(width, height) {
-		return `(${width} x ${height})`;
+	resetEditorToCreateMode() {
+		this.editingSchemeId = null;
+		if (this.editorIdInput) this.editorIdInput.value = '';
+		if (this.editorTitle) this.editorTitle.textContent = i18n.t('modal_schemes_create_title');
+		if (this.btnSaveEditor) this.btnSaveEditor.textContent = i18n.t('modal_schemes_btn_create');
+		if (this.btnSaveAsNew) this.btnSaveAsNew.style.display = 'none';
+
+		if (this.inputName) this.inputName.value = '';
+		if (this.inputW) this.inputW.value = 64;
+		if (this.inputH) this.inputH.value = 64;
+		if (this.inputWorldX) this.inputWorldX.value = 10500;
+		if (this.inputWorldY) this.inputWorldY.value = 9200;
+	}
+
+	static formatDimension(width, height, worldOriginX = 10500, worldOriginY = 9200) {
+		return `(${width} x ${height} @ ${worldOriginX},${worldOriginY})`;
 	}
 
 	updateHeaderInfo() {
 		const nameEl = document.getElementById('active-scheme-name');
 		const dimEl = document.getElementById('active-scheme-dim');
 		if (nameEl) nameEl.textContent = this.state.scheme.name;
-		if (dimEl) dimEl.textContent = SchemeModal.formatDimension(this.state.scheme.width, this.state.scheme.height);
+		if (dimEl) {
+			const s = this.state.scheme;
+			dimEl.textContent = SchemeModal.formatDimension(
+				s.width,
+				s.height,
+				s.worldOriginX || 10500,
+				s.worldOriginY || 9200,
+			);
+		}
 	}
 
 	renderSchemeList() {

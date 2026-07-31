@@ -71,6 +71,8 @@ export class CanvasRenderer {
 		this.overlayCanvas.style.position = 'absolute';
 		this.overlayCanvas.style.top = '0';
 		this.overlayCanvas.style.left = '0';
+		this.overlayCanvas.style.width = '100%';
+		this.overlayCanvas.style.height = '100%';
 		this.overlayCanvas.style.pointerEvents = 'none';
 		this.overlayCanvas.style.zIndex = '10';
 		this.overlayCtx = this.overlayCanvas.getContext('2d');

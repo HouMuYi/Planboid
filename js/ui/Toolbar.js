@@ -72,23 +72,6 @@ export class Toolbar {
 			PngExporter.exportToPng(this.state, this.renderer);
 		});
 
-		const inputWorldX = document.getElementById('input-world-x');
-		const inputWorldY = document.getElementById('input-world-y');
-
-		if (inputWorldX && inputWorldY) {
-			inputWorldX.value = this.state.scheme.worldOriginX || 10500;
-			inputWorldY.value = this.state.scheme.worldOriginY || 9200;
-
-			const handleOriginChange = () => {
-				const wx = parseInt(inputWorldX.value, 10) || 0;
-				const wy = parseInt(inputWorldY.value, 10) || 0;
-				this.state.setWorldOrigin(wx, wy);
-			};
-
-			inputWorldX.addEventListener('change', handleOriginChange);
-			inputWorldY.addEventListener('change', handleOriginChange);
-		}
-
 		const chk3DWalls = document.getElementById('chk-3d-walls');
 		chk3DWalls?.addEventListener('change', (e) => {
 			this.state.is3DWallsEnabled = e.target.checked;
@@ -130,7 +113,7 @@ export class Toolbar {
 		btnRedo?.addEventListener('click', () => this.state.redo());
 
 		window.addEventListener('keydown', (e) => {
-			if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+			if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
 
 			if (e.ctrlKey || e.metaKey) {
 				const key = e.key.toLowerCase();
@@ -157,12 +140,36 @@ export class Toolbar {
 				if (this.state.deleteSelection()) {
 					e.preventDefault();
 				}
-			} else if (e.key === 'PageUp') {
+			} else if (e.key === 'PageUp' || e.key.toLowerCase() === 'z') {
 				e.preventDefault();
 				btnFloorUp?.click();
-			} else if (e.key === 'PageDown') {
+			} else if (e.key === 'PageDown' || e.key.toLowerCase() === 'x') {
 				e.preventDefault();
 				btnFloorDown?.click();
+			} else if (e.key === '1') {
+				e.preventDefault();
+				document.getElementById('tool-floor')?.click();
+			} else if (e.key === '2') {
+				e.preventDefault();
+				document.getElementById('tool-wall')?.click();
+			} else if (e.key === '3') {
+				e.preventDefault();
+				document.getElementById('tool-erase-floor')?.click();
+			} else if (e.key === '4') {
+				e.preventDefault();
+				document.getElementById('tool-erase-wall')?.click();
+			} else if (e.key === '5') {
+				e.preventDefault();
+				document.getElementById('tool-select')?.click();
+			} else if (e.key.toLowerCase() === 'q') {
+				e.preventDefault();
+				document.getElementById('shape-single')?.click();
+			} else if (e.key.toLowerCase() === 'w') {
+				e.preventDefault();
+				document.getElementById('shape-line')?.click();
+			} else if (e.key.toLowerCase() === 'e') {
+				e.preventDefault();
+				document.getElementById('shape-box')?.click();
 			}
 		});
 	}
