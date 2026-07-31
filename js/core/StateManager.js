@@ -7,6 +7,7 @@ import { eventBus } from './EventBus.js';
 import { StorageManager } from './StorageManager.js';
 import { ToolModeState } from './ToolModeState.js';
 import { UISelectionState } from './UISelectionState.js';
+import { CONFIG } from './Config.js';
 
 export class StateManager {
 	constructor() {
@@ -38,7 +39,7 @@ export class StateManager {
 		}
 
 		// Undo / Redo
-		this.maxHistory = 30;
+		this.maxHistory = CONFIG.HISTORY_MAX_STEPS;
 		this.undoStack = [];
 		this.redoStack = [];
 
@@ -139,6 +140,15 @@ export class StateManager {
 	set ghostLayerEnabled(val) {
 		this.toolState.ghostLayerEnabled = val;
 	}
+	get otherFloorsMode() {
+		return this.toolState.otherFloorsMode;
+	}
+	set otherFloorsMode(val) {
+		this.toolState.setOtherFloorsMode(val);
+	}
+	setOtherFloorsMode(mode) {
+		this.toolState.setOtherFloorsMode(mode);
+	}
 	get visualOffsetEnabled() {
 		return this.toolState.visualOffsetEnabled;
 	}
@@ -222,7 +232,7 @@ export class StateManager {
 	}
 
 	setZLevel(level) {
-		this.currentZLevel = Math.max(-2, Math.min(8, level));
+		this.currentZLevel = Math.max(CONFIG.Z_LEVEL_MIN, Math.min(CONFIG.Z_LEVEL_MAX, level));
 		this.scheme.currentLevel = this.currentZLevel;
 		this.notifyStateChange();
 	}
@@ -239,8 +249,8 @@ export class StateManager {
 		const target = this.schemes.find(s => s.id === id);
 		if (target) {
 			target.name = newName;
-			target.width = Math.max(10, Math.min(300, newWidth));
-			target.height = Math.max(10, Math.min(300, newHeight));
+			target.width = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, newWidth));
+			target.height = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, newHeight));
 			this.persist();
 			this.notifyStateChange();
 		}

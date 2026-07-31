@@ -131,6 +131,10 @@ a { text-decoration:none; color:inherit }
 .floor-selector { justify-content:space-between; padding:4px }
 .floor-btn { background:transparent; border:none; color:var(--c0); padding:calc(4px*var(--s)) calc(6px*var(--s)); font-size:calc(.72rem*var(--s)); font-weight:500; border-radius:var(--r); white-space:nowrap }
 .floor-indicator { font-weight:700; color:var(--ac); font-size:calc(.8rem*var(--s)); white-space:nowrap }
+.other-floors-control { display:flex; flex-direction:column; gap:calc(6px*var(--s)); margin-top:calc(4px*var(--s)) }
+.segmented-control { display:flex; width:100%; background:var(--bg); border:1px solid var(--bd); border-radius:var(--r); padding:2px; gap:2px }
+.btn-segmented { flex:1; padding:.35em .4em; font-size:calc(.75rem*var(--s)); border:none; background:transparent; color:var(--c1); border-radius:calc(var(--r) - 2px); transition:all .15s }
+.btn-segmented.active { background:var(--ac); color:#fff; font-weight:600; box-shadow:0 1px 4px rgba(0,0,0,.4) }
 
 /* 列表通用 ListItem 物件 */
 .palette-item, .scheme-item { gap:calc(8px*var(--s)); padding:calc(7px*var(--s)) calc(10px*var(--s)); border:1px solid var(--bd); border-radius:var(--r); background:var(--bg-c); flex-shrink:0 }

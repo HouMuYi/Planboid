@@ -217,10 +217,38 @@
 									▼ 下層
 								</button>
 							</div>
-							<label class="checkbox-label">
-								<input type="checkbox" id="chk-ghost-layer" checked>
-								<span data-i18n="sidebar_toggle_ghost_layer">全樓層動態鬼影 (Ghost Layer)</span>
-							</label>
+							<div class="other-floors-control">
+								<span class="field-label" data-i18n="sidebar_other_floors_label">其他樓層顯示：</span>
+								<div class="segmented-control" id="other-floors-group">
+									<button
+										class="btn btn-segmented"
+										data-mode="hidden"
+										data-i18n="sidebar_other_floors_hidden"
+										data-i18n-title="sidebar_other_floors_hidden_title"
+										title="隱藏其他所有樓層"
+									>
+										隱藏
+									</button>
+									<button
+										class="btn btn-segmented active"
+										data-mode="ghost"
+										data-i18n="sidebar_other_floors_ghost"
+										data-i18n-title="sidebar_other_floors_ghost_title"
+										title="以半透明鬼影呈現其他樓層"
+									>
+										虛影
+									</button>
+									<button
+										class="btn btn-segmented"
+										data-mode="solid"
+										data-i18n="sidebar_other_floors_solid"
+										data-i18n-title="sidebar_other_floors_solid_title"
+										title="以完整實心呈現其他樓層"
+									>
+										實心
+									</button>
+								</div>
+							</div>
 						</div>
 
 						<div class="divider"></div>

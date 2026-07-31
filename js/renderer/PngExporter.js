@@ -8,6 +8,7 @@ import { Utils } from '../core/Utils.js';
 import { ExportCanvasPipeline } from './ExportCanvasPipeline.js';
 import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
 import { IsoMath } from './IsoMath.js';
+import { CONFIG } from '../core/Config.js';
 
 export class PngExporter {
 	/**
@@ -41,7 +42,7 @@ export class PngExporter {
 			currentProgress,
 			viewportW,
 			viewportH,
-			60, // 留白邊距 padding
+			CONFIG.FIT_VIEW_PADDING,
 		);
 
 		ctx.save();
@@ -96,7 +97,7 @@ export class PngExporter {
 		ctx.restore();
 
 		// 3. 渲染所有樓層 (按層分組 ctx.translate 統一偏置)
-		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, stateManager.ghostLayerEnabled);
+		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, stateManager.otherFloorsMode);
 
 		layers.forEach(layer => {
 			const { z, isCurrent, alpha, desatFactor, items } = layer;
@@ -104,24 +105,17 @@ export class PngExporter {
 
 			ctx.save();
 			ctx.translate(dx, dy);
+			ctx.globalAlpha = alpha;
 
 			// Pass 1: Floor Polygons
 			items.forEach(({ x, y, tile }) => {
 				if (tile.floorColorId && palette[tile.floorColorId]) {
 					const rawColor = palette[tile.floorColorId].color;
-					const finalColor = isCurrent ? rawColor : PngExporter.desaturateHex(rawColor, desatFactor);
-					const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(isoMath, x, y, currentProgress);
+					const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
 
 					ctx.save();
 					ctx.globalAlpha = alpha;
-					ctx.fillStyle = finalColor;
-					ctx.beginPath();
-					ctx.moveTo(p0.x, p0.y);
-					ctx.lineTo(p1.x, p1.y);
-					ctx.lineTo(p2.x, p2.y);
-					ctx.lineTo(p3.x, p3.y);
-					ctx.closePath();
-					ctx.fill();
+					GeometryPipeline.drawTilePoly(ctx, isoMath, x, y, finalColor, currentProgress);
 					ctx.restore();
 				}
 			});
@@ -132,50 +126,11 @@ export class PngExporter {
 					Object.entries(tile.walls).forEach(([edge, colorId]) => {
 						if (colorId && palette[colorId]) {
 							const rawColor = palette[colorId].color;
-							const finalColor = isCurrent ? rawColor : PngExporter.desaturateHex(rawColor, desatFactor);
+							const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
 							if (stateManager.is3DWallsEnabled && currentProgress > 0) {
-								const quad = GeometryPipeline.getWallQuad96Points(isoMath, x, y, edge, currentProgress);
-								if (quad) {
-									const [b0, b1, t1, t0] = quad;
-									ctx.save();
-									ctx.globalAlpha = alpha * 0.45;
-									ctx.fillStyle = finalColor;
-									ctx.beginPath();
-									ctx.moveTo(b0.x, b0.y);
-									ctx.lineTo(b1.x, b1.y);
-									ctx.lineTo(t1.x, t1.y);
-									ctx.lineTo(t0.x, t0.y);
-									ctx.closePath();
-									ctx.fill();
-
-									ctx.globalAlpha = alpha * 0.8;
-									ctx.strokeStyle = finalColor;
-									ctx.lineWidth = 2 / fit.zoom;
-									ctx.stroke();
-									ctx.restore();
-								}
+								GeometryPipeline.drawWallQuad96px(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress, CONFIG.WALL_FILL_ALPHA);
 							} else {
-								let p0, p1;
-								const e = String(edge || '').toLowerCase();
-								if (e === 'north' || e === 'n') {
-									p0 = isoMath.gridToScreen(x, y, currentProgress);
-									p1 = isoMath.gridToScreen(x + 1, y, currentProgress);
-								} else if (e === 'west' || e === 'w') {
-									p0 = isoMath.gridToScreen(x, y, currentProgress);
-									p1 = isoMath.gridToScreen(x, y + 1, currentProgress);
-								}
-								if (p0 && p1) {
-									ctx.save();
-									ctx.globalAlpha = alpha;
-									ctx.strokeStyle = finalColor;
-									ctx.lineWidth = 5 / fit.zoom;
-									ctx.lineCap = 'round';
-									ctx.beginPath();
-									ctx.moveTo(p0.x, p0.y);
-									ctx.lineTo(p1.x, p1.y);
-									ctx.stroke();
-									ctx.restore();
-								}
+								GeometryPipeline.drawWallLine2D(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress);
 							}
 						}
 					});
@@ -186,16 +141,7 @@ export class PngExporter {
 			if (isCurrent) {
 				items.forEach(({ x, y, tile }) => {
 					if (tile.label) {
-						const center = isoMath.gridToScreen(x + 0.5, y + 0.5, currentProgress);
-						ctx.save();
-						ctx.fillStyle = '#ffffff';
-						ctx.font = `bold ${Math.max(10, 12 / fit.zoom)}px Inter, sans-serif`;
-						ctx.textAlign = 'center';
-						ctx.textBaseline = 'middle';
-						ctx.shadowColor = 'rgba(0,0,0,0.9)';
-						ctx.shadowBlur = 4;
-						ctx.fillText(tile.label, center.x, center.y);
-						ctx.restore();
+						GeometryPipeline.drawTileText(ctx, isoMath, x, y, tile.label, fit.zoom, currentProgress);
 					}
 				});
 			}
@@ -264,19 +210,5 @@ export class PngExporter {
 		const url = offCanvas.toDataURL('image/png');
 		const filename = Utils.getExportFileName(scheme.name, 'blueprint', 'png');
 		Utils.triggerDownload(filename, url);
-	}
-
-	static desaturateHex(hex, factor = 0.7) {
-		if (!hex || hex.length < 7) return '#64748b';
-		let r = parseInt(hex.substring(1, 3), 16);
-		let g = parseInt(hex.substring(3, 5), 16);
-		let b = parseInt(hex.substring(5, 7), 16);
-
-		const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-		r = Math.round(r + (gray - r) * factor);
-		g = Math.round(g + (gray - g) * factor);
-		b = Math.round(b + (gray - b) * factor);
-
-		return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 	}
 }

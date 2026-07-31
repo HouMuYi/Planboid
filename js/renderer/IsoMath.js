@@ -2,9 +2,11 @@
  * IsoMath.js - 精確 ISO 與 Ortho 座標幾何轉換與頂點計算
  */
 
+import { CONFIG } from '../core/Config.js';
+
 export class IsoMath {
 	/**
-	 * @param {number} tileSize 地塊尺寸 (預設 32px)
+	 * @param {number} tileSize 地塊尺寸 (預設 CONFIG.TILE_SIZE)
 	 */
 	constructor(tileSize = 32) {
 		this.tileSize = tileSize;
@@ -57,8 +59,8 @@ export class IsoMath {
 	 * 取得帶入 PZ 樓層視覺偏移 (-3z, -3z) 後的地塊四頂點 [p0, p1, p2, p3]
 	 */
 	getTilePolyScreen(x, y, z, progress = 1.0) {
-		const rX = x - 3 * z * progress;
-		const rY = y - 3 * z * progress;
+		const rX = x - CONFIG.Z_VISUAL_OFFSET * z * progress;
+		const rY = y - CONFIG.Z_VISUAL_OFFSET * z * progress;
 
 		const p0 = this.gridToScreen(rX, rY, progress);
 		const p1 = this.gridToScreen(rX + 1, rY, progress);
@@ -91,7 +93,7 @@ export class IsoMath {
 
 		if (!b0 || !b1) return null;
 
-		const wallHeight = 96 * progress;
+		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * progress;
 		const t0 = { x: b0.x, y: b0.y - wallHeight };
 		const t1 = { x: b1.x, y: b1.y - wallHeight };
 

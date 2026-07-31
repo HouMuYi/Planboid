@@ -99,10 +99,29 @@ export class Toolbar {
 			updateFloorDisplay();
 		});
 
-		chkGhost?.addEventListener('change', (e) => {
-			this.state.ghostLayerEnabled = e.target.checked;
-			this.state.notifyStateChange();
+		const otherFloorsBtns = document.querySelectorAll('#other-floors-group .btn-segmented');
+		const syncOtherFloorsUI = () => {
+			const currentMode = this.state.otherFloorsMode || 'ghost';
+			otherFloorsBtns.forEach(btn => {
+				if (btn.dataset.mode === currentMode) {
+					btn.classList.add('active');
+				} else {
+					btn.classList.remove('active');
+				}
+			});
+		};
+
+		otherFloorsBtns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const mode = btn.dataset.mode;
+				this.state.setOtherFloorsMode(mode);
+				syncOtherFloorsUI();
+				this.state.notifyStateChange();
+			});
 		});
+
+		window.addEventListener('statechange', syncOtherFloorsUI);
+		syncOtherFloorsUI();
 
 		window.addEventListener('langchange', updateFloorDisplay);
 

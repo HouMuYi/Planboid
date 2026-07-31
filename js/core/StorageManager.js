@@ -4,6 +4,7 @@
 
 import { i18n } from './I18nManager.js';
 import { SchemeSerializer } from './SchemeSerializer.js';
+import { CONFIG } from './Config.js';
 
 const STORAGE_KEY = 'planboid_data_v4';
 
@@ -15,11 +16,11 @@ export class StorageManager {
 		return {
 			id: 'scheme_' + Date.now(),
 			name: i18n.t('defaults_scheme_name') || '預設地塊規劃',
-			width: 64,
-			height: 64,
+			width: CONFIG.DEFAULT_SCHEME_WIDTH,
+			height: CONFIG.DEFAULT_SCHEME_HEIGHT,
 			currentLevel: 0,
-			worldOriginX: 10500,
-			worldOriginY: 9200,
+			worldOriginX: CONFIG.DEFAULT_ORIGIN_X,
+			worldOriginY: CONFIG.DEFAULT_ORIGIN_Y,
 			tiles: {},
 			palette: {
 				'color_road': { color: '#334155', name: i18n.t('defaults_palette_road') || '道路' },

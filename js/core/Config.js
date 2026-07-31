@@ -1,0 +1,41 @@
+/**
+ * Config.js - 專案全域魔術數字與環境常數配置
+ */
+
+export const CONFIG = {
+	// PZ 幾何
+	TILE_SIZE: 32, // 地塊預設基礎尺寸 (px)
+	Z_VISUAL_OFFSET: 3, // 每層 Z 軸樓層視覺高程偏置係數
+
+	// 視角與相機
+	ZOOM_MIN: 0.2, // 最遠縮放倍率下限
+	ZOOM_MAX: 5.0, // 最近縮放倍率上限
+	ZOOM_WHEEL_FACTOR: 1.15, // 滑鼠滾輪縮放倍率 (上滾乘以該值，下滾除以該值)
+	ZOOM_ANIMATION_FACTOR: 0.35, // 平滑縮放 Lerp 動畫內插因子
+	TRANSITION_SPEED: 0.35, // 2D/3D 視角切換動畫過渡速度 (與縮放動畫一致，極速順暢)
+	FIT_VIEW_PADDING: 1, // 畫面自動置中 (fitView) 時留白邊界 (格數)
+
+	// 操作與邊緣判定
+	EDGE_SNAP_MIN: 0.25, // 網格內判定牆面邊緣吸附下限 (25%)
+	EDGE_SNAP_MAX: 0.75, // 網格內判定牆面邊緣吸附上限 (75%)
+
+	// 領域與狀態限制
+	HISTORY_MAX_STEPS: 30, // Undo / Redo 歷史紀錄最大步數
+	SCHEME_SIZE_MIN: 10, // 方案寬度與高度最小網格限制
+	SCHEME_SIZE_MAX: 300, // 方案寬度與高度最大網格限制
+	Z_LEVEL_MIN: -17, // 最底層 Z 軸樓層限制
+	Z_LEVEL_MAX: 29, // 最高層 Z 軸樓層限制
+	DEFAULT_SCHEME_WIDTH: 64, // 新增預設方案網格寬度
+	DEFAULT_SCHEME_HEIGHT: 64, // 新增預設方案網格高度
+	DEFAULT_ORIGIN_X: 10500, // 新增預設方案地圖 X 世界座標
+	DEFAULT_ORIGIN_Y: 9200, // 新增預設方案地圖 Y 世界座標
+
+	// 視覺與顏色
+	COLOR_BG: '#0b0f19', // 底層 Canvas 純黑主背景色
+	COLOR_GRID_NORMAL: 'rgba(255, 255, 255, 0.08)', // 畫布輔助網格線顏色
+	COLOR_GRID_BOUNDS: 'rgba(99, 102, 241, 0.5)', // 地塊外框邊界網格線顏色
+	WALL_FILL_ALPHA: 0.55, // 3D 牆面面片基礎不透明度
+	GHOST_BASE_ALPHA: 0.45, // 相隔 1 層鬼影之基礎不透明度
+	GHOST_ALPHA_DECAY: 0.8, // 鬼影跨層不透明度衰減率 (每多相隔 1 層)
+	GHOST_SATURATION_DECAY: 0.8, // 鬼影跨層彩度/飽和度留存率 (每多相隔 1 層)
+};

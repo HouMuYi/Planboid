@@ -17,7 +17,7 @@ export class SvgExporter {
 		if (!stateManager || !stateManager.scheme) return;
 		const scheme = stateManager.scheme;
 		const isoMath = new IsoMath(32);
-		this.downloadSvg(scheme, isoMath, stateManager.currentZLevel, stateManager.ghostLayerEnabled);
+		this.downloadSvg(scheme, isoMath, stateManager.currentZLevel, stateManager.otherFloorsMode);
 	}
 
 	/**
@@ -25,10 +25,10 @@ export class SvgExporter {
 	 * @param {Object} scheme
 	 * @param {Object} isoMath
 	 * @param {number} currentZ
-	 * @param {boolean} ghostEnabled
+	 * @param {string|boolean} otherFloorsMode
 	 * @returns {string} XML SVG 字串
 	 */
-	static exportSvg(scheme, isoMath, currentZ = 0, ghostEnabled = true) {
+	static exportSvg(scheme, isoMath, currentZ = 0, otherFloorsMode = 'ghost') {
 		const fit = ExportCanvasPipeline.calculateFitCamera(scheme, isoMath, currentZ);
 		const palette = scheme.palette || {};
 
@@ -40,12 +40,18 @@ export class SvgExporter {
 		let svgContent = `<?xml version="1.0" encoding="UTF-8"?>\n`;
 		svgContent +=
 			`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}" width="${viewBoxW}" height="${viewBoxH}">\n`;
+		svgContent += `<defs>\n`;
+		svgContent += `  <linearGradient id="svg-wall-shading" x1="0%" y1="0%" x2="0%" y2="100%">\n`;
+		svgContent += `    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />\n`;
+		svgContent += `    <stop offset="100%" stop-color="#000000" stop-opacity="0.32" />\n`;
+		svgContent += `  </linearGradient>\n`;
+		svgContent += `</defs>\n`;
 		svgContent += `<rect x="${viewBoxX}" y="${viewBoxY}" width="${viewBoxW}" height="${viewBoxH}" fill="#0b0f19" />\n`;
 
 		svgContent += `<g id="planboid-map-layer">\n`;
 
 		// 按樓層分組：每層一個 <g> 套用 transform 與 opacity，子元素使用純邏輯座標
-		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, ghostEnabled);
+		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, otherFloorsMode);
 
 		layers.forEach(layer => {
 			const { z, isCurrent, alpha, items } = layer;
@@ -63,18 +69,13 @@ export class SvgExporter {
 				}
 			});
 
-			// Pass 2: 牆面面片
+			// Pass 2: 牆面面片 (呼叫 GeometryPipeline 權威 SVG 標籤管道)
 			items.forEach(({ x, y, tile }) => {
 				if (tile.walls) {
 					Object.entries(tile.walls).forEach(([edge, colorId]) => {
 						if (colorId && palette[colorId]) {
 							const color = palette[colorId].color;
-							const quad = GeometryPipeline.getWallQuad96Points(isoMath, x, y, edge, 1.0);
-							if (quad) {
-								const [b0, b1, t1, t0] = quad;
-								svgContent +=
-									`<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall" data-edge="${edge}" data-color-id="${colorId}" points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="${color}" fill-opacity="0.45" stroke="${color}" stroke-opacity="0.8" stroke-width="1.5" />\n`;
-							}
+							svgContent += GeometryPipeline.getWallSvgElements(isoMath, x, y, z, edge, colorId, color);
 						}
 					});
 				}
@@ -133,8 +134,8 @@ export class SvgExporter {
 	/**
 	 * 觸發瀏覽器下載 SVG
 	 */
-	static downloadSvg(scheme, isoMath, currentZ = 0, ghostEnabled = true) {
-		const svgContent = this.exportSvg(scheme, isoMath, currentZ, ghostEnabled);
+	static downloadSvg(scheme, isoMath, currentZ = 0, otherFloorsMode = 'ghost') {
+		const svgContent = this.exportSvg(scheme, isoMath, currentZ, otherFloorsMode);
 		const filename = Utils.getExportFileName(scheme.name, 'full_canvas', 'svg');
 		Utils.triggerDownload(filename, svgContent, 'image/svg+xml;charset=utf-8');
 	}

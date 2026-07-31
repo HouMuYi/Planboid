@@ -5,6 +5,7 @@
  */
 
 import { calcZTranslate } from './GeometryPipeline.js';
+import { CONFIG } from '../core/Config.js';
 
 export class InputDispatcher {
 	/**
@@ -46,13 +47,16 @@ export class InputDispatcher {
 
 		let edge = null;
 		// 邊緣吸附需在 25% 帶內，且必須位於邊長度方向的中央 50% (0.25 ~ 0.75，忽略兩端各 25% 角落交錯區)
-		if (localY < 0.25 && localX >= 0.25 && localX <= 0.75) {
+		const snapMin = CONFIG.EDGE_SNAP_MIN;
+		const snapMax = CONFIG.EDGE_SNAP_MAX;
+		
+		if (localY < snapMin && localX >= snapMin && localX <= snapMax) {
 			edge = 'north';
-		} else if (localY > 0.75 && localX >= 0.25 && localX <= 0.75) {
+		} else if (localY > snapMax && localX >= snapMin && localX <= snapMax) {
 			edge = 'south';
-		} else if (localX < 0.25 && localY >= 0.25 && localY <= 0.75) {
+		} else if (localX < snapMin && localY >= snapMin && localY <= snapMax) {
 			edge = 'west';
-		} else if (localX > 0.75 && localY >= 0.25 && localY <= 0.75) {
+		} else if (localX > snapMax && localY >= snapMin && localY <= snapMax) {
 			edge = 'east';
 		}
 
@@ -63,6 +67,8 @@ export class InputDispatcher {
 		const el = this.renderer.canvas;
 
 		el.addEventListener('mousedown', (e) => {
+			if (this.renderer.isAnimating) return;
+
 			const { cellX, cellY, edge } = this.getMouseGridPos(e);
 
 			if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
@@ -232,7 +238,7 @@ export class InputDispatcher {
 					const currentTargetCamX = this.isZoomAnimating ? this.targetCameraX : this.renderer.cameraX;
 					const currentTargetCamY = this.isZoomAnimating ? this.targetCameraY : this.renderer.cameraY;
 
-					const newTargetZoom = Math.max(0.2, Math.min(5.0, currentTargetZoom * zoomRatio));
+					const newTargetZoom = Math.max(CONFIG.ZOOM_MIN, Math.min(CONFIG.ZOOM_MAX, currentTargetZoom * zoomRatio));
 
 					// 同時計算雙指中心點的位移 (Two-finger Pan)
 					const deltaCenterX = centerX - this.lastTouchCenterX;
@@ -244,10 +250,8 @@ export class InputDispatcher {
 						+ deltaCenterY;
 					this.targetZoom = newTargetZoom;
 
-					if (!this.isZoomAnimating) {
-						this.isZoomAnimating = true;
-						this.animateZoom();
-					}
+					this.isZoomAnimating = true;
+					this.renderer.requestRenderAll();
 				}
 
 				this.lastTouchDist = dist;
@@ -287,13 +291,16 @@ export class InputDispatcher {
 
 		el.addEventListener('wheel', (e) => {
 			e.preventDefault();
-			const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+			if (this.renderer.isAnimating) return;
 
 			const currentTargetZoom = this.isZoomAnimating ? this.targetZoom : this.renderer.zoom;
 			const currentTargetCamX = this.isZoomAnimating ? this.targetCameraX : this.renderer.cameraX;
 			const currentTargetCamY = this.isZoomAnimating ? this.targetCameraY : this.renderer.cameraY;
 
-			const newTargetZoom = Math.max(0.2, Math.min(5.0, currentTargetZoom * zoomFactor));
+			const rawTargetZoom = e.deltaY < 0
+				? currentTargetZoom * CONFIG.ZOOM_WHEEL_FACTOR
+				: currentTargetZoom / CONFIG.ZOOM_WHEEL_FACTOR;
+			const newTargetZoom = Math.max(CONFIG.ZOOM_MIN, Math.min(CONFIG.ZOOM_MAX, rawTargetZoom));
 
 			const rect = el.getBoundingClientRect();
 			const mouseX = e.clientX - rect.left;
@@ -303,37 +310,9 @@ export class InputDispatcher {
 			this.targetCameraY = mouseY - (mouseY - currentTargetCamY) * (newTargetZoom / currentTargetZoom);
 			this.targetZoom = newTargetZoom;
 
-			if (!this.isZoomAnimating) {
-				this.isZoomAnimating = true;
-				this.animateZoom();
-			}
+			this.isZoomAnimating = true;
+			this.renderer.requestRenderAll();
 		}, { passive: false });
-	}
-
-	animateZoom() {
-		if (!this.isZoomAnimating) return;
-
-		// 快速短時間 Lerp 插值 (0.35 因子：約 40ms 內極速滑平，超快且極致順暢)
-		const factor = 0.35;
-		const diffZoom = this.targetZoom - this.renderer.zoom;
-		const diffCamX = this.targetCameraX - this.renderer.cameraX;
-		const diffCamY = this.targetCameraY - this.renderer.cameraY;
-
-		if (Math.abs(diffZoom) < 0.001 && Math.abs(diffCamX) < 0.1 && Math.abs(diffCamY) < 0.1) {
-			this.renderer.zoom = this.targetZoom;
-			this.renderer.cameraX = this.targetCameraX;
-			this.renderer.cameraY = this.targetCameraY;
-			this.isZoomAnimating = false;
-		} else {
-			this.renderer.zoom += diffZoom * factor;
-			this.renderer.cameraX += diffCamX * factor;
-			this.renderer.cameraY += diffCamY * factor;
-			requestAnimationFrame(() => this.animateZoom());
-		}
-
-		this.renderer.requestRenderAll();
-		const event = new CustomEvent('zoomchange', { detail: { zoom: this.renderer.zoom } });
-		window.dispatchEvent(event);
 	}
 
 	updateHoverState(cellX, cellY, edge) {
@@ -347,8 +326,8 @@ export class InputDispatcher {
 
 			const displayX = cellX + 1;
 			const displayY = cellY + 1;
-			const gameX = (this.state.scheme.worldOriginX || 10500) + cellX;
-			const gameY = (this.state.scheme.worldOriginY || 9200) + cellY;
+			const gameX = (this.state.scheme.worldOriginX || CONFIG.DEFAULT_ORIGIN_X) + cellX;
+			const gameY = (this.state.scheme.worldOriginY || CONFIG.DEFAULT_ORIGIN_Y) + cellY;
 
 			const event = new CustomEvent('gridhover', {
 				detail: {
@@ -363,6 +342,20 @@ export class InputDispatcher {
 	}
 
 	handleMouseMove(e) {
+		// 視角過渡動畫期間排他冷凍網格懸停游標，防止座標抖動
+		if (this.renderer.isAnimating) {
+			this.updateHoverState(-1, -1, null);
+			return;
+		}
+
+		// 若遊標移至 .view-overlay-controls 或 .canvas-info-overlay 等懸浮 UI 上方，停止畫布懸停追蹤與游標高亮
+		if (e.target && e.target.closest && (e.target.closest('.view-overlay-controls') || e.target.closest('.canvas-info-overlay'))) {
+			if (!this.renderer.isDraggingCamera && !this.renderer.isPainting && !this.renderer.isRightPainting) {
+				this.updateHoverState(-1, -1, null);
+				return;
+			}
+		}
+
 		if (this.renderer.isDraggingCamera) {
 			const dx = e.clientX - this.renderer.lastMouseX;
 			const dy = e.clientY - this.renderer.lastMouseY;

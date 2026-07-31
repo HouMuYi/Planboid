@@ -11,9 +11,23 @@ export class ToolModeState {
 		this.activeColorId = ''; // 目前選取的色塊 ID
 
 		// 視覺與遊戲開關
-		this.ghostLayerEnabled = true;
+		this.otherFloorsMode = 'ghost'; // "hidden" | "ghost" | "solid"
 		this.visualOffsetEnabled = true;
 		this.is3DWallsEnabled = true;
+	}
+
+	get ghostLayerEnabled() {
+		return this.otherFloorsMode !== 'hidden';
+	}
+
+	set ghostLayerEnabled(val) {
+		this.otherFloorsMode = val ? 'ghost' : 'hidden';
+	}
+
+	setOtherFloorsMode(mode) {
+		if (['hidden', 'ghost', 'solid'].includes(mode)) {
+			this.otherFloorsMode = mode;
+		}
 	}
 
 	setActiveTool(tool) {
