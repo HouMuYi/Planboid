@@ -165,24 +165,201 @@ export class InputDispatcher {
 
 		el.addEventListener('contextmenu', (e) => e.preventDefault());
 
+		// 輕量短時間平滑縮放變數初始化
+		this.targetZoom = this.renderer.zoom;
+		this.targetCameraX = this.renderer.cameraX;
+		this.targetCameraY = this.renderer.cameraY;
+		this.isZoomAnimating = false;
+
+		// 行動端雙指觸控手勢與防誤觸冷卻鎖變數
+		this.lastTouchDist = 0;
+		this.lastTouchCenterX = 0;
+		this.lastTouchCenterY = 0;
+		this.isTouchPinching = false;
+
+		el.addEventListener('touchstart', (e) => {
+			if (e.touches.length >= 2) {
+				e.preventDefault();
+				this.isTouchPinching = true;
+				// 防護 1：雙指觸控瞬間，強制冷凍中斷任何單指繪圖/筆刷/選區狀態！
+				this.renderer.isPainting = false;
+				this.renderer.isRightPainting = false;
+				this.renderer.shapeStartCell = null;
+				this.renderer.requestRenderOverlay();
+
+				const t1 = e.touches[0];
+				const t2 = e.touches[1];
+				this.lastTouchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+				const rect = el.getBoundingClientRect();
+				this.lastTouchCenterX = (t1.clientX + t2.clientX) / 2 - rect.left;
+				this.lastTouchCenterY = (t1.clientY + t2.clientY) / 2 - rect.top;
+			} else if (e.touches.length === 1) {
+				// 若處於雙指離場冷卻鎖狀態，禁止觸發單指工具繪圖
+				if (this.isTouchPinching) return;
+
+				const touch = e.touches[0];
+				const { cellX, cellY, edge } = this.getMouseGridPos(touch);
+				this.updateHoverState(cellX, cellY, edge);
+
+				const mouseEvent = new MouseEvent('mousedown', {
+					clientX: touch.clientX,
+					clientY: touch.clientY,
+					button: 0,
+				});
+				el.dispatchEvent(mouseEvent);
+			}
+		}, { passive: false });
+
+		el.addEventListener('touchmove', (e) => {
+			if (e.touches.length >= 2) {
+				e.preventDefault();
+				this.isTouchPinching = true;
+				// 防護 2：雙指手勢移動期間，持續確保筆刷被冷凍，防止誤繪
+				this.renderer.isPainting = false;
+
+				const t1 = e.touches[0];
+				const t2 = e.touches[1];
+				const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+				const rect = el.getBoundingClientRect();
+				const centerX = (t1.clientX + t2.clientX) / 2 - rect.left;
+				const centerY = (t1.clientY + t2.clientY) / 2 - rect.top;
+
+				if (this.lastTouchDist > 0) {
+					const zoomRatio = dist / this.lastTouchDist;
+					const currentTargetZoom = this.isZoomAnimating ? this.targetZoom : this.renderer.zoom;
+					const currentTargetCamX = this.isZoomAnimating ? this.targetCameraX : this.renderer.cameraX;
+					const currentTargetCamY = this.isZoomAnimating ? this.targetCameraY : this.renderer.cameraY;
+
+					const newTargetZoom = Math.max(0.2, Math.min(5.0, currentTargetZoom * zoomRatio));
+
+					// 同時計算雙指中心點的位移 (Two-finger Pan)
+					const deltaCenterX = centerX - this.lastTouchCenterX;
+					const deltaCenterY = centerY - this.lastTouchCenterY;
+
+					this.targetCameraX = centerX - (centerX - currentTargetCamX) * (newTargetZoom / currentTargetZoom)
+						+ deltaCenterX;
+					this.targetCameraY = centerY - (centerY - currentTargetCamY) * (newTargetZoom / currentTargetZoom)
+						+ deltaCenterY;
+					this.targetZoom = newTargetZoom;
+
+					if (!this.isZoomAnimating) {
+						this.isZoomAnimating = true;
+						this.animateZoom();
+					}
+				}
+
+				this.lastTouchDist = dist;
+				this.lastTouchCenterX = centerX;
+				this.lastTouchCenterY = centerY;
+			} else if (e.touches.length === 1) {
+				if (this.isTouchPinching) return;
+
+				const touch = e.touches[0];
+				const { cellX, cellY, edge } = this.getMouseGridPos(touch);
+				this.updateHoverState(cellX, cellY, edge);
+
+				const mouseEvent = new MouseEvent('mousemove', {
+					clientX: touch.clientX,
+					clientY: touch.clientY,
+				});
+				window.dispatchEvent(mouseEvent);
+			}
+		}, { passive: false });
+
+		const handleTouchEnd = (e) => {
+			if (e.touches.length === 0) {
+				// 當所有手指離場時，解開雙指手勢冷卻鎖
+				this.isTouchPinching = false;
+				this.lastTouchDist = 0;
+
+				const mouseEvent = new MouseEvent('mouseup', {});
+				window.dispatchEvent(mouseEvent);
+			} else if (e.touches.length === 1) {
+				// 雙指離開其中一隻時，重置距離與中心
+				this.lastTouchDist = 0;
+			}
+		};
+
+		el.addEventListener('touchend', handleTouchEnd);
+		el.addEventListener('touchcancel', handleTouchEnd);
+
 		el.addEventListener('wheel', (e) => {
 			e.preventDefault();
-			const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-			const newZoom = Math.max(0.2, Math.min(5.0, this.renderer.zoom * zoomFactor));
+			const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+
+			const currentTargetZoom = this.isZoomAnimating ? this.targetZoom : this.renderer.zoom;
+			const currentTargetCamX = this.isZoomAnimating ? this.targetCameraX : this.renderer.cameraX;
+			const currentTargetCamY = this.isZoomAnimating ? this.targetCameraY : this.renderer.cameraY;
+
+			const newTargetZoom = Math.max(0.2, Math.min(5.0, currentTargetZoom * zoomFactor));
 
 			const rect = el.getBoundingClientRect();
 			const mouseX = e.clientX - rect.left;
 			const mouseY = e.clientY - rect.top;
 
-			this.renderer.cameraX = mouseX - (mouseX - this.renderer.cameraX) * (newZoom / this.renderer.zoom);
-			this.renderer.cameraY = mouseY - (mouseY - this.renderer.cameraY) * (newZoom / this.renderer.zoom);
-			this.renderer.zoom = newZoom;
+			this.targetCameraX = mouseX - (mouseX - currentTargetCamX) * (newTargetZoom / currentTargetZoom);
+			this.targetCameraY = mouseY - (mouseY - currentTargetCamY) * (newTargetZoom / currentTargetZoom);
+			this.targetZoom = newTargetZoom;
 
-			this.renderer.requestRenderAll();
-
-			const event = new CustomEvent('zoomchange', { detail: { zoom: this.renderer.zoom } });
-			window.dispatchEvent(event);
+			if (!this.isZoomAnimating) {
+				this.isZoomAnimating = true;
+				this.animateZoom();
+			}
 		}, { passive: false });
+	}
+
+	animateZoom() {
+		if (!this.isZoomAnimating) return;
+
+		// 快速短時間 Lerp 插值 (0.35 因子：約 40ms 內極速滑平，超快且極致順暢)
+		const factor = 0.35;
+		const diffZoom = this.targetZoom - this.renderer.zoom;
+		const diffCamX = this.targetCameraX - this.renderer.cameraX;
+		const diffCamY = this.targetCameraY - this.renderer.cameraY;
+
+		if (Math.abs(diffZoom) < 0.001 && Math.abs(diffCamX) < 0.1 && Math.abs(diffCamY) < 0.1) {
+			this.renderer.zoom = this.targetZoom;
+			this.renderer.cameraX = this.targetCameraX;
+			this.renderer.cameraY = this.targetCameraY;
+			this.isZoomAnimating = false;
+		} else {
+			this.renderer.zoom += diffZoom * factor;
+			this.renderer.cameraX += diffCamX * factor;
+			this.renderer.cameraY += diffCamY * factor;
+			requestAnimationFrame(() => this.animateZoom());
+		}
+
+		this.renderer.requestRenderAll();
+		const event = new CustomEvent('zoomchange', { detail: { zoom: this.renderer.zoom } });
+		window.dispatchEvent(event);
+	}
+
+	updateHoverState(cellX, cellY, edge) {
+		if (
+			cellX !== this.renderer.hoveredCell.x
+			|| cellY !== this.renderer.hoveredCell.y
+			|| edge !== this.renderer.hoveredCell.edge
+		) {
+			this.renderer.hoveredCell = { x: cellX, y: cellY, edge };
+			this.renderer.requestRenderOverlay();
+
+			const displayX = cellX + 1;
+			const displayY = cellY + 1;
+			const gameX = (this.state.scheme.worldOriginX || 10500) + cellX;
+			const gameY = (this.state.scheme.worldOriginY || 9200) + cellY;
+
+			const event = new CustomEvent('gridhover', {
+				detail: {
+					x: displayX,
+					y: displayY,
+					gameX,
+					gameY,
+				},
+			});
+			window.dispatchEvent(event);
+		}
 	}
 
 	handleMouseMove(e) {
@@ -196,26 +373,7 @@ export class InputDispatcher {
 			this.renderer.requestRenderAll();
 		} else {
 			const { cellX, cellY, edge } = this.getMouseGridPos(e);
-			if (cellX !== this.renderer.hoveredCell.x || cellY !== this.renderer.hoveredCell.y || edge !== this.renderer.hoveredCell.edge) {
-				this.renderer.hoveredCell = { x: cellX, y: cellY, edge };
-				// 關鍵優化：Hover 變更時，僅請求極輕量的頂層 Overlay 重繪 (耗費 <0.1ms)，完全不重繪底層地塊！
-				this.renderer.requestRenderOverlay();
-
-				const displayX = cellX + 1;
-				const displayY = cellY + 1;
-				const gameX = (this.state.scheme.worldOriginX || 10500) + cellX;
-				const gameY = (this.state.scheme.worldOriginY || 9200) + cellY;
-
-				const event = new CustomEvent('gridhover', {
-					detail: {
-						x: displayX,
-						y: displayY,
-						gameX,
-						gameY,
-					},
-				});
-				window.dispatchEvent(event);
-			}
+			this.updateHoverState(cellX, cellY, edge);
 
 			if (this.renderer.isRightPainting) {
 				this.applicator.applyRightClickErase(cellX, cellY, edge);

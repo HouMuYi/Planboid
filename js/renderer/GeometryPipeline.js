@@ -111,7 +111,7 @@ export class GeometryPipeline {
 	/**
 	 * 計算能夠在指定 Viewport 下「恰恰好包覆全畫布與所有樓層地塊」的最佳 Camera X, Y 與 Zoom
 	 */
-	static calculateFitCameraPos(isoMath, scheme, currentProgress, viewportWidth, viewportHeight, padding = 40) {
+	static calculateFitCameraPos(isoMath, scheme, currentProgress, viewportWidth, viewportHeight, padding = 40, sidebarWidth = 0) {
 		const w = scheme.width;
 		const h = scheme.height;
 
@@ -148,14 +148,16 @@ export class GeometryPipeline {
 		const boundsW = Math.max(10, maxX - minX);
 		const boundsH = Math.max(10, maxY - minY);
 
-		const zoomX = (viewportWidth - padding * 2) / boundsW;
+		const effectiveWidth = Math.max(100, viewportWidth - sidebarWidth);
+
+		const zoomX = (effectiveWidth - padding * 2) / boundsW;
 		const zoomY = (viewportHeight - padding * 2) / boundsH;
 		const fitZoom = Math.max(0.15, Math.min(4.0, Math.min(zoomX, zoomY)));
 
 		const centerX = (minX + maxX) / 2;
 		const centerY = (minY + maxY) / 2;
 
-		const cameraX = viewportWidth / 2 - centerX * fitZoom;
+		const cameraX = effectiveWidth / 2 - centerX * fitZoom;
 		const cameraY = viewportHeight / 2 - centerY * fitZoom;
 
 		return { zoom: fitZoom, cameraX, cameraY, minX, minY, maxX, maxY };

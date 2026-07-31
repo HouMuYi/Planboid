@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+	<defs>
+		<linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#0f172a" />
+			<stop offset="100%" stop-color="#080c14" />
+		</linearGradient>
+
+		<linearGradient id="spiffoOrangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#fbbf24" />
+			<stop offset="100%" stop-color="#d97706" />
+		</linearGradient>
+
+		<linearGradient id="spiffoBrownLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+			<stop offset="0%" stop-color="#78350f" />
+			<stop offset="100%" stop-color="#451a03" />
+		</linearGradient>
+
+		<linearGradient id="spiffoBrownRight" x1="0%" y1="0%" x2="0%" y2="100%">
+			<stop offset="0%" stop-color="#92400e" />
+			<stop offset="100%" stop-color="#541b05" />
+		</linearGradient>
+
+		<linearGradient id="spiffoRedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#f87171" />
+			<stop offset="100%" stop-color="#dc2626" />
+		</linearGradient>
+
+		<linearGradient id="wallGreenGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#34d399" />
+			<stop offset="100%" stop-color="#059669" />
+		</linearGradient>
+	</defs>
+
+	<rect x="24" y="24" width="464" height="464" rx="96" fill="url(#bgGrad)" stroke="rgba(255, 255, 255, 0.12)" stroke-width="3" />
+
+	<g id="logo-composite-body">
+		<polygon points="256,193.5 426,278.5 256,363.5 86,278.5" fill="url(#spiffoOrangeGrad)" stroke="#fef3c7" stroke-width="2.5" />
+		<polygon points="86,278.5 256,363.5 256,408.5 86,323.5" fill="url(#spiffoBrownLeft)" />
+		<polygon points="256,363.5 426,278.5 426,323.5 256,408.5" fill="url(#spiffoBrownRight)" />
+
+		<g id="accent-block">
+			<polygon points="192.25,246.625 256,278.5 256,308.5 192.25,276.625" fill="#991b1b" />
+			<polygon points="256,278.5 319.75,246.625 319.75,276.625 256,308.5" fill="#7f1d1d" />
+			<polygon points="256,216.625 319.75,246.625 256,278.5 192.25,246.625" fill="url(#spiffoRedGrad)" stroke="#fca5a5" stroke-width="2" />
+		</g>
+
+		<polygon points="86,278.5 256,193.5 256,88.5 86,173.5" fill="rgba(30, 77, 56, 0.82)" stroke="#a7f3d0" stroke-width="3" />
+		<polygon points="256,193.5 426,278.5 426,173.5 256,88.5" fill="rgba(20, 58, 41, 0.9)" stroke="#6ee7b7" stroke-width="3" />
+
+		<polyline points="86,173.5 256,88.5 426,173.5" fill="none" stroke="#fef3c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+	</g>
+</svg>

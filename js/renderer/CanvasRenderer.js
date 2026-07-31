@@ -71,6 +71,8 @@ export class CanvasRenderer {
 		this.overlayCanvas.style.position = 'absolute';
 		this.overlayCanvas.style.top = '0';
 		this.overlayCanvas.style.left = '0';
+		this.overlayCanvas.style.width = '100%';
+		this.overlayCanvas.style.height = '100%';
 		this.overlayCanvas.style.pointerEvents = 'none';
 		this.overlayCanvas.style.zIndex = '10';
 		this.overlayCtx = this.overlayCanvas.getContext('2d');
@@ -106,16 +108,30 @@ export class CanvasRenderer {
 		this.requestRenderAll();
 	}
 
+	/**
+	 * 取得展開狀態下右側邊欄的視覺寬度（若已摺疊/收起則回傳 0）
+	 */
+	getSidebarWidth() {
+		const sidebar = document.getElementById('main-sidebar');
+		if (sidebar && !sidebar.classList.contains('collapsed')) {
+			return sidebar.offsetWidth || 0;
+		}
+		return 0;
+	}
+
 	centerCamera() {
+		const sidebarWidth = this.getSidebarWidth();
+		const effectiveWidth = this.viewportWidth - sidebarWidth;
 		const scheme = this.state.scheme;
 		const z = this.state.currentZLevel;
 		const basePos = this.isoMath.gridToScreen(scheme.width / 2, scheme.height / 2, this.currentProgress);
 		const { dx, dy } = calcZTranslate(z, this.currentProgress);
-		this.cameraX = this.viewportWidth / 2 - (basePos.x + dx) * this.zoom;
+		this.cameraX = effectiveWidth / 2 - (basePos.x + dx) * this.zoom;
 		this.cameraY = this.viewportHeight / 2 - (basePos.y + dy) * this.zoom;
 	}
 
 	fitView(padding = 40) {
+		const sidebarWidth = this.getSidebarWidth();
 		const fit = GeometryPipeline.calculateFitCameraPos(
 			this.isoMath,
 			this.state.scheme,
@@ -123,6 +139,7 @@ export class CanvasRenderer {
 			this.viewportWidth,
 			this.viewportHeight,
 			padding,
+			sidebarWidth,
 		);
 		this.zoom = fit.zoom;
 		this.cameraX = fit.cameraX;
@@ -143,7 +160,9 @@ export class CanvasRenderer {
 	}
 
 	getCurrentCenterGridCell() {
-		const centerScreenX = this.viewportWidth / 2;
+		const sidebarWidth = this.getSidebarWidth();
+		const effectiveWidth = this.viewportWidth - sidebarWidth;
+		const centerScreenX = effectiveWidth / 2;
 		const centerScreenY = this.viewportHeight / 2;
 
 		const worldX = (centerScreenX - this.cameraX) / this.zoom;
@@ -180,9 +199,11 @@ export class CanvasRenderer {
 			this.currentProgress += diff * this.transitionSpeed;
 
 			if (this.anchorGridCell) {
+				const sidebarWidth = this.getSidebarWidth();
+				const effectiveWidth = this.viewportWidth - sidebarWidth;
 				const z = this.state.currentZLevel;
 				const newPos = this.getScreenPos(this.anchorGridCell.x, this.anchorGridCell.y, z);
-				this.cameraX = this.viewportWidth / 2 - newPos.x * this.zoom;
+				this.cameraX = effectiveWidth / 2 - newPos.x * this.zoom;
 				this.cameraY = this.viewportHeight / 2 - newPos.y * this.zoom;
 			}
 

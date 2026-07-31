@@ -156,16 +156,8 @@ export class PalettePanel {
 		presetContainer.innerHTML = '';
 		presets.forEach(color => {
 			const btn = document.createElement('div');
-			btn.style.cssText = `
-                width: 24px;
-                height: 24px;
-                border-radius: 4px;
-                background-color: ${color};
-                border: 1px solid rgba(255, 255, 255, 0.25);
-                cursor: pointer;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            `;
 			btn.className = 'preset-swatch-item';
+			btn.style.backgroundColor = color;
 			btn.addEventListener('click', () => {
 				if (this.editColorInput) {
 					this.editColorInput.value = color;

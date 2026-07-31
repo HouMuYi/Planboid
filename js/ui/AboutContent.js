@@ -1,45 +1,44 @@
 /**
  * 自動產生檔 (請勿手動修改，請執行 node scripts/build-about.mjs 重新編譯)
  */
-export const ABOUT_HTML = `<h1>Planboid 📐</h1>
+export const ABOUT_HTML = `<h1>Planboid 線上地塊規劃器</h1>
 
-<blockquote><strong>Project Zomboid (PZ) 線上地塊規劃器</strong> — 專為模組作者、地圖編輯器玩家與生存基地設計師打造的零依賴純前端工具。</blockquote>
+Planboid 是線上地塊規劃工具，專為《殭屍毀滅工程》（Project Zomboid）模組作者、生存基地設計師打造的前端工具。
 
-<h2>✨ 特色亮點</h2>
+<h2>🚀快速開始</h2>
 
-<ul><li><strong>零依賴純前端 (Zero-Dependency)</strong>：無需 \`npm\` / \`Vite\` 等打包工具或建置步驟，以任何 HTTP 伺服器開啟即可在瀏覽器中直接運行。</li><li><strong>PZ 遊戲幾何對齊</strong>：</li></ul>
-  - 預設 64x64 地圖規模與 1-based 座標索引 (\`(1,1)\` 到 \`(64,64)\`)。
-  - 輸入遊戲真實絕對座標原點（例如 \`10500, 9200\`），即時換算地塊對應的 PZ 世界座標。
-<ul><li><strong>雙視角即時平滑過渡</strong>：</li></ul>
-  - <strong>2:1 菱形視角 (Isometric)</strong>：北方定為右上角，展現立體空間感。
-  - <strong>1:1 正交視角 (Orthogonal)</strong>：北方定為正上方，適合純平面佈局觀察。
-  - 切換時以畫面正中央地塊為轉軸平滑過渡旋轉。
-<ul><li><strong>高畫質雙格式圖檔匯出</strong>：</li></ul>
-  - <strong>SVG 向量圖</strong>：匯出無限放大不失真、超輕量體積的全畫構圖。
-  - <strong>PNG 快照圖</strong>：一鍵產生高畫質圖片，方便分享至 Discord 或社群討論區。
-<ul><li><strong>選區與剪貼簿 (Copy / Paste / Delete)</strong>：支援矩形區域框選，以及 \`Ctrl+C\`、\`Ctrl+V\` (跟隨預覽貼上) 與 \`Delete\` 快捷鍵操作。</li></ul>
+<ul><li>🌐原始碼：<a href="https://houmuyi.github.io/Planboid/" target="_blank" rel="noopener">GitHub Pages 線上部署頁面</a></li><li>📦專案庫：<a href="https://github.com/HouMuYi/Planboid" target="_blank" rel="noopener">GitHub 原始碼專案倉庫</a></li><li>💻本機運行：複製或下載此專案，透過任何本地 HTTP 伺服器，如 VS Code Live Server、\`npx serve\`，或 \`python -m http.server\`（小雙無情加上）開啟 \`index.html\` 即可！</li></ul>
 
-<hr>
+<h2>✨核心特色</h2>
 
-<h2>👥 致謝與貢獻者 (Credits)</h2>
+<ul><li><strong>零依賴純前端</strong>：無需 \`npm\` / \`Vite\` 等打包工具或建置步驟，以任何 HTTP 伺服器皆可直接運行。</li><li><strong>切換雙重視角</strong>：支援正交與菱形視角，切換至菱形視角即可開啟立體牆面，模擬遊戲真實視覺比例。</li><li><strong>規劃多層空間</strong>：內建樓層控制，支援自由升降樓層，並具備全樓層動態鬼影，方便透視對照各層結構。</li><li><strong>繪製多元地塊</strong>：提供畫具與形狀工具，供玩家單點塗抹、拉直線或框選矩形，快速建立地塊與邊線。</li><li><strong>自訂區域色塊</strong>：內建通用調色盤，供玩家新增色塊，塗抹指定區域並附加標籤，區分空間用途。</li><li><strong>匯出多樣格式</strong>：支援建立與切換多套方案，可匯出高畫質 SVG 與全幅 PNG 圖檔，或輸出 JSON 檔案與方案文字，方便備份分享。</li><li><strong>錨定遊戲座標</strong>：設定 PZ 原點後，系統會即時顯示網格與 PZ 座標，精準對應遊戲地圖。</li><li><strong>選區與剪貼簿</strong>：支援矩形區域框選，以及 \`Ctrl+C\`、\`Ctrl+V\`（跟隨預覽貼上）與 \`Delete\` 快捷鍵操作。</li></ul>
 
-<ul><li><strong>出一張嘴</strong>：<a href="https://github.com/HouMuYi/" target="_blank" rel="noopener">慕儀 (HouMuYi)</a></li><li><strong>具體實作</strong>：小雙 (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)</li></ul>
+<h2>👥致謝與貢獻者</h2>
 
-<hr>
+<ul><li><strong>出一張嘴</strong>：<a href="https://github.com/HouMuYi/" target="_blank" rel="noopener">慕儀（HouMuYi）</a></li><li><strong>具體實作</strong>：小雙（GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE）</li></ul>
 
-<h2>🚀 快速開始</h2>
-
-<h3>線上體驗與原始碼</h3>
-
-<ul><li>🌐 <a href="https://houmuyi.github.io/Planboid/" target="_blank" rel="noopener">GitHub Pages 線上部署頁面</a></li><li>📦 <a href="https://github.com/HouMuYi/Planboid" target="_blank" rel="noopener">GitHub 原始碼專案倉庫</a></li></ul>
-
-<h3>本機運行</h3>
-
-複製或下載此專案，透過任何本地 HTTP 伺服器，如 VS Code Live Server、\`npx serve\`，或 \`python -m http.server\`（小雙無情加上）開啟 \`index.html\` 即可！
-
-<hr>
-
-<h2>📄 授權條款</h2>
+<h2>📄授權條款</h2>
 
 本專案採用 MIT License 授權。
-`;
+
+<hr>
+
+<h1>Planboid - Project Zomboid Tile & Base Planner</h1>
+
+Planboid is a lightweight, zero-dependency web-based tile and base planning tool designed for Project Zomboid modders and base designers.
+
+<h2>🚀 Quick Start</h2>
+
+<ul><li>🌐 Online Demo: <a href="https://houmuyi.github.io/Planboid/" target="_blank" rel="noopener">GitHub Pages Online Deployment</a></li><li>📦 Repository: <a href="https://github.com/HouMuYi/Planboid" target="_blank" rel="noopener">GitHub Source Code Repository</a></li><li>💻 Run Locally: Clone or download this repository, and open \`index.html\` via any local HTTP server (such as VS Code Live Server, \`npx serve\`, or \`python -m http.server\`).</li></ul>
+
+<h2>✨ Features</h2>
+
+<ul><li><strong>Zero Dependencies & Pure Front-end</strong>: Runs directly on any HTTP server without \`npm\`, \`Vite\`, or build steps.</li><li><strong>Dual View Modes</strong>: Supports 1:1 Orthogonal and 2:1 Isometric views with 3D wall overlays for authentic game perspective modelling.</li><li><strong>Multi-Level Elevation</strong>: Built-in Z-Level controls with dynamic ghost layering to transparently cross-reference multiple floors.</li><li><strong>Versatile Drawing Tools</strong>: Floor and wall brushes with single-tile, line, and rectangle shape modes.</li><li><strong>Custom Palette & Labels</strong>: Add custom colour swatches and labels to differentiate room functions.</li><li><strong>Multiple Export Formats</strong>: Manage multiple schemes and export high-resolution SVG vector diagrams, full-frame PNG snapshots, or raw JSON/scheme strings.</li><li><strong>PZ Game Coordinates Anchor</strong>: Set a custom PZ origin to calculate and display real-time grid and in-game map coordinates.</li><li><strong>Selection & Clipboard</strong>: Supports rectangle box selection, \`Ctrl+C\` / \`Ctrl+V\` (with live placement preview), and \`Delete\` operations.</li></ul>
+
+<h2>👥 Credits & Contributors</h2>
+
+<ul><li><strong>The Backseat Driver</strong>: <a href="https://github.com/HouMuYi/" target="_blank" rel="noopener">HouMuYi</a></li><li><strong>The Chauffeur</strong>: Xiao Shuang (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)</li></ul>
+
+<h2>📄 License</h2>
+
+Distributed under the MIT License.`;

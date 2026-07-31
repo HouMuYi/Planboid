@@ -22,11 +22,13 @@ export class SchemeModal {
 		// 方案編輯/建立盒體控制元素
 		this.editorIdInput = document.getElementById('scheme-editor-id');
 		this.editorTitle = document.getElementById('scheme-editor-title');
-		this.btnCancelEdit = document.getElementById('btn-cancel-scheme-editor');
 		this.inputName = document.getElementById('new-scheme-name');
 		this.inputW = document.getElementById('new-scheme-width');
 		this.inputH = document.getElementById('new-scheme-height');
+		this.inputWorldX = document.getElementById('new-scheme-world-x');
+		this.inputWorldY = document.getElementById('new-scheme-world-y');
 		this.btnSaveEditor = document.getElementById('btn-save-scheme-editor');
+		this.btnSaveAsNew = document.getElementById('btn-save-as-new-scheme');
 
 		// 內建文字貼上盒體 (零原生彈窗)
 		this.boxTextImport = document.getElementById('box-text-import');
@@ -44,7 +46,7 @@ export class SchemeModal {
 		const btnCloseModal = document.getElementById('btn-close-scheme-modal');
 
 		btnOpenModal?.addEventListener('click', () => {
-			this.resetEditorToCreateMode();
+			this.setEditorToEditMode(this.state.activeSchemeId);
 			this.hideTextImportBox();
 			this.renderSchemeList();
 			this.modal?.showModal();
@@ -59,7 +61,7 @@ export class SchemeModal {
 		const activeDimEl = document.getElementById('active-scheme-dim');
 
 		const handleOpenCurrentSchemeEdit = () => {
-			this.setEditorToEditMode(this.state.scheme.id);
+			this.setEditorToEditMode(this.state.activeSchemeId);
 			this.hideTextImportBox();
 			this.renderSchemeList();
 			this.modal?.showModal();
@@ -68,22 +70,25 @@ export class SchemeModal {
 		activeNameEl?.addEventListener('click', handleOpenCurrentSchemeEdit);
 		activeDimEl?.addEventListener('click', handleOpenCurrentSchemeEdit);
 
-		// 取消編輯按鈕
-		this.btnCancelEdit?.addEventListener('click', () => {
-			this.resetEditorToCreateMode();
-			this.renderSchemeList();
-		});
-
-		// 建立 / 編輯 儲存按鈕
+		// 建立 / 更新 按鈕
 		this.btnSaveEditor?.addEventListener('click', () => {
 			const name = this.inputName.value.trim() || i18n.t('modal_schemes_name_placeholder');
 			const width = parseInt(this.inputW.value, 10) || 64;
 			const height = parseInt(this.inputH.value, 10) || 64;
+			const worldX = parseInt(this.inputWorldX?.value, 10) || 10500;
+			const worldY = parseInt(this.inputWorldY?.value, 10) || 9200;
 
 			if (this.editingSchemeId) {
 				this.state.updateSchemeDetails(this.editingSchemeId, name, width, height);
-				ToastNotification.show('方案修改成功！', 'success');
-				this.resetEditorToCreateMode();
+				const target = this.state.schemes.find(s => s.id === this.editingSchemeId);
+				if (target) {
+					target.worldOriginX = worldX;
+					target.worldOriginY = worldY;
+				}
+				if (this.editingSchemeId === this.state.activeSchemeId) {
+					this.state.setWorldOrigin(worldX, worldY);
+				}
+				ToastNotification.show(i18n.t('toast_scheme_updated') || '方案更新成功！', 'success');
 			} else {
 				const newScheme = {
 					id: 'scheme_' + Date.now(),
@@ -91,6 +96,8 @@ export class SchemeModal {
 					width: Math.max(10, Math.min(300, width)),
 					height: Math.max(10, Math.min(300, height)),
 					currentLevel: 0,
+					worldOriginX: worldX,
+					worldOriginY: worldY,
 					palette: StorageManager.getDefaultScheme().palette,
 					tiles: {},
 				};
@@ -102,9 +109,44 @@ export class SchemeModal {
 				this.state.persist();
 				this.state.notifyStateChange();
 				ToastNotification.show(i18n.t('toast_scheme_created') || '新方案建立成功！', 'success');
-				this.resetEditorToCreateMode();
+				this.setEditorToEditMode(newScheme.id);
 			}
 
+			this.renderSchemeList();
+			this.updateHeaderInfo();
+		});
+
+		// 另存新方案按鈕
+		this.btnSaveAsNew?.addEventListener('click', () => {
+			const name = this.inputName.value.trim() || i18n.t('modal_schemes_name_placeholder');
+			const width = parseInt(this.inputW.value, 10) || 64;
+			const height = parseInt(this.inputH.value, 10) || 64;
+			const worldX = parseInt(this.inputWorldX?.value, 10) || 10500;
+			const worldY = parseInt(this.inputWorldY?.value, 10) || 9200;
+
+			const sourceScheme = this.state.schemes.find(s => s.id === this.editingSchemeId) || this.state.scheme;
+			const newScheme = {
+				id: 'scheme_' + Date.now(),
+				name,
+				width: Math.max(10, Math.min(300, width)),
+				height: Math.max(10, Math.min(300, height)),
+				currentLevel: sourceScheme ? sourceScheme.currentLevel || 0 : 0,
+				worldOriginX: worldX,
+				worldOriginY: worldY,
+				palette: JSON.parse(JSON.stringify(sourceScheme ? sourceScheme.palette : StorageManager.getDefaultScheme().palette)),
+				tiles: JSON.parse(JSON.stringify(sourceScheme ? sourceScheme.tiles : {})),
+			};
+
+			this.state.schemes.push(newScheme);
+			this.state.activeSchemeId = newScheme.id;
+			this.state.scheme = newScheme;
+			this.state.currentZLevel = newScheme.currentLevel || 0;
+			this.state.pushHistory();
+			this.state.persist();
+			this.state.notifyStateChange();
+
+			ToastNotification.show(i18n.t('toast_scheme_saved_as_new') || '已另存為新方案！', 'success');
+			this.setEditorToEditMode(newScheme.id);
 			this.renderSchemeList();
 			this.updateHeaderInfo();
 		});
@@ -360,7 +402,7 @@ export class SchemeModal {
 		if (this.editorIdInput) this.editorIdInput.value = '';
 		if (this.editorTitle) this.editorTitle.textContent = i18n.t('modal_schemes_create_title');
 		if (this.btnSaveEditor) this.btnSaveEditor.textContent = i18n.t('modal_schemes_btn_create');
-		if (this.btnCancelEdit) this.btnCancelEdit.style.display = 'none';
+		if (this.btnSaveAsNew) this.btnSaveAsNew.style.display = 'none';
 
 		if (this.inputName) this.inputName.value = '';
 		if (this.inputW) this.inputW.value = 64;
@@ -373,24 +415,48 @@ export class SchemeModal {
 
 		this.editingSchemeId = schemeId;
 		if (this.editorIdInput) this.editorIdInput.value = schemeId;
-		if (this.editorTitle) this.editorTitle.textContent = i18n.t('modal_schemes_edit_title', {}, 'zh') || '編輯方案';
-		if (this.btnSaveEditor) this.btnSaveEditor.textContent = i18n.t('modal_palette_btn_save', {}, 'zh') || '儲存變更';
-		if (this.btnCancelEdit) this.btnCancelEdit.style.display = 'inline-flex';
+		if (this.editorTitle) this.editorTitle.textContent = i18n.t('modal_schemes_edit_title');
+		if (this.btnSaveEditor) this.btnSaveEditor.textContent = i18n.t('modal_schemes_btn_update');
+		if (this.btnSaveAsNew) this.btnSaveAsNew.style.display = 'inline-flex';
 
 		if (this.inputName) this.inputName.value = target.name;
 		if (this.inputW) this.inputW.value = target.width;
 		if (this.inputH) this.inputH.value = target.height;
+		if (this.inputWorldX) this.inputWorldX.value = target.worldOriginX || 10500;
+		if (this.inputWorldY) this.inputWorldY.value = target.worldOriginY || 9200;
 	}
 
-	static formatDimension(width, height) {
-		return `(${width} x ${height})`;
+	resetEditorToCreateMode() {
+		this.editingSchemeId = null;
+		if (this.editorIdInput) this.editorIdInput.value = '';
+		if (this.editorTitle) this.editorTitle.textContent = i18n.t('modal_schemes_create_title');
+		if (this.btnSaveEditor) this.btnSaveEditor.textContent = i18n.t('modal_schemes_btn_create');
+		if (this.btnSaveAsNew) this.btnSaveAsNew.style.display = 'none';
+
+		if (this.inputName) this.inputName.value = '';
+		if (this.inputW) this.inputW.value = 64;
+		if (this.inputH) this.inputH.value = 64;
+		if (this.inputWorldX) this.inputWorldX.value = 10500;
+		if (this.inputWorldY) this.inputWorldY.value = 9200;
+	}
+
+	static formatDimension(width, height, worldOriginX = 10500, worldOriginY = 9200) {
+		return `(${width} x ${height} @ ${worldOriginX},${worldOriginY})`;
 	}
 
 	updateHeaderInfo() {
 		const nameEl = document.getElementById('active-scheme-name');
 		const dimEl = document.getElementById('active-scheme-dim');
 		if (nameEl) nameEl.textContent = this.state.scheme.name;
-		if (dimEl) dimEl.textContent = SchemeModal.formatDimension(this.state.scheme.width, this.state.scheme.height);
+		if (dimEl) {
+			const s = this.state.scheme;
+			dimEl.textContent = SchemeModal.formatDimension(
+				s.width,
+				s.height,
+				s.worldOriginX || 10500,
+				s.worldOriginY || 9200,
+			);
+		}
 	}
 
 	renderSchemeList() {
@@ -399,8 +465,15 @@ export class SchemeModal {
 
 		this.state.schemes.forEach(scheme => {
 			const isUsing = scheme.id === this.state.activeSchemeId;
+			const isEditing = scheme.id === this.editingSchemeId;
 			const itemDiv = document.createElement('div');
-			itemDiv.className = `scheme-item ${isUsing ? 'active' : ''}`;
+			itemDiv.className = `scheme-item ${isUsing ? 'active' : ''} ${isEditing ? 'editing' : ''}`;
+
+			itemDiv.addEventListener('click', (e) => {
+				if (e.target.closest('.scheme-actions')) return;
+				this.setEditorToEditMode(scheme.id);
+				this.renderSchemeList();
+			});
 
 			const infoDiv = document.createElement('div');
 			infoDiv.className = 'scheme-info';
@@ -419,15 +492,6 @@ export class SchemeModal {
 			const actionsDiv = document.createElement('div');
 			actionsDiv.className = 'scheme-actions';
 
-			const btnEdit = document.createElement('button');
-			btnEdit.className = 'btn';
-			btnEdit.textContent = i18n.t('modal_schemes_btn_edit_details', {}, 'zh') || '✏️ 編輯';
-			btnEdit.addEventListener('click', () => {
-				this.setEditorToEditMode(scheme.id);
-				this.renderSchemeList();
-			});
-			actionsDiv.appendChild(btnEdit);
-
 			if (isUsing) {
 				const badge = document.createElement('span');
 				badge.className = 'badge badge-active';
@@ -444,6 +508,7 @@ export class SchemeModal {
 					this.state.pushHistory();
 					this.state.persist();
 					this.state.notifyStateChange();
+					this.setEditorToEditMode(scheme.id);
 					this.renderSchemeList();
 					this.updateHeaderInfo();
 					ToastNotification.show(`已切換至方案: ${scheme.name}`, 'info');
@@ -456,12 +521,16 @@ export class SchemeModal {
 					btnDel.textContent = '🗑️';
 					btnDel.title = i18n.t('modal_schemes_btn_delete_title', {}, 'zh') || '刪除方案';
 					btnDel.addEventListener('click', async () => {
-						const confirmed = await ConfirmModal.show(`確定要刪除方案「${scheme.name}」嗎？`);
+						const confirmed = await ConfirmModal.show(i18n.t('modal_schemes_confirm_delete', { name: scheme.name }));
 						if (confirmed) {
+							const wasEditingThis = this.editingSchemeId === scheme.id;
 							this.state.deleteScheme(scheme.id);
+							if (wasEditingThis) {
+								this.setEditorToEditMode(this.state.activeSchemeId);
+							}
 							this.renderSchemeList();
 							this.updateHeaderInfo();
-							ToastNotification.show('方案已刪除', 'info');
+							ToastNotification.show(i18n.t('toast_scheme_deleted') || '方案已刪除', 'info');
 						}
 					});
 					actionsDiv.appendChild(btnDel);
@@ -472,5 +541,27 @@ export class SchemeModal {
 			itemDiv.appendChild(actionsDiv);
 			this.schemeListContainer.appendChild(itemDiv);
 		});
+
+		// 列表最下方「（新方案⋯⋯）」偽方案項目
+		const isNewSelected = this.editingSchemeId === null;
+		const pseudoDiv = document.createElement('div');
+		pseudoDiv.className = `scheme-item pseudo-item ${isNewSelected ? 'active' : ''}`;
+
+		const pseudoInfoDiv = document.createElement('div');
+		pseudoInfoDiv.className = 'scheme-info';
+
+		const pseudoNameSpan = document.createElement('span');
+		pseudoNameSpan.className = 'scheme-name';
+		pseudoNameSpan.textContent = i18n.t('modal_schemes_new_pseudo_item') || '➕ (新方案...)';
+
+		pseudoInfoDiv.appendChild(pseudoNameSpan);
+		pseudoDiv.appendChild(pseudoInfoDiv);
+
+		pseudoDiv.addEventListener('click', () => {
+			this.resetEditorToCreateMode();
+			this.renderSchemeList();
+		});
+
+		this.schemeListContainer.appendChild(pseudoDiv);
 	}
 }
