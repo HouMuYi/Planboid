@@ -2,6 +2,7 @@
  * StorageManager.js - 持久化與預設方案管理 (整合 SchemeSerializer 解碼與標準化)
  */
 
+import { i18n } from './I18nManager.js';
 import { SchemeSerializer } from './SchemeSerializer.js';
 
 const STORAGE_KEY = 'planboid_data_v4';
@@ -13,7 +14,7 @@ export class StorageManager {
 	static getDefaultScheme() {
 		return {
 			id: 'scheme_' + Date.now(),
-			name: '預設地塊規劃',
+			name: i18n.t('defaults_scheme_name') || '預設地塊規劃',
 			width: 64,
 			height: 64,
 			currentLevel: 0,
@@ -21,8 +22,8 @@ export class StorageManager {
 			worldOriginY: 9200,
 			tiles: {},
 			palette: {
-				'color_road': { color: '#334155', name: '道路' },
-				'color_indoor': { color: '#94a3b8', name: '室內空間' },
+				'color_road': { color: '#334155', name: i18n.t('defaults_palette_road') || '道路' },
+				'color_indoor': { color: '#94a3b8', name: i18n.t('defaults_palette_indoor') || '室內空間' },
 			},
 		};
 	}

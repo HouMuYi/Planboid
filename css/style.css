@@ -29,6 +29,15 @@
 /* ── 2. Global Reset & Interactive Physical Rule ── */
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; user-select:none }
 body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; width:100vw }
+a { text-decoration:none; color:inherit }
+
+/* 通用修飾符 (Utility Modifiers) */
+.w-full { width:100% }
+.flex-1 { flex:1; min-width:0 }
+.flex-2 { flex:2; min-width:0 }
+.text-accent { color:var(--ac); font-weight:600 }
+.text-danger { color:var(--danger) }
+.text-muted { font-size:calc(.8rem*var(--s)); color:var(--c2) }
 
 /* 物理法則級別全局提亮 (消滅手繪感 :hover 冗餘) */
 :is(.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .palette-item, .checkbox-label, .select-lang, .btn-close, button, a):hover { filter:brightness(1.25); transform:translateY(-1px) }
@@ -37,10 +46,13 @@ body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; wid
 /* ── 3. Objects: Layout Primitives (.stack & .cluster) ── */
 .stack, #app-container, .toolbar-left, .tool-group, .sidebar-right, .sidebar-scroll-content, .panel-section, .palette-section, .palette-list, .modal-content { display:flex; flex-direction:column }
 .cluster, .app-header, .logo-area, .header-center, .header-actions, .section-header, .view-overlay-controls, .floor-selector, .world-origin-inputs, .checkbox-label, .palette-item, .scheme-item, .modal-header, .canvas-info-overlay, .toggle-pill { display:flex; align-items:center }
+.cluster { gap:calc(8px*var(--s)) }
+.cluster-between { justify-content:space-between }
+.cluster-end { justify-content:flex-end }
 
 /* ── 4. Object: .panel & .box (通用容器物件) ── */
 .panel { background:var(--bg-p); backdrop-filter:var(--blur); border:1px solid var(--bd); border-radius:var(--r) }
-.box { background:var(--bg-c); border:1px solid var(--bd); border-radius:var(--r) }
+.box { background:var(--bg-c); border:1px solid var(--bd); border-radius:var(--r); padding:calc(12px*var(--s)); gap:calc(8px*var(--s)) }
 .divider { width:32px; height:1px; background:var(--bd); flex-shrink:0 }
 
 /* ── 5. Object: .btn (通用按鈕物件，全 em 相對單位) ── */
@@ -53,6 +65,9 @@ body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; wid
 :is(.input-text, .input-number, .select-lang, select, textarea) { background:var(--bg); border:1px solid var(--bd); border-radius:var(--r); color:var(--c0); font-size:calc(.85rem*var(--s)); font-family:inherit; padding:.4em .75em; min-width:0; width:100% }
 :is(.input-text, .input-number, .select-lang, select, textarea):focus { outline:none; border-color:var(--ac) }
 .world-origin-inputs .input-number { width:calc(76px*var(--s)); background:transparent; border:none; color:var(--green); font-weight:600; text-align:center }
+.field-label { font-size:calc(.8rem*var(--s)); color:var(--c2) }
+.input-code { font-family:monospace; resize:vertical; font-weight:600 }
+.input-color { width:48px; height:38px; border:none; cursor:pointer; border-radius:6px; padding:0; background:transparent }
 
 /* ── 7. Component Structure & Boundaries ── */
 #app-container { height:100vh; width:100vw }
@@ -108,9 +123,14 @@ body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; wid
 
 /* 列表通用 ListItem 物件 */
 .palette-item, .scheme-item { gap:calc(8px*var(--s)); padding:calc(7px*var(--s)) calc(10px*var(--s)); border:1px solid var(--bd); border-radius:var(--r); background:var(--bg-c); flex-shrink:0 }
+.scheme-item { cursor:pointer }
+.scheme-info { flex:1 }
 .palette-item { cursor:grab }
 .palette-item:active { cursor:grabbing }
 .palette-item.active, .scheme-item.active { border-color:var(--ac); background:rgba(99,102,241,.2); box-shadow:0 0 10px rgba(99,102,241,.2) }
+.scheme-item.editing { border-color:var(--green); background:rgba(16,185,129,.15) }
+.scheme-item.pseudo-item { border-style:dashed; opacity:.85 }
+.scheme-item.pseudo-item .scheme-name { font-weight:600 }
 .palette-item.dragging { opacity:.4; border-style:dashed; border-color:var(--ac) }
 .palette-item.drag-over { border-top:2px solid var(--ac) }
 .palette-swatch { width:calc(20px*var(--s)); height:calc(20px*var(--s)); border-radius:4px; border:1px solid rgba(255,255,255,.2); flex-shrink:0 }
@@ -121,7 +141,11 @@ body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; wid
 .app-modal { margin:auto; border:none; background:transparent }
 .app-modal::backdrop { background:rgba(0,0,0,.75); backdrop-filter:blur(8px) }
 .modal-content { box-shadow:var(--shadow); padding:calc(24px*var(--s)); color:var(--c0) }
-.about-modal-content { width:min(720px,92vw); max-height:85vh }
+.modal-body.stack { gap:calc(16px*var(--s)) }
+.modal-sm { width:min(380px,90vw) }
+.modal-md { width:min(460px,90vw) }
+.modal-lg { width:min(560px,90vw) }
+.modal-xl { width:min(720px,92vw); max-height:85vh }
 .modal-header { justify-content:space-between; margin-bottom:16px; flex-shrink:0 }
 .modal-title-text { font-size:calc(1.25rem*var(--s)); font-weight:700 }
 .btn-close { background:transparent; border:none; color:var(--c2); font-size:1.4rem }
@@ -153,3 +177,12 @@ body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; wid
 	:is(.tool-btn,.shape-btn) { width:38px; height:38px }
 	.canvas-info-overlay { bottom:80px }
 }
+
+/* ── 9. Dynamic Components (Toast & Swatches) ── */
+#toast-container { position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none }
+.toast-item { background:var(--bg-p); color:var(--c0); border:1px solid var(--bd); padding:10px 18px; border-radius:8px; font-size:calc(.85rem*var(--s)); font-weight:500; box-shadow:var(--shadow); pointer-events:auto; opacity:0; transform:translateY(-10px); transition:all .25s cubic-bezier(.16,1,.3,1); white-space:nowrap }
+.toast-item.toast-info { border-left:4px solid var(--ac) }
+.toast-item.toast-error { border-left:4px solid var(--danger) }
+.toast-item.show { opacity:1; transform:translateY(0) }
+
+.preset-swatch-item { width:calc(24px*var(--s)); height:calc(24px*var(--s)); border-radius:4px; border:1px solid var(--bd); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.3) }
