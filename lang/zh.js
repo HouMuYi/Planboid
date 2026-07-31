@@ -114,7 +114,7 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'export_copy_clipboard_success': '已將選擇範圍複製至剪貼簿 (按 Ctrl+V 貼上)',
 
 	'defaults_scheme_name': '預設規劃方案',
-	'defaults_palette_road': '道路 / 室外',
+	'defaults_palette_road': '道路',
 	'defaults_palette_indoor': '室內空間',
 
 	'toast_scheme_created': '新方案建立成功！',

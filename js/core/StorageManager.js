@@ -23,7 +23,7 @@ export class StorageManager {
 			tiles: {},
 			palette: {
 				'color_road': { color: '#334155', name: i18n.t('defaults_palette_road') || '道路' },
-				'color_indoor': { color: '#94a3b8', name: i18n.t('defaults_palette_indoor') || '室內空間' },
+				'color_indoor': { color: '#B38147', name: i18n.t('defaults_palette_indoor') || '室內空間' },
 			},
 		};
 	}

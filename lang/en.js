@@ -114,7 +114,7 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'export_copy_clipboard_success': 'Selection copied to clipboard (Press Ctrl+V to paste)',
 
 	'defaults_scheme_name': 'Default Scheme',
-	'defaults_palette_road': 'Road / Exterior',
+	'defaults_palette_road': 'Road',
 	'defaults_palette_indoor': 'Indoor Space',
 
 	'toast_scheme_created': 'New scheme created!',
