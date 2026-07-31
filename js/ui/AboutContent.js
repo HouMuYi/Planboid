@@ -1,5 +1,5 @@
 /**
- * 自動產生檔 (請勿手動修改，請執行 node scripts/build-about.mjs 重新編譯)
+ * 自動產生檔 (請勿手動修改，請執行 node scripts/build.mjs 重新編譯)
  */
 export const ABOUT_HTML = `<h1>Planboid 線上地塊規劃器</h1>
 

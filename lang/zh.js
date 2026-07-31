@@ -107,6 +107,8 @@ window.PLANBOID_LANGUAGES['zh'] = {
 
 	'modal_confirm_cancel': '取消',
 	'modal_confirm_ok': '確定刪除',
+	'modal_confirm_title': '⚠️ 操作確認',
+	'prompt_import_text_placeholder': '{ "n": "..." }',
 
 	'modal_palette_title_edit': '編輯色塊',
 	'modal_palette_title_add': '新增色塊',
