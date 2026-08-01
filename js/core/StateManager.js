@@ -3,11 +3,11 @@
  */
 
 import { ShapeStrokeEngine } from '../renderer/ShapeStrokeEngine.js';
+import { CONFIG } from './Config.js';
 import { eventBus } from './EventBus.js';
 import { StorageManager } from './StorageManager.js';
 import { ToolModeState } from './ToolModeState.js';
 import { UISelectionState } from './UISelectionState.js';
-import { CONFIG } from './Config.js';
 
 export class StateManager {
 	constructor() {

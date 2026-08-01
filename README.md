@@ -60,9 +60,8 @@ Planboid is a lightweight, zero-dependency web-based tile and base planning tool
 ## 👥 Credits & Contributors
 
 - **The Backseat Driver**: [HouMuYi](https://github.com/HouMuYi/)
-- **The Chauffeur**: Xiao Shuang (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)
+- **The Chauffeur**: Jemmy (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)
 
 ## 📄 License
 
 Distributed under the MIT License.
-

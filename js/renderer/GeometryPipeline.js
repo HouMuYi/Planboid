@@ -8,8 +8,8 @@
  * - LevelVisualOffset 僅保留給 InputDispatcher 逆算滑鼠座標時使用。
  */
 
-import { IsoMath } from './IsoMath.js';
 import { CONFIG } from '../core/Config.js';
+import { IsoMath } from './IsoMath.js';
 
 /**
  * 計算第 z 層樓相對於 z=0 的螢幕像素偏移量
@@ -31,9 +31,15 @@ export function calcZTranslate(z, progress = 1.0) {
  * 鬼影層 (Ghost Layer) 視覺透視與衰減常數配置
  */
 export const GHOST_CONFIG = {
-	get BASE_ALPHA() { return CONFIG.GHOST_BASE_ALPHA; },
-	get ALPHA_DECAY() { return CONFIG.GHOST_ALPHA_DECAY; },
-	get SATURATION_DECAY() { return CONFIG.GHOST_SATURATION_DECAY; },
+	get BASE_ALPHA() {
+		return CONFIG.GHOST_BASE_ALPHA;
+	},
+	get ALPHA_DECAY() {
+		return CONFIG.GHOST_ALPHA_DECAY;
+	},
+	get SATURATION_DECAY() {
+		return CONFIG.GHOST_SATURATION_DECAY;
+	},
 };
 
 export class GeometryPipeline {
@@ -139,7 +145,16 @@ export class GeometryPipeline {
 	/**
 	 * 計算能夠在指定 Viewport 下「恰恰好包覆全畫布與所有樓層地塊」的最佳 Camera X, Y 與 Zoom
 	 */
-	static calculateFitCameraPos(isoMath, scheme, currentProgress, viewportWidth, viewportHeight, padding = CONFIG.FIT_VIEW_PADDING, sidebarWidth = 0, currentZ = 0) {
+	static calculateFitCameraPos(
+		isoMath,
+		scheme,
+		currentProgress,
+		viewportWidth,
+		viewportHeight,
+		padding = CONFIG.FIT_VIEW_PADDING,
+		sidebarWidth = 0,
+		currentZ = 0,
+	) {
 		const w = scheme.width;
 		const h = scheme.height;
 
@@ -328,9 +343,11 @@ export class GeometryPipeline {
 		const [b0, b1, t1, t0] = quad;
 		let str = '';
 		// 1. 原色面片
-		str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall" data-edge="${edge}" data-color-id="${colorId}" points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="${color}" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" stroke="${color}" stroke-opacity="0.675" stroke-width="1.5" />\n`;
+		str +=
+			`<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall" data-edge="${edge}" data-color-id="${colorId}" points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="${color}" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" stroke="${color}" stroke-opacity="0.675" stroke-width="1.5" />\n`;
 		// 2. 向量 Shading 遮罩
-		str += `<polygon points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="url(#svg-wall-shading)" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" />\n`;
+		str +=
+			`<polygon points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="url(#svg-wall-shading)" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" />\n`;
 		// 3. 牆頂 1px 高光
 		str += `<line x1="${t0.x}" y1="${t0.y}" x2="${t1.x}" y2="${t1.y}" stroke="#ffffff" stroke-opacity="0.75" stroke-width="1.5" />\n`;
 		// 4. 牆底 1px 壓角暗線

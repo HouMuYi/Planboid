@@ -4,8 +4,8 @@
  * 包含 60FPS 訊框鎖與分層繪製調度 (rAF Lock + Overlay Decoupling)
  */
 
-import { calcZTranslate } from './GeometryPipeline.js';
 import { CONFIG } from '../core/Config.js';
+import { calcZTranslate } from './GeometryPipeline.js';
 
 export class InputDispatcher {
 	/**
@@ -49,7 +49,7 @@ export class InputDispatcher {
 		// 邊緣吸附需在 25% 帶內，且必須位於邊長度方向的中央 50% (0.25 ~ 0.75，忽略兩端各 25% 角落交錯區)
 		const snapMin = CONFIG.EDGE_SNAP_MIN;
 		const snapMax = CONFIG.EDGE_SNAP_MAX;
-		
+
 		if (localY < snapMin && localX >= snapMin && localX <= snapMax) {
 			edge = 'north';
 		} else if (localY > snapMax && localX >= snapMin && localX <= snapMax) {

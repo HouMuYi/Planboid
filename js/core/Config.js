@@ -25,8 +25,8 @@ export const CONFIG = {
 	SCHEME_SIZE_MAX: 300, // 方案寬度與高度最大網格限制
 	Z_LEVEL_MIN: -17, // 最底層 Z 軸樓層限制
 	Z_LEVEL_MAX: 29, // 最高層 Z 軸樓層限制
-	DEFAULT_SCHEME_WIDTH: 64, // 新增預設方案網格寬度
-	DEFAULT_SCHEME_HEIGHT: 64, // 新增預設方案網格高度
+	DEFAULT_SCHEME_WIDTH: 32, // 新增預設方案網格寬度
+	DEFAULT_SCHEME_HEIGHT: 32, // 新增預設方案網格高度
 	DEFAULT_ORIGIN_X: 10500, // 新增預設方案地圖 X 世界座標
 	DEFAULT_ORIGIN_Y: 9200, // 新增預設方案地圖 Y 世界座標
 

@@ -2,9 +2,9 @@
  * StorageManager.js - 持久化與預設方案管理 (整合 SchemeSerializer 解碼與標準化)
  */
 
+import { CONFIG } from './Config.js';
 import { i18n } from './I18nManager.js';
 import { SchemeSerializer } from './SchemeSerializer.js';
-import { CONFIG } from './Config.js';
 
 const STORAGE_KEY = 'planboid_data_v4';
 

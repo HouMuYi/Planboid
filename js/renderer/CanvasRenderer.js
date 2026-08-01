@@ -4,12 +4,12 @@
  * - 頂層 Canvas (this.overlayCanvas): 負責 Hover 高亮、選區、筆刷與貼上預覽 (極輕量，<0.1ms 重繪，徹底拯救 CPU)
  */
 
+import { CONFIG } from '../core/Config.js';
 import { BrushActionApplicator } from './BrushActionApplicator.js';
 import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
 import { InputDispatcher } from './InputDispatcher.js';
 import { IsoMath } from './IsoMath.js';
 import { ShapeStrokeEngine } from './ShapeStrokeEngine.js';
-import { CONFIG } from '../core/Config.js';
 
 export class CanvasRenderer {
 	/**
