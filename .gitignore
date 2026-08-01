@@ -6,6 +6,7 @@ Thumbs.db
 dprint.jsonc
 
 # Agent Scratch & Internal Decision Logs
+AGENTS.md
 .gemini/
 .agents/
 scripts/
