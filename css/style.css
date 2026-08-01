@@ -113,6 +113,7 @@ a { text-decoration:none; color:inherit }
 .toggle-pill { gap:6px; padding:calc(6px*var(--s)) calc(12px*var(--s)); color:var(--c1) }
 .toggle-pill input { accent-color:var(--ac) }
 .canvas-info-overlay { position:absolute; bottom:calc(16px*var(--s)); left:calc(16px*var(--s)); padding:calc(6px*var(--s)) calc(14px*var(--s)); font-size:calc(.75rem*var(--s)); gap:8px }
+.canvas-hotkeys-overlay { left:auto; right:calc(16px*var(--s) + var(--sidebar-offset, 0px)); white-space:pre-line; text-align:right; transition:right .3s cubic-bezier(.4,0,.2,1) }
 .dot { color:var(--c2) }
 
 /* 右側 Sidebar */

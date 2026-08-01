@@ -50,7 +50,7 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'viewport_view_ortho': 'Orthogonal (1:1)',
 	'viewport_view_ortho_title': '1:1 Orthogonal View',
 	'viewport_toggle_3d_walls': '3D Walls',
-	'viewport_toggle_3d_walls_title': 'Display semi-transparent 96px 3D wall quads in isometric mode',
+	'viewport_toggle_3d_walls_title': '3D Walls (Home/End)',
 	'viewport_btn_reset_view_title': 'Reset view zoom and position',
 	'viewport_btn_fit_view_title': 'Fit view to show all canvas tiles',
 	'viewport_info_coords': 'Grid: ({x}, {y}), Z: {z}',

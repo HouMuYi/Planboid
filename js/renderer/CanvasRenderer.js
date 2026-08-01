@@ -107,6 +107,7 @@ export class CanvasRenderer {
 		this.ctx.scale(dpr, dpr);
 		this.overlayCtx.scale(dpr, dpr);
 
+		this.updateHotkeyLegendPosition();
 		this.requestRenderAll();
 	}
 
@@ -119,6 +120,15 @@ export class CanvasRenderer {
 			return sidebar.offsetWidth || 0;
 		}
 		return 0;
+	}
+
+	/**
+	 * 根據側邊欄展開/收合狀態，避免右下角熱鍵圖例被展開的側邊欄遮住
+	 */
+	updateHotkeyLegendPosition() {
+		const legend = document.getElementById('canvas-hotkey-legend');
+		if (!legend) return;
+		legend.style.setProperty('--sidebar-offset', `${this.getSidebarWidth()}px`);
 	}
 
 	centerCamera() {

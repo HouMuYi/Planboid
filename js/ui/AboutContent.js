@@ -29,7 +29,7 @@ Planboid is a lightweight, zero-dependency web-based tile and base planning tool
 
 <h2>🚀 Quick Start</h2>
 
-<ul><li>🌐 Online Demo: <a href="https://houmuyi.github.io/Planboid/" target="_blank" rel="noopener">GitHub Pages Online Deployment</a></li><li>📦 Repository: <a href="https://github.com/HouMuYi/Planboid" target="_blank" rel="noopener">GitHub Source Code Repository</a></li><li>💻 Run Locally: Clone or download this repository, and open \`index.html\` via any local HTTP server (such as VS Code Live Server, \`npx serve\`, or \`python -m http.server\`).</li></ul>
+<ul><li>🌐 Online: <a href="https://houmuyi.github.io/Planboid/" target="_blank" rel="noopener">GitHub Pages Online Deployment</a></li><li>📦 Repository: <a href="https://github.com/HouMuYi/Planboid" target="_blank" rel="noopener">GitHub Source Code Repository</a></li><li>💻 Run Locally: Clone or download this repository, and open \`index.html\` via any local HTTP server (such as VS Code Live Server, \`npx serve\`, or \`python -m http.server\`).</li></ul>
 
 <h2>✨ Features</h2>
 

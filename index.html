@@ -156,17 +156,6 @@
 							</button>
 						</div>
 
-						<div class="pz-toggle-group desktop-only">
-							<label
-								class="toggle-pill"
-								data-i18n-title="viewport_toggle_3d_walls_title"
-								title="菱形視角下牆面呈現具備 96px 高度的半透明立體面片"
-							>
-								<input type="checkbox" id="chk-3d-walls" checked>
-								<span data-i18n="viewport_toggle_3d_walls">立體牆面</span>
-							</label>
-						</div>
-
 						<button class="btn btn-circle" id="btn-fit-view" data-i18n-title="viewport_btn_fit_view_title" title="顯示全部畫布與地塊">
 							🔍
 						</button>
@@ -182,6 +171,8 @@
 						<span class="dot">•</span>
 						<span id="info-zoom">Zoom: 100%</span>
 					</div>
+
+					<div class="canvas-info-overlay canvas-hotkeys-overlay desktop-only" id="canvas-hotkey-legend"></div>
 				</section>
 
 				<!-- 右側側邊欄 -->
@@ -249,6 +240,14 @@
 									</button>
 								</div>
 							</div>
+							<label
+								class="toggle-pill"
+								data-i18n-title="viewport_toggle_3d_walls_title"
+								title="立體牆面（Home／End）"
+							>
+								<input type="checkbox" id="chk-3d-walls" checked>
+								<span data-i18n="viewport_toggle_3d_walls">立體牆面</span>
+							</label>
 						</div>
 
 						<div class="divider"></div>

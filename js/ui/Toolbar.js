@@ -125,6 +125,29 @@ export class Toolbar {
 
 		window.addEventListener('langchange', updateFloorDisplay);
 
+		const hotkeyLegend = document.getElementById('canvas-hotkey-legend');
+		const updateHotkeyLegend = () => {
+			if (!hotkeyLegend) return;
+			const keys = [
+				'toolbar_tool_floor',
+				'toolbar_tool_wall',
+				'toolbar_tool_erase_floor',
+				'toolbar_tool_erase_wall',
+				'toolbar_tool_select',
+				'toolbar_shape_single_title',
+				'toolbar_shape_line_title',
+				'toolbar_shape_box_title',
+				'sidebar_floor_up_title',
+				'sidebar_floor_down_title',
+				'toolbar_btn_undo_title',
+				'toolbar_btn_redo_title',
+				'viewport_toggle_3d_walls_title',
+			];
+			hotkeyLegend.textContent = keys.map(key => i18n.t(key)).join('\n');
+		};
+		window.addEventListener('langchange', updateHotkeyLegend);
+		updateHotkeyLegend();
+
 		const btnUndo = document.getElementById('btn-undo');
 		const btnRedo = document.getElementById('btn-redo');
 
@@ -165,6 +188,18 @@ export class Toolbar {
 			} else if (e.key === 'PageDown' || e.key.toLowerCase() === 'x') {
 				e.preventDefault();
 				btnFloorDown?.click();
+			} else if (e.key === 'Home') {
+				e.preventDefault();
+				if (chk3DWalls && !chk3DWalls.checked) {
+					chk3DWalls.checked = true;
+					chk3DWalls.dispatchEvent(new Event('change'));
+				}
+			} else if (e.key === 'End') {
+				e.preventDefault();
+				if (chk3DWalls && chk3DWalls.checked) {
+					chk3DWalls.checked = false;
+					chk3DWalls.dispatchEvent(new Event('change'));
+				}
 			} else if (e.key === '1') {
 				e.preventDefault();
 				document.getElementById('tool-floor')?.click();

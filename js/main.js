@@ -39,9 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
 	const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
 	const mainSidebar = document.getElementById('main-sidebar');
 	if (window.matchMedia('(max-width:1024px)').matches) mainSidebar?.classList.add('collapsed');
+	renderer.updateHotkeyLegendPosition();
 
 	btnToggleSidebar?.addEventListener('click', () => {
 		mainSidebar?.classList.toggle('collapsed');
+		renderer.updateHotkeyLegendPosition();
 		setTimeout(() => {
 			renderer.resize();
 		}, 320);
