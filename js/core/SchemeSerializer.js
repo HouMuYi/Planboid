@@ -6,6 +6,7 @@
  * 4. 牆面 100% 無損正規化 (自動將 S/E 邊線轉化為對應格點之 N/W 邊線)
  */
 
+import { CONFIG } from './Config.js';
 import { ShapeStrokeEngine } from '../renderer/ShapeStrokeEngine.js';
 
 export class SchemeSerializer {
@@ -68,10 +69,10 @@ export class SchemeSerializer {
 			v: 2,
 			id: scheme.id || `scheme_${Date.now()}`,
 			n: scheme.name || '未命名方案',
-			w: scheme.width || 64,
-			h: scheme.height || 64,
-			ox: scheme.worldOriginX ?? 10500,
-			oy: scheme.worldOriginY ?? 9200,
+			w: scheme.width || CONFIG.DEFAULT_SCHEME_WIDTH,
+			h: scheme.height || CONFIG.DEFAULT_SCHEME_HEIGHT,
+			ox: scheme.worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X,
+			oy: scheme.worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y,
 			p: paletteTuples,
 			d: denseTiles,
 		};
@@ -156,10 +157,10 @@ export class SchemeSerializer {
 		return {
 			id: obj.id || `scheme_${Date.now()}`,
 			name: obj.n || obj.name || '匯入方案',
-			width: obj.w || obj.width || 64,
-			height: obj.h || obj.height || 64,
-			worldOriginX: obj.ox ?? obj.worldOriginX ?? 10500,
-			worldOriginY: obj.oy ?? obj.worldOriginY ?? 9200,
+			width: obj.w || obj.width || CONFIG.DEFAULT_SCHEME_WIDTH,
+			height: obj.h || obj.height || CONFIG.DEFAULT_SCHEME_HEIGHT,
+			worldOriginX: obj.ox ?? obj.worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X,
+			worldOriginY: obj.oy ?? obj.worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y,
 			palette: paletteMap,
 			tiles: tilesMap,
 		};
@@ -177,7 +178,7 @@ export class SchemeSerializer {
 		const dStr = '[\n' + dLines.join(',\n') + '\n  ]';
 
 		return `{\n  "v": ${compactObj.v || 2},\n  "id": ${JSON.stringify(compactObj.id || '')},\n  "n": ${JSON.stringify(compactObj.n || '')},\n  "w": ${
-			compactObj.w || 64
-		},\n  "h": ${compactObj.h || 64},\n  "ox": ${compactObj.ox ?? 10500},\n  "oy": ${compactObj.oy ?? 9200},\n  "p": ${pStr},\n  "d": ${dStr}\n}`;
+			compactObj.w || CONFIG.DEFAULT_SCHEME_WIDTH
+		},\n  "h": ${compactObj.h || CONFIG.DEFAULT_SCHEME_HEIGHT},\n  "ox": ${compactObj.ox ?? CONFIG.DEFAULT_ORIGIN_X},\n  "oy": ${compactObj.oy ?? CONFIG.DEFAULT_ORIGIN_Y},\n  "p": ${pStr},\n  "d": ${dStr}\n}`;
 	}
 }

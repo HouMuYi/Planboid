@@ -4,7 +4,7 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'__FALLBACK__': 'zh',
 	'__LANG_NAME__': 'English',
 
-	'header_badge': 'PZ Plot Planner',
+	'header_badge': 'Project Zomboid Plot Planner',
 	'header_default_scheme_name': 'Default Scheme',
 	'header_scheme_name_tooltip': 'Click to rename or adjust dimensions',
 	'header_world_origin_title': 'Set PZ world origin coordinates for grid (1,1)',

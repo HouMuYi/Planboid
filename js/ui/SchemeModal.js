@@ -2,6 +2,7 @@
  * SchemeModal.js - 方案管理視窗 (極簡 Dense Flat Tuple 格式、零原生彈窗、剪貼簿與內建盒體導入導出)
  */
 
+import { CONFIG } from '../core/Config.js';
 import { i18n } from '../core/I18nManager.js';
 import { SchemeSerializer } from '../core/SchemeSerializer.js';
 import { StorageManager } from '../core/StorageManager.js';
@@ -73,10 +74,10 @@ export class SchemeModal {
 		// 建立 / 更新 按鈕
 		this.btnSaveEditor?.addEventListener('click', () => {
 			const name = this.inputName.value.trim() || i18n.t('modal_schemes_name_placeholder');
-			const width = parseInt(this.inputW.value, 10) || 64;
-			const height = parseInt(this.inputH.value, 10) || 64;
-			const worldX = parseInt(this.inputWorldX?.value, 10) || 10500;
-			const worldY = parseInt(this.inputWorldY?.value, 10) || 9200;
+			const width = parseInt(this.inputW.value, 10) || CONFIG.DEFAULT_SCHEME_WIDTH;
+			const height = parseInt(this.inputH.value, 10) || CONFIG.DEFAULT_SCHEME_HEIGHT;
+			const worldX = parseInt(this.inputWorldX?.value, 10) || CONFIG.DEFAULT_ORIGIN_X;
+			const worldY = parseInt(this.inputWorldY?.value, 10) || CONFIG.DEFAULT_ORIGIN_Y;
 
 			if (this.editingSchemeId) {
 				this.state.updateSchemeDetails(this.editingSchemeId, name, width, height);
@@ -119,10 +120,10 @@ export class SchemeModal {
 		// 另存新方案按鈕
 		this.btnSaveAsNew?.addEventListener('click', () => {
 			const name = this.inputName.value.trim() || i18n.t('modal_schemes_name_placeholder');
-			const width = parseInt(this.inputW.value, 10) || 64;
-			const height = parseInt(this.inputH.value, 10) || 64;
-			const worldX = parseInt(this.inputWorldX?.value, 10) || 10500;
-			const worldY = parseInt(this.inputWorldY?.value, 10) || 9200;
+			const width = parseInt(this.inputW.value, 10) || CONFIG.DEFAULT_SCHEME_WIDTH;
+			const height = parseInt(this.inputH.value, 10) || CONFIG.DEFAULT_SCHEME_HEIGHT;
+			const worldX = parseInt(this.inputWorldX?.value, 10) || CONFIG.DEFAULT_ORIGIN_X;
+			const worldY = parseInt(this.inputWorldY?.value, 10) || CONFIG.DEFAULT_ORIGIN_Y;
 
 			const sourceScheme = this.state.schemes.find(s => s.id === this.editingSchemeId) || this.state.scheme;
 			const newScheme = {
@@ -337,8 +338,8 @@ export class SchemeModal {
 			n: scheme.name,
 			w: scheme.width,
 			h: scheme.height,
-			ox: scheme.worldOriginX || 10500,
-			oy: scheme.worldOriginY || 9200,
+			ox: scheme.worldOriginX || CONFIG.DEFAULT_ORIGIN_X,
+			oy: scheme.worldOriginY || CONFIG.DEFAULT_ORIGIN_Y,
 			p: paletteList,
 			d: denseTuples,
 		};
@@ -388,25 +389,13 @@ export class SchemeModal {
 		return {
 			id: 'scheme_' + Date.now(),
 			name: compactObj.n || '匯入方案',
-			width: compactObj.w || 64,
-			height: compactObj.h || 64,
-			worldOriginX: compactObj.ox || 10500,
-			worldOriginY: compactObj.oy || 9200,
+			width: compactObj.w || CONFIG.DEFAULT_SCHEME_WIDTH,
+			height: compactObj.h || CONFIG.DEFAULT_SCHEME_HEIGHT,
+			worldOriginX: compactObj.ox || CONFIG.DEFAULT_ORIGIN_X,
+			worldOriginY: compactObj.oy || CONFIG.DEFAULT_ORIGIN_Y,
 			palette,
 			tiles,
 		};
-	}
-
-	resetEditorToCreateMode() {
-		this.editingSchemeId = null;
-		if (this.editorIdInput) this.editorIdInput.value = '';
-		if (this.editorTitle) this.editorTitle.textContent = i18n.t('modal_schemes_create_title');
-		if (this.btnSaveEditor) this.btnSaveEditor.textContent = i18n.t('modal_schemes_btn_create');
-		if (this.btnSaveAsNew) this.btnSaveAsNew.style.display = 'none';
-
-		if (this.inputName) this.inputName.value = '';
-		if (this.inputW) this.inputW.value = 64;
-		if (this.inputH) this.inputH.value = 64;
 	}
 
 	setEditorToEditMode(schemeId) {
@@ -422,8 +411,8 @@ export class SchemeModal {
 		if (this.inputName) this.inputName.value = target.name;
 		if (this.inputW) this.inputW.value = target.width;
 		if (this.inputH) this.inputH.value = target.height;
-		if (this.inputWorldX) this.inputWorldX.value = target.worldOriginX || 10500;
-		if (this.inputWorldY) this.inputWorldY.value = target.worldOriginY || 9200;
+		if (this.inputWorldX) this.inputWorldX.value = target.worldOriginX || CONFIG.DEFAULT_ORIGIN_X;
+		if (this.inputWorldY) this.inputWorldY.value = target.worldOriginY || CONFIG.DEFAULT_ORIGIN_Y;
 	}
 
 	resetEditorToCreateMode() {
@@ -434,13 +423,13 @@ export class SchemeModal {
 		if (this.btnSaveAsNew) this.btnSaveAsNew.style.display = 'none';
 
 		if (this.inputName) this.inputName.value = '';
-		if (this.inputW) this.inputW.value = 64;
-		if (this.inputH) this.inputH.value = 64;
-		if (this.inputWorldX) this.inputWorldX.value = 10500;
-		if (this.inputWorldY) this.inputWorldY.value = 9200;
+		if (this.inputW) this.inputW.value = CONFIG.DEFAULT_SCHEME_WIDTH;
+		if (this.inputH) this.inputH.value = CONFIG.DEFAULT_SCHEME_HEIGHT;
+		if (this.inputWorldX) this.inputWorldX.value = CONFIG.DEFAULT_ORIGIN_X;
+		if (this.inputWorldY) this.inputWorldY.value = CONFIG.DEFAULT_ORIGIN_Y;
 	}
 
-	static formatDimension(width, height, worldOriginX = 10500, worldOriginY = 9200) {
+	static formatDimension(width, height, worldOriginX = CONFIG.DEFAULT_ORIGIN_X, worldOriginY = CONFIG.DEFAULT_ORIGIN_Y) {
 		return `(${width} x ${height} @ ${worldOriginX},${worldOriginY})`;
 	}
 
@@ -453,10 +442,13 @@ export class SchemeModal {
 			dimEl.textContent = SchemeModal.formatDimension(
 				s.width,
 				s.height,
-				s.worldOriginX || 10500,
-				s.worldOriginY || 9200,
+				s.worldOriginX || CONFIG.DEFAULT_ORIGIN_X,
+				s.worldOriginY || CONFIG.DEFAULT_ORIGIN_Y,
 			);
 		}
+
+		const schemeName = this.state.scheme?.name || '';
+		document.title = `${schemeName} - Planboid: ${i18n.t('header_badge')}`;
 	}
 
 	renderSchemeList() {
@@ -484,7 +476,7 @@ export class SchemeModal {
 
 			const sizeSpan = document.createElement('span');
 			sizeSpan.className = 'scheme-size';
-			sizeSpan.textContent = ` ${SchemeModal.formatDimension(scheme.width, scheme.height)}`;
+			sizeSpan.textContent = ` ${SchemeModal.formatDimension(scheme.width, scheme.height, scheme.worldOriginX, scheme.worldOriginY)}`;
 
 			infoDiv.appendChild(nameSpan);
 			infoDiv.appendChild(sizeSpan);

@@ -4,7 +4,7 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'__FALLBACK__': 'zh',
 	'__LANG_NAME__': '中文',
 
-	'header_badge': 'PZ 地塊規劃器',
+	'header_badge': 'Project Zomboid 地塊規劃器',
 	'header_default_scheme_name': '預設規劃方案',
 	'header_scheme_name_tooltip': '點擊重新命名與調整尺寸',
 	'header_world_origin_title': '設定 (1,1) 對應的 PZ 遊戲真實座標',
