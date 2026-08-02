@@ -22,21 +22,24 @@
 	--shadow: 0 10px 30px -10px rgba(0,0,0,.5);
 	--blur: blur(14px);
 	--s: 1;
+	--font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Microsoft YaHei", "微软雅黑", sans-serif;
+	--font-serif: "Noto Serif TC", "Songti TC", "PMingLiU", "新細明體", "Songti SC", "SimSun", "宋体", serif;
+	--font-mono: "Ubuntu Mono", Consolas, Menlo, Monaco, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Microsoft YaHei", "微软雅黑", monospace;
 }
 @media (min-width:1920px) { :root { --s:1.15 } }
 @media (min-width:2560px) { :root { --s:1.28 } }
 
 /* ── 2. Global Reset & Interactive Physical Rule ── */
-*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif }
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; font-family:var(--font-sans) }
 body { background:var(--bg); color:var(--c0); overflow:hidden; height:100vh; height:100dvh; width:100vw }
 a { text-decoration:none; color:inherit }
 
-/* 取消文字選取 (全局 UI 元件防禦，傳統平鋪) */
+/* 取消文字選取 */
 #main-canvas, .canvas-viewport, .toolbar-left, .sidebar-right, .btn, button, .palette-item, .scheme-item, .toggle-pill { user-select:none }
 /* 保留特定元素文字選取能力 */
 .modal-content, #about-markdown-body, input, textarea, p, span, code { user-select:text }
 
-/* 通用修飾符 (Utility Modifiers) */
+/* 通用修飾符 */
 .w-full { width:100% }
 .flex-1 { flex:1; min-width:0 }
 .flex-2 { flex:2; min-width:0 }
@@ -44,7 +47,7 @@ a { text-decoration:none; color:inherit }
 .text-danger { color:var(--danger) }
 .text-muted { font-size:calc(.8rem*var(--s)); color:var(--c2) }
 
-/* 物理法則級別全局提亮 (消滅手繪感 :hover 冗餘) */
+/* 物理法則級別全局提亮 */
 :is(.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .palette-item, .checkbox-label, .select-lang, .btn-close, button, a):hover { filter:brightness(1.25); transform:translateY(-1px) }
 .btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .checkbox-label, .select-lang, .btn-close, button, a { cursor:pointer; transition:filter .15s, transform .15s }
 
@@ -71,7 +74,7 @@ a { text-decoration:none; color:inherit }
 :is(.input-text, .input-number, .select-lang, select, textarea):focus { outline:none; border-color:var(--ac) }
 .world-origin-inputs .input-number { width:calc(76px*var(--s)); background:transparent; border:none; color:var(--green); font-weight:600; text-align:center }
 .field-label { font-size:calc(.8rem*var(--s)); color:var(--c2) }
-.input-code { font-family:monospace; resize:vertical; font-weight:600 }
+.input-code { font-family:var(--font-mono); resize:vertical; font-weight:600 }
 .input-color { width:48px; height:38px; border:none; cursor:pointer; border-radius:6px; padding:0; background:transparent }
 
 /* ── 7. Component Structure & Boundaries ── */
@@ -82,7 +85,7 @@ a { text-decoration:none; color:inherit }
 .header-actions { flex-shrink:0; gap:calc(8px*var(--s)) }
 .logo-icon { width:calc(32px*var(--s)); height:calc(32px*var(--s)); flex-shrink:0; object-fit:contain }
 .header-center { flex:1; min-width:0; justify-content:center; gap:calc(8px*var(--s)) }
-.logo-title { font-family:'Outfit',sans-serif; font-weight:700; font-size:calc(1.25rem*var(--s)); background:linear-gradient(135deg,#a5b4fc,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent }
+.logo-title { font-family:'Orbitron',sans-serif; font-weight:700; font-size:calc(1.25rem*var(--s)); background:linear-gradient(135deg,#a5b4fc,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent }
 .badge { font-size:calc(.7rem*var(--s)); background:rgba(99,102,241,.15); color:#a5b4fc; padding:.25em .65em; border-radius:1em; border:1px solid rgba(99,102,241,.3); display:inline-flex; align-items:center; white-space:nowrap; width:auto }
 .scheme-title { max-width:min(300px,28vw); font-weight:600; font-size:calc(.95rem*var(--s)); border-bottom:1px dashed var(--ac); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right }
 #btn-scheme-modal { flex-shrink:0 }
@@ -112,7 +115,7 @@ a { text-decoration:none; color:inherit }
 .view-btn.active { background:var(--ac); color:#fff; font-weight:600 }
 .toggle-pill { gap:6px; padding:calc(6px*var(--s)) calc(12px*var(--s)); color:var(--c1) }
 .toggle-pill input { accent-color:var(--ac) }
-.canvas-info-overlay { position:absolute; bottom:calc(16px*var(--s)); left:calc(16px*var(--s)); padding:calc(6px*var(--s)) calc(14px*var(--s)); font-size:calc(.75rem*var(--s)); gap:8px }
+.canvas-info-overlay { position:absolute; bottom:calc(16px*var(--s)); left:calc(16px*var(--s)); padding:calc(6px*var(--s)) calc(14px*var(--s)); font-size:calc(.75rem*var(--s)); font-family:var(--font-mono); gap:8px }
 .canvas-hotkeys-overlay { left:auto; right:calc(16px*var(--s) + var(--sidebar-offset, 0px)); white-space:pre-line; text-align:right; transition:right .3s cubic-bezier(.4,0,.2,1) }
 .dot { color:var(--c2) }
 
@@ -167,7 +170,7 @@ a { text-decoration:none; color:inherit }
 .btn-close { background:transparent; border:none; color:var(--c2); font-size:1.4rem }
 
 #about-markdown-body { color:var(--c1); font-size:calc(1rem*var(--s)); line-height:1.75; padding-right:8px; overflow-y:auto; flex:1; min-height:0 }
-#about-markdown-body h1 { font-size:calc(1.7rem*var(--s)); font-weight:700; color:#818cf8; margin-bottom:14px; font-family:'Outfit',sans-serif }
+#about-markdown-body h1 { font-size:calc(1.7rem*var(--s)); font-weight:700; color:#818cf8; margin-bottom:14px; font-family:var(--font-sans) }
 #about-markdown-body h2 { font-size:calc(1.35rem*var(--s)); font-weight:700; color:var(--c0); margin:20px 0 12px; border-bottom:1px solid var(--bd); padding-bottom:6px }
 #about-markdown-body h3 { font-size:calc(1.15rem*var(--s)); font-weight:600; color:#34d399; margin:16px 0 8px }
 #about-markdown-body blockquote { border-left:4px solid var(--ac); background:rgba(99,102,241,.14); padding:12px 16px; border-radius:0 var(--r) var(--r) 0; color:#f1f5f9; font-style:italic; margin:14px 0 }
