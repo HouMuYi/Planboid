@@ -44,6 +44,7 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'toolbar_group_history': '歷史',
 	'toolbar_btn_undo_title': '復原（Ctrl+Z）',
 	'toolbar_btn_redo_title': '重做（Ctrl+Y）',
+	'toolbar_btn_cancel_op_title': '中斷操作（Esc）',
 
 	'viewport_view_iso': '菱形（2:1）',
 	'viewport_view_iso_title': '2:1 菱形視角',

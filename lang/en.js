@@ -44,6 +44,7 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'toolbar_group_history': 'History',
 	'toolbar_btn_undo_title': 'Undo (Ctrl+Z)',
 	'toolbar_btn_redo_title': 'Redo (Ctrl+Y)',
+	'toolbar_btn_cancel_op_title': 'Cancel Action (Esc)',
 
 	'viewport_view_iso': 'Isometric (2:1)',
 	'viewport_view_iso_title': '2:1 Isometric View',

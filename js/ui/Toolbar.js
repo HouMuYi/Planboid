@@ -141,6 +141,7 @@ export class Toolbar {
 				'sidebar_floor_down_title',
 				'toolbar_btn_undo_title',
 				'toolbar_btn_redo_title',
+				'toolbar_btn_cancel_op_title',
 				'viewport_toggle_3d_walls_title',
 			];
 			hotkeyLegend.textContent = keys.map(key => i18n.t(key)).join('\n');
@@ -156,6 +157,16 @@ export class Toolbar {
 
 		window.addEventListener('keydown', (e) => {
 			if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
+
+			if (e.key === 'Escape' || e.key === 'Esc') {
+				if (this.renderer?.dispatcher) {
+					const canceled = this.renderer.dispatcher.cancelActiveOperation();
+					if (canceled) {
+						e.preventDefault();
+					}
+				}
+				return;
+			}
 
 			if (e.ctrlKey || e.metaKey) {
 				const key = e.key.toLowerCase();

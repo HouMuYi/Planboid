@@ -63,6 +63,48 @@ export class InputDispatcher {
 		return { cellX: logicX, cellY: logicY, edge };
 	}
 
+	/**
+	 * 統一無腦中斷機制：一站式重置所有需起點/終點、選區、貼上或拖曳中之瞬態操作
+	 * @returns {boolean} 是否中斷了任何活動中的瞬態操作
+	 */
+	cancelActiveOperation() {
+		let canceledAny = false;
+
+		// 1. 重置形狀/選區繪製起點
+		if (this.renderer.shapeStartCell) {
+			this.renderer.shapeStartCell = null;
+			canceledAny = true;
+		}
+
+		// 2. 重置 Ctrl+V 跟隨貼上預覽模式
+		if (this.state.isPastingMode) {
+			this.state.isPastingMode = false;
+			canceledAny = true;
+		}
+
+		// 3. 清除高亮選區/選區框
+		if (this.state.selectedCell || this.state.selectionBox) {
+			this.state.selectedCell = null;
+			this.state.selectionBox = null;
+			canceledAny = true;
+		}
+
+		// 4. 重置進行中之塗抹、右鍵擦除與相機拖曳
+		if (this.renderer.isPainting || this.renderer.isRightPainting || this.renderer.isDraggingCamera) {
+			this.renderer.isPainting = false;
+			this.renderer.isRightPainting = false;
+			this.renderer.isDraggingCamera = false;
+			canceledAny = true;
+		}
+
+		if (canceledAny) {
+			this.renderer.requestRenderAll();
+			this.state.notifyStateChange();
+		}
+
+		return canceledAny;
+	}
+
 	setupEvents() {
 		const el = this.renderer.canvas;
 
