@@ -32,10 +32,10 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'toast_text_import_invalid': 'Invalid scheme text content!',
 
 	'toolbar_group_tools': 'Tools',
-	'toolbar_tool_floor': 'Draw Floor (1)',
-	'toolbar_tool_wall': 'Draw Wall Edge (2)',
-	'toolbar_tool_erase_floor': 'Erase Floor (3)',
-	'toolbar_tool_erase_wall': 'Erase Wall Edge (4)',
+	'toolbar_tool_floor': 'Draw Tile (1)',
+	'toolbar_tool_wall': 'Draw Border (2)',
+	'toolbar_tool_erase_floor': 'Erase Tile (3)',
+	'toolbar_tool_erase_wall': 'Erase Border (4)',
 	'toolbar_tool_select': 'Select Tool (5)',
 	'toolbar_group_shapes': 'Shapes',
 	'toolbar_shape_single_title': 'Single Tile (Q)',
@@ -120,8 +120,8 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'modal_palette_btn_save': 'Save Changes',
 
 	'export_svg_legend_title': 'Legend',
-	'export_svg_legend_block': 'Floor',
-	'export_svg_legend_line': 'Wall',
+	'export_svg_legend_block': 'Tile',
+	'export_svg_legend_line': 'Border',
 	'export_copy_clipboard_success': 'Selection copied to clipboard (Press Ctrl+V to paste)',
 
 	'defaults_scheme_name': 'Default Scheme',

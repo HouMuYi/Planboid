@@ -10,8 +10,8 @@ Planboid 是線上地塊規劃工具，專為《殭屍毀滅工程》（Project 
 
 ## 🚀快速開始
 
-- 🌐原始碼：[GitHub Pages 線上部署頁面](https://houmuyi.github.io/Planboid/)
-- 📦專案庫：[GitHub 原始碼專案倉庫](https://github.com/HouMuYi/Planboid)
+- 🌐線上體驗：[GitHub Pages 線上部署頁面](https://houmuyi.github.io/Planboid/)
+- 📦專案倉庫：[GitHub 原始碼專案倉庫](https://github.com/HouMuYi/Planboid)
 - 💻本機運行：複製或下載此專案，透過任何本地 HTTP 伺服器，如 VS Code Live Server、`npx serve`，或 `python -m http.server`（小雙無情加上）開啟 `index.html` 即可！
 
 ## ✨核心特色
