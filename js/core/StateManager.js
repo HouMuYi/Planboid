@@ -2,7 +2,7 @@
  * StateManager.js - 核心領域模型與持久化狀態管理器 (支援 PZ 牆面正規化、舊版 4 方向相容與動態方案調整)
  */
 
-import { ShapeStrokeEngine } from '../renderer/ShapeStrokeEngine.js';
+import { BorderEdgeNormalizer } from '../renderer/BorderEdgeNormalizer.js';
 import { CONFIG } from './Config.js';
 import { eventBus } from './EventBus.js';
 import { StorageManager } from './StorageManager.js';
@@ -59,7 +59,7 @@ export class StateManager {
 			if (tile.walls) {
 				Object.entries(tile.walls).forEach(([edge, colorId]) => {
 					if (colorId) {
-						const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 						const normKey = `${norm.x},${norm.y},${zStr}`;
 						if (!updatedTiles[normKey]) {
 							updatedTiles[normKey] = { walls: {} };
@@ -115,12 +115,6 @@ export class StateManager {
 	}
 	set activeTool(val) {
 		this.toolState.setActiveTool(val);
-	}
-	get shapeMode() {
-		return this.toolState.shapeMode;
-	}
-	set shapeMode(val) {
-		this.toolState.setShapeMode(val);
 	}
 	get brushType() {
 		return this.toolState.brushType;
@@ -181,7 +175,7 @@ export class StateManager {
 		this.redoStack.push(currentSnap);
 
 		const prevSnap = this.undoStack[this.undoStack.length - 1];
-		this.scheme = JSON.parse(prevSnap);
+		Object.assign(this.scheme, JSON.parse(prevSnap));
 
 		const paletteKeys = Object.keys(this.scheme.palette || {});
 		if (!this.scheme.palette[this.activeColorId] && paletteKeys.length > 0) {
@@ -197,7 +191,7 @@ export class StateManager {
 		if (this.redoStack.length === 0) return false;
 		const nextSnap = this.redoStack.pop();
 		this.undoStack.push(nextSnap);
-		this.scheme = JSON.parse(nextSnap);
+		Object.assign(this.scheme, JSON.parse(nextSnap));
 
 		const paletteKeys = Object.keys(this.scheme.palette || {});
 		if (!this.scheme.palette[this.activeColorId] && paletteKeys.length > 0) {
@@ -207,21 +201,6 @@ export class StateManager {
 		this.persist();
 		this.notifyStateChange();
 		return true;
-	}
-
-	persist() {
-		const idx = this.schemes.findIndex(s => s.id === this.scheme.id);
-		if (idx !== -1) {
-			this.schemes[idx] = this.scheme;
-		}
-		StorageManager.saveData({
-			activeSchemeId: this.activeSchemeId,
-			schemes: this.schemes,
-		});
-	}
-
-	notifyStateChange() {
-		window.dispatchEvent(new CustomEvent('statechange', { detail: { scheme: this.scheme } }));
 	}
 
 	/**
@@ -371,7 +350,7 @@ export class StateManager {
 
 	setTileWall(x, y, edge, colorId) {
 		// PZ 邊界正規化 (South ->下格 North, East ->右格 West)
-		const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 		if (norm.x < 0 || norm.x > this.scheme.width || norm.y < 0 || norm.y > this.scheme.height) return;
 
 		const key = `${norm.x},${norm.y},${this.currentZLevel}`;
@@ -399,7 +378,7 @@ export class StateManager {
 	}
 
 	removeWall(x, y, edge) {
-		const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 		const key = `${norm.x},${norm.y},${this.currentZLevel}`;
 		if (this.scheme.tiles[key] && this.scheme.tiles[key].walls) {
 			delete this.scheme.tiles[key].walls[norm.edge];

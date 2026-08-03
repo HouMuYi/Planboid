@@ -83,53 +83,56 @@
 				<aside class="toolbar-left panel" id="main-toolbar">
 					<div class="tool-group">
 						<span class="group-label desktop-only" data-i18n="toolbar_group_tools">畫具</span>
-						<button class="tool-btn active" id="tool-floor" data-tool="floor" data-i18n-title="toolbar_tool_floor" title="繪製地塊">
+						<button
+							class="tool-btn active"
+							id="tool-floor"
+							data-tool="floor"
+							data-i18n-title="toolbar_tool_floor_title"
+							title="繪製地塊（1）&#10;點擊單一地塊立即上色；按住拖曳後放開，可依起訖對角批次為矩形範圍地塊上色。"
+						>
 							<span class="icon unicode-icon">◆</span>
 						</button>
-						<button class="tool-btn" id="tool-wall" data-tool="wall" data-i18n-title="toolbar_tool_wall" title="繪製邊線">
+						<button
+							class="tool-btn"
+							id="tool-wall"
+							data-tool="wall"
+							data-i18n-title="toolbar_tool_wall_title"
+							title="繪製邊線（2）&#10;遊標會自動吸附至地塊網格交叉點；點擊一交叉點作為起點後，按住拖曳到另一交叉點放開，或放開後移動再次點擊，皆可沿水平或垂直單一直線批次繪製整排邊線；按 Esc 可中斷。"
+						>
 							<span class="icon unicode-icon">◇</span>
 						</button>
-						<button class="tool-btn" id="tool-erase-floor" data-tool="erase-floor" data-i18n-title="toolbar_tool_erase_floor" title="清除地塊">
+						<button
+							class="tool-btn"
+							id="tool-erase-floor"
+							data-tool="erase-floor"
+							data-i18n-title="toolbar_tool_erase_floor_title"
+							title="清除地塊（3）&#10;操作邏輯與繪製地塊相同：點擊單一地塊立即清除；按住拖曳後放開，可清除起訖對角所框出之矩形範圍內全部地塊。"
+						>
 							<span class="icon combo-icon">
 								<span class="base-icon">◆</span>
 								<span class="overlay-icon">✘</span>
 							</span>
 						</button>
-						<button class="tool-btn" id="tool-erase-wall" data-tool="erase-wall" data-i18n-title="toolbar_tool_erase_wall" title="清除邊線">
+						<button
+							class="tool-btn"
+							id="tool-erase-wall"
+							data-tool="erase-wall"
+							data-i18n-title="toolbar_tool_erase_wall_title"
+							title="清除邊線（4）&#10;操作邏輯與繪製邊線相同：吸附交叉點設定起點後，拖曳或再次點擊終點，即可沿同一水平或垂直直線批次清除整排邊線。"
+						>
 							<span class="icon combo-icon">
 								<span class="base-icon">◇</span>
 								<span class="overlay-icon">✘</span>
 							</span>
 						</button>
-						<button class="tool-btn" id="tool-select" data-tool="select" data-i18n-title="toolbar_tool_select" title="選取工具">
+						<button
+							class="tool-btn"
+							id="tool-select"
+							data-tool="select"
+							data-i18n-title="toolbar_tool_select_title"
+							title="選取工具（5）&#10;點擊單一地塊即可選取並編輯標籤；按住拖曳後放開，可框選矩形範圍地塊，供複製（Ctrl+C）、貼上（Ctrl+V）或刪除（Delete）使用。"
+						>
 							<span class="icon">👆</span>
-						</button>
-					</div>
-
-					<div class="divider"></div>
-
-					<div class="tool-group">
-						<span class="group-label desktop-only" data-i18n="toolbar_group_shapes">形狀</span>
-						<button
-							class="shape-btn active"
-							id="shape-single"
-							data-shape="single"
-							data-i18n-title="toolbar_shape_single_title"
-							title="單點 / 自由塗抹"
-						>
-							<span class="unicode-shape">•</span>
-						</button>
-						<button
-							class="shape-btn"
-							id="shape-line"
-							data-shape="line"
-							data-i18n-title="toolbar_shape_line_title"
-							title="起點+終點 自動繪製直線"
-						>
-							<span class="unicode-shape">│</span>
-						</button>
-						<button class="shape-btn" id="shape-box" data-shape="box" data-i18n-title="toolbar_shape_box_title" title="對角線矩形區域框選">
-							<span class="unicode-shape">■</span>
 						</button>
 					</div>
 

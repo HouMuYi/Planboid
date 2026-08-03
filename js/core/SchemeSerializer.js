@@ -7,7 +7,7 @@
  */
 
 import { CONFIG } from './Config.js';
-import { ShapeStrokeEngine } from '../renderer/ShapeStrokeEngine.js';
+import { BorderEdgeNormalizer } from '../renderer/BorderEdgeNormalizer.js';
 
 export class SchemeSerializer {
 	/**
@@ -47,7 +47,7 @@ export class SchemeSerializer {
 				if (tile.walls) {
 					Object.entries(tile.walls).forEach(([edge, colorId]) => {
 						if (colorId) {
-							const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 							const wKey = `${norm.x},${norm.y},${z},${norm.edge}`;
 							normalizedWalls.set(wKey, colorId);
 						}
@@ -121,7 +121,7 @@ export class SchemeSerializer {
 					tile.floorColorId = val;
 				} else if (type === 1 || type === 2) {
 					const edge = (type === 1) ? 'N' : 'W';
-					const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+					const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 					const tile = getTile(norm.x, norm.y, z);
 					if (!tile.walls) tile.walls = {};
 					tile.walls[norm.edge] = val;
@@ -144,7 +144,7 @@ export class SchemeSerializer {
 				if (tile.walls) {
 					Object.entries(tile.walls).forEach(([edge, colorId]) => {
 						if (colorId) {
-							const norm = ShapeStrokeEngine.normalizeWallEdge(x, y, edge);
+							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 							const normTile = getTile(norm.x, norm.y, z);
 							if (!normTile.walls) normTile.walls = {};
 							normTile.walls[norm.edge] = colorId;

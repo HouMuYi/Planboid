@@ -2,10 +2,18 @@
  * InputDispatcher.js - Canvas 輸入與互動事件分派器 (Input Event Dispatcher Seam)
  * 負責 Canvas DOM 事件綁定、滑鼠座標反算、相機 Drag/Zoom 與筆刷呼叫分派
  * 包含 60FPS 訊框鎖與分層繪製調度 (rAF Lock + Overlay Decoupling)
+ *
+ * 互動邏輯 (地塊與邊線共用「按下起點、放開終點」統一心智模型)：
+ * - 地塊 (floor 筆刷 / 選取工具)：mousedown 記錄起點格，mouseup 時若終點格與起點格相同視為單格操作，
+ *   否則視為矩形範圍操作 (起訖對角)。全程僅在 mouseup 當下才寫入領域資料，中途純預覽。
+ * - 邊線 (wall 筆刷)：遊標吸附至地塊網格交叉點。首次 mousedown 記錄交叉點起點；之後不論是「按住拖曳
+ *   到另一交叉點放開」或「放開後移動遊標、再次點擊」，只要 mouseup 當下的終點交叉點與起點不同，就
+ *   立即結算為兩點之間沿同一 X 軸或同一 Y 軸的整排邊線 (軸向鎖定由 GeometryPipeline.constrainAxisPoint 保證)。
+ *   若終點與起點相同 (單純點擊尚未移動)，則保留起點、繼續等待下一次互動。
  */
 
 import { CONFIG } from '../core/Config.js';
-import { calcZTranslate } from './GeometryPipeline.js';
+import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
 
 export class InputDispatcher {
 	/**
@@ -24,7 +32,7 @@ export class InputDispatcher {
 	}
 
 	/**
-	 * 計算滑鼠對應的邏輯網格座標與最近邊緣
+	 * 計算滑鼠對應的邏輯網格座標 (地塊)、最近邊緣區 (供右鍵快速抹除使用) 與最近網格交叉點 (供邊線工具吸附使用)
 	 */
 	getMouseGridPos(e) {
 		const rect = this.renderer.canvas.getBoundingClientRect();
@@ -47,6 +55,7 @@ export class InputDispatcher {
 
 		let edge = null;
 		// 邊緣吸附需在 25% 帶內，且必須位於邊長度方向的中央 50% (0.25 ~ 0.75，忽略兩端各 25% 角落交錯區)
+		// (此區域判定僅供右鍵快速抹除的即時單邊偵測使用，與邊線筆刷的交叉點吸附為兩套獨立機制)
 		const snapMin = CONFIG.EDGE_SNAP_MIN;
 		const snapMax = CONFIG.EDGE_SNAP_MAX;
 
@@ -60,7 +69,11 @@ export class InputDispatcher {
 			edge = 'east';
 		}
 
-		return { cellX: logicX, cellY: logicY, edge };
+		// 邊線筆刷交叉點吸附：直接四捨五入至最近的網格交叉點 (地塊網格的頂點)
+		const ix = Math.round(res.gridX);
+		const iy = Math.round(res.gridY);
+
+		return { cellX: logicX, cellY: logicY, edge, ix, iy };
 	}
 
 	/**
@@ -70,9 +83,10 @@ export class InputDispatcher {
 	cancelActiveOperation() {
 		let canceledAny = false;
 
-		// 1. 重置形狀/選區繪製起點
-		if (this.renderer.shapeStartCell) {
-			this.renderer.shapeStartCell = null;
+		// 1. 重置地塊矩形拖曳起點與邊線交叉點起點
+		if (this.renderer.rectStartCell || this.renderer.wallStartPoint) {
+			this.renderer.rectStartCell = null;
+			this.renderer.wallStartPoint = null;
 			canceledAny = true;
 		}
 
@@ -105,13 +119,67 @@ export class InputDispatcher {
 		return canceledAny;
 	}
 
+	/**
+	 * 結算地塊矩形操作 (floor 筆刷 / 選取工具共用)：起點與終點格相同視為單格，否則視為矩形
+	 */
+	finalizeRectOperation() {
+		const start = this.renderer.rectStartCell;
+		this.renderer.rectStartCell = null;
+		this.renderer.isPainting = false;
+		if (!start) return;
+
+		const end = this.renderer.hoveredCell;
+		if (end.x < 0 || end.y < 0) return;
+
+		const minX = Math.min(start.x, end.x);
+		const maxX = Math.max(start.x, end.x);
+		const minY = Math.min(start.y, end.y);
+		const maxY = Math.max(start.y, end.y);
+
+		if (this.state.activeTool === 'select') {
+			if (minX === maxX && minY === maxY) {
+				if (minX >= 0 && minX < this.state.scheme.width && minY >= 0 && minY < this.state.scheme.height) {
+					this.state.selectedCell = { x: minX, y: minY };
+					this.state.selectionBox = null;
+					this.state.notifyStateChange();
+				}
+			} else {
+				this.state.selectionBox = { minX, minY, maxX, maxY };
+				this.state.selectedCell = { x: minX, y: minY };
+				this.state.notifyStateChange();
+			}
+		} else {
+			this.applicator.applyRectFloor(minX, minY, maxX, maxY);
+		}
+
+		this.renderer.requestRenderAll();
+	}
+
+	/**
+	 * 結算邊線交叉點直線操作：僅在終點 (依軸向鎖定後) 與起點不同時才真正寫入並重置起點
+	 */
+	finalizeWallOperationIfMoved() {
+		const start = this.renderer.wallStartPoint;
+		if (!start) return;
+
+		const raw = this.renderer.hoveredIntersection;
+		if (raw.x < 0 || raw.y < 0) return;
+
+		const end = GeometryPipeline.constrainAxisPoint(start, raw);
+		if (end.x === start.x && end.y === start.y) return; // 尚未移動到不同交叉點，繼續等待下一次互動
+
+		this.applicator.applyWallLine(start, end);
+		this.renderer.wallStartPoint = null;
+		this.renderer.requestRenderAll();
+	}
+
 	setupEvents() {
 		const el = this.renderer.canvas;
 
 		el.addEventListener('mousedown', (e) => {
 			if (this.renderer.isAnimating) return;
 
-			const { cellX, cellY, edge } = this.getMouseGridPos(e);
+			const { cellX, cellY, edge, ix, iy } = this.getMouseGridPos(e);
 
 			if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
 				this.renderer.isDraggingCamera = true;
@@ -130,59 +198,28 @@ export class InputDispatcher {
 			}
 
 			if (e.button === 0) {
-				const tool = this.state.activeTool;
-				const shape = this.state.shapeMode;
-
 				if (this.state.isPastingMode) {
 					this.state.pasteSelection(cellX, cellY);
 					this.renderer.requestRenderAll();
 					return;
 				}
 
-				if (tool === 'select') {
-					if (shape === 'single') {
-						if (
-							cellX >= 0 && cellX < this.state.scheme.width
-							&& cellY >= 0 && cellY < this.state.scheme.height
-						) {
-							this.state.selectedCell = { x: cellX, y: cellY };
-							this.state.selectionBox = null;
-							this.state.notifyStateChange();
-						}
-					} else if (shape === 'box') {
-						if (!this.renderer.shapeStartCell) {
-							this.renderer.shapeStartCell = { x: cellX, y: cellY };
-							this.renderer.requestRenderOverlay();
-						} else {
-							const minX = Math.min(this.renderer.shapeStartCell.x, cellX);
-							const maxX = Math.max(this.renderer.shapeStartCell.x, cellX);
-							const minY = Math.min(this.renderer.shapeStartCell.y, cellY);
-							const maxY = Math.max(this.renderer.shapeStartCell.y, cellY);
+				const tool = this.state.activeTool;
+				const isWallMode = tool !== 'select' && this.state.brushType === 'wall';
 
-							this.state.selectionBox = { minX, minY, maxX, maxY };
-							this.state.selectedCell = { x: minX, y: minY };
-							this.renderer.shapeStartCell = null;
-							this.state.notifyStateChange();
-						}
+				if (isWallMode) {
+					// 邊線工具：只在尚未設定起點時記錄交叉點起點，其餘一律交由 mouseup 統一結算
+					if (!this.renderer.wallStartPoint) {
+						this.renderer.wallStartPoint = { x: ix, y: iy };
+						this.renderer.requestRenderOverlay();
 					}
 					return;
 				}
 
-				if (shape === 'single') {
-					this.state.pushHistory();
-					this.renderer.isPainting = true;
-					this.applicator.applyBrushAt(cellX, cellY, edge);
-				} else if (shape === 'line' || shape === 'box') {
-					if (!this.renderer.shapeStartCell) {
-						this.renderer.shapeStartCell = { x: cellX, y: cellY, edge };
-						this.renderer.requestRenderOverlay();
-					} else {
-						const start = this.renderer.shapeStartCell;
-						this.applicator.applyShapeBrush(start, { x: cellX, y: cellY, edge });
-						this.renderer.shapeStartCell = null;
-						this.renderer.requestRenderAll();
-					}
-				}
+				// 地塊筆刷 / 選取工具：記錄拖曳起點，統一交由 mouseup 判定單格或矩形
+				this.renderer.rectStartCell = { x: cellX, y: cellY };
+				this.renderer.isPainting = true;
+				this.renderer.requestRenderOverlay();
 			}
 		});
 
@@ -201,10 +238,18 @@ export class InputDispatcher {
 				this.renderer.isDraggingCamera = false;
 				el.style.cursor = 'default';
 			}
-			if (this.renderer.isPainting || this.renderer.isRightPainting) {
-				this.renderer.isPainting = false;
+
+			if (this.renderer.isRightPainting) {
 				this.renderer.isRightPainting = false;
 				this.state.pushHistory();
+			}
+
+			if (this.renderer.rectStartCell) {
+				this.finalizeRectOperation();
+			}
+
+			if (this.renderer.wallStartPoint) {
+				this.finalizeWallOperationIfMoved();
 			}
 		};
 
@@ -232,7 +277,8 @@ export class InputDispatcher {
 				// 防護 1：雙指觸控瞬間，強制冷凍中斷任何單指繪圖/筆刷/選區狀態！
 				this.renderer.isPainting = false;
 				this.renderer.isRightPainting = false;
-				this.renderer.shapeStartCell = null;
+				this.renderer.rectStartCell = null;
+				this.renderer.wallStartPoint = null;
 				this.renderer.requestRenderOverlay();
 
 				const t1 = e.touches[0];
@@ -247,8 +293,8 @@ export class InputDispatcher {
 				if (this.isTouchPinching) return;
 
 				const touch = e.touches[0];
-				const { cellX, cellY, edge } = this.getMouseGridPos(touch);
-				this.updateHoverState(cellX, cellY, edge);
+				const { cellX, cellY, edge, ix, iy } = this.getMouseGridPos(touch);
+				this.updateHoverState(cellX, cellY, edge, ix, iy);
 
 				const mouseEvent = new MouseEvent('mousedown', {
 					clientX: touch.clientX,
@@ -303,8 +349,8 @@ export class InputDispatcher {
 				if (this.isTouchPinching) return;
 
 				const touch = e.touches[0];
-				const { cellX, cellY, edge } = this.getMouseGridPos(touch);
-				this.updateHoverState(cellX, cellY, edge);
+				const { cellX, cellY, edge, ix, iy } = this.getMouseGridPos(touch);
+				this.updateHoverState(cellX, cellY, edge, ix, iy);
 
 				const mouseEvent = new MouseEvent('mousemove', {
 					clientX: touch.clientX,
@@ -357,13 +403,16 @@ export class InputDispatcher {
 		}, { passive: false });
 	}
 
-	updateHoverState(cellX, cellY, edge) {
-		if (
-			cellX !== this.renderer.hoveredCell.x
+	updateHoverState(cellX, cellY, edge, ix = -1, iy = -1) {
+		const changed = cellX !== this.renderer.hoveredCell.x
 			|| cellY !== this.renderer.hoveredCell.y
 			|| edge !== this.renderer.hoveredCell.edge
-		) {
+			|| ix !== this.renderer.hoveredIntersection.x
+			|| iy !== this.renderer.hoveredIntersection.y;
+
+		if (changed) {
 			this.renderer.hoveredCell = { x: cellX, y: cellY, edge };
+			this.renderer.hoveredIntersection = { x: ix, y: iy };
 			this.renderer.requestRenderOverlay();
 
 			const displayX = cellX + 1;
@@ -407,13 +456,11 @@ export class InputDispatcher {
 			this.renderer.lastMouseY = e.clientY;
 			this.renderer.requestRenderAll();
 		} else {
-			const { cellX, cellY, edge } = this.getMouseGridPos(e);
-			this.updateHoverState(cellX, cellY, edge);
+			const { cellX, cellY, edge, ix, iy } = this.getMouseGridPos(e);
+			this.updateHoverState(cellX, cellY, edge, ix, iy);
 
 			if (this.renderer.isRightPainting) {
 				this.applicator.applyRightClickErase(cellX, cellY, edge);
-			} else if (this.renderer.isPainting && this.state.shapeMode === 'single') {
-				this.applicator.applyBrushAt(cellX, cellY, edge);
 			}
 		}
 	}

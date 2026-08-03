@@ -44,6 +44,22 @@ export const GHOST_CONFIG = {
 
 export class GeometryPipeline {
 	/**
+	 * 邊線交叉點軸向鎖定：將任意懸停交叉點約束為與起點同 X 軸或同 Y 軸
+	 * (取兩軸位移量較大的一方為鎖定方向，維持邊線只能水平或垂直繪製)
+	 * @param {{x: number, y: number}} start
+	 * @param {{x: number, y: number}} raw
+	 * @returns {{x: number, y: number}}
+	 */
+	static constrainAxisPoint(start, raw) {
+		const dx = raw.x - start.x;
+		const dy = raw.y - start.y;
+		if (Math.abs(dx) >= Math.abs(dy)) {
+			return { x: raw.x, y: start.y };
+		}
+		return { x: start.x, y: raw.y };
+	}
+
+	/**
 	 * 計算地塊四個頂點的螢幕投影座標 (純邏輯座標，不含 Z 軸偏移)
 	 */
 	static getTilePolyPoints(isoMath, x, y, progress = 1.0) {

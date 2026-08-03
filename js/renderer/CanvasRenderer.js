@@ -9,7 +9,6 @@ import { BrushActionApplicator } from './BrushActionApplicator.js';
 import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
 import { InputDispatcher } from './InputDispatcher.js';
 import { IsoMath } from './IsoMath.js';
-import { ShapeStrokeEngine } from './ShapeStrokeEngine.js';
 
 export class CanvasRenderer {
 	/**
@@ -52,9 +51,12 @@ export class CanvasRenderer {
 		this.lastMouseX = 0;
 		this.lastMouseY = 0;
 
-		// 多模式繪畫/選區起點與懸停狀態
-		this.shapeStartCell = null;
+		// 地塊矩形拖曳起點 (floor 筆刷 / 選取工具共用：放開時判定單格或矩形)
+		this.rectStartCell = null;
+		// 邊線交叉點起點 (wall 筆刷專用：吸附十字交界處繪製直線)
+		this.wallStartPoint = null;
 		this.hoveredCell = { x: -1, y: -1, edge: null };
+		this.hoveredIntersection = { x: -1, y: -1 };
 
 		// 獨立分派器與筆刷器 (Seams)
 		this.applicator = new BrushActionApplicator(this.state);
@@ -194,6 +196,7 @@ export class CanvasRenderer {
 		this.anchorGridCell = this.getCurrentCenterGridCell();
 		// 視角過渡開始，立即冷凍並隱藏網格懸停游標
 		this.hoveredCell = { x: -1, y: -1, edge: null };
+		this.hoveredIntersection = { x: -1, y: -1 };
 		this.isAnimating = true;
 		this.requestRenderAll();
 	}
@@ -368,23 +371,29 @@ export class CanvasRenderer {
 		// 2. 貼上跟隨預覽
 		if (this.state.isPastingMode && this.hoveredCell.x >= 0) {
 			this.drawPastePreview(ctx, this.hoveredCell.x, this.hoveredCell.y);
-		} // 3. 動態筆刷與 Hover 預覽
-		else if (this.shapeStartCell && this.hoveredCell.x >= 0) {
-			this.drawShapePreview(ctx);
-		} else if (
-			this.hoveredCell.x >= 0 && this.hoveredCell.x <= this.state.scheme.width
-			&& this.hoveredCell.y >= 0 && this.hoveredCell.y <= this.state.scheme.height
-		) {
-			const isWallMode = this.state.brushType === 'wall' || this.state.activeTool === 'erase-wall';
+		} // 3. 地塊矩形拖曳預覽 (floor 筆刷 / 選取工具共用)
+		else if (this.rectStartCell) {
+			if (this.hoveredCell.x >= 0) this.drawRectPreview(ctx);
+		} // 4. 邊線交叉點直線預覽
+		else if (this.wallStartPoint) {
+			this.drawWallLinePreview(ctx);
+		} else {
+			const isWallMode = this.state.activeTool !== 'select' && this.state.brushType === 'wall';
 			if (isWallMode) {
-				if (this.hoveredCell.edge && this.state.activeTool !== 'select') {
-					const norm = ShapeStrokeEngine.normalizeWallEdge(this.hoveredCell.x, this.hoveredCell.y, this.hoveredCell.edge);
-					this.drawWallHighlight(ctx, norm.x, norm.y, norm.edge);
+				if (
+					this.hoveredIntersection.x >= 0 && this.hoveredIntersection.x <= this.state.scheme.width
+					&& this.hoveredIntersection.y >= 0 && this.hoveredIntersection.y <= this.state.scheme.height
+				) {
+					this.drawIntersectionMarker(ctx, this.hoveredIntersection.x, this.hoveredIntersection.y);
 				}
-			} else if (this.hoveredCell.x < this.state.scheme.width && this.hoveredCell.y < this.state.scheme.height) {
+			} else if (
+				this.hoveredCell.x >= 0 && this.hoveredCell.x < this.state.scheme.width
+				&& this.hoveredCell.y >= 0 && this.hoveredCell.y < this.state.scheme.height
+			) {
 				this.drawCellHighlight(ctx, this.hoveredCell.x, this.hoveredCell.y, 'rgba(99, 102, 241, 0.35)', '#6366f1', 1.5);
 			}
 		}
+
 
 		ctx.restore(); // 結束 Z 層偏移
 		ctx.restore(); // 結束相機變換
@@ -573,44 +582,70 @@ export class CanvasRenderer {
 		this.drawWallLine2D(ctx, x, y, edge, '#10b981');
 	}
 
-	drawShapePreview(ctx) {
-		if (!this.shapeStartCell) return;
+	/**
+	 * 交叉點吸附標記：邊線工具尚未按下起點時的懸停指示
+	 */
+	drawIntersectionMarker(ctx, x, y) {
+		const p = this.isoMath.gridToScreen(x, y, this.currentProgress);
+		const r = 5 / this.zoom;
 
-		const x1 = this.shapeStartCell.x;
-		const y1 = this.shapeStartCell.y;
-		const x2 = this.hoveredCell.x;
-		const y2 = this.hoveredCell.y;
-		const tool = this.state.activeTool;
-		const shape = this.state.shapeMode;
-		const brushType = this.state.brushType;
+		ctx.fillStyle = '#6366f1';
+		ctx.strokeStyle = '#ffffff';
+		ctx.lineWidth = 1.5 / this.zoom;
+		ctx.beginPath();
+		ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.stroke();
+	}
 
-		if (tool === 'select' && shape === 'box') {
-			const minX = Math.min(x1, x2);
-			const maxX = Math.max(x1, x2);
-			const minY = Math.min(y1, y2);
-			const maxY = Math.max(y1, y2);
+	/**
+	 * 地塊矩形拖曳預覽 (floor 筆刷 / 選取工具)：rectStartCell 為起點，hoveredCell 為當前終點
+	 */
+	drawRectPreview(ctx) {
+		if (!this.rectStartCell || this.hoveredCell.x < 0) return;
+
+		const minX = Math.min(this.rectStartCell.x, this.hoveredCell.x);
+		const maxX = Math.max(this.rectStartCell.x, this.hoveredCell.x);
+		const minY = Math.min(this.rectStartCell.y, this.hoveredCell.y);
+		const maxY = Math.max(this.rectStartCell.y, this.hoveredCell.y);
+
+		if (this.state.activeTool === 'select') {
 			this.drawDashedSelectionBox(ctx, minX, minY, maxX, maxY);
 			return;
 		}
 
-		if (shape === 'box') {
-			const isErasing = tool === 'erase-wall';
-			const bounds = ShapeStrokeEngine.getBoxBounds({ x: x1, y: y1 }, { x: x2, y: y2 }, isErasing ? 'wall' : brushType, isErasing);
-			if (brushType === 'wall' || isErasing) {
-				bounds.walls.forEach(w => this.drawWallHighlight(ctx, w.x, w.y, w.edge));
-			} else {
-				bounds.floors.forEach(f => this.drawCellHighlight(ctx, f.x, f.y, 'rgba(16, 185, 129, 0.3)', '#10b981', 1.5));
+		for (let x = minX; x <= maxX; x++) {
+			for (let y = minY; y <= maxY; y++) {
+				this.drawCellHighlight(ctx, x, y, 'rgba(16, 185, 129, 0.3)', '#10b981', 1.5);
 			}
-		} else if (shape === 'line') {
-			const points = ShapeStrokeEngine.getBresenhamLine(x1, y1, x2, y2);
-			points.forEach(p => {
-				if (brushType === 'wall' || tool === 'erase-wall') {
-					const norm = ShapeStrokeEngine.normalizeWallEdge(p.x, p.y, this.shapeStartCell.edge || 'north');
-					this.drawWallHighlight(ctx, norm.x, norm.y, norm.edge);
-				} else {
-					this.drawCellHighlight(ctx, p.x, p.y, 'rgba(99, 102, 241, 0.4)', '#6366f1', 1.5);
-				}
-			});
+		}
+	}
+
+	/**
+	 * 邊線交叉點直線預覽：wallStartPoint 為起點，hoveredIntersection 依軸向鎖定後為當前終點
+	 */
+	drawWallLinePreview(ctx) {
+		if (!this.wallStartPoint || this.hoveredIntersection.x < 0) return;
+
+		const start = this.wallStartPoint;
+		const end = GeometryPipeline.constrainAxisPoint(start, this.hoveredIntersection);
+
+		if (end.x === start.x && end.y === start.y) {
+			this.drawIntersectionMarker(ctx, start.x, start.y);
+			return;
+		}
+
+		if (start.y === end.y) {
+			const y = start.y;
+			const minX = Math.min(start.x, end.x);
+			const maxX = Math.max(start.x, end.x);
+			for (let x = minX; x < maxX; x++) this.drawWallHighlight(ctx, x, y, 'north');
+		} else {
+			const x = start.x;
+			const minY = Math.min(start.y, end.y);
+			const maxY = Math.max(start.y, end.y);
+			for (let y = minY; y < maxY; y++) this.drawWallHighlight(ctx, x, y, 'west');
 		}
 	}
 }
+

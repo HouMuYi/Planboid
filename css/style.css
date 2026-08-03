@@ -48,8 +48,8 @@ a { text-decoration:none; color:inherit }
 .text-muted { font-size:calc(.8rem*var(--s)); color:var(--c2) }
 
 /* 物理法則級別全局提亮 */
-:is(.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .palette-item, .checkbox-label, .select-lang, .btn-close, button, a):hover { filter:brightness(1.25); transform:translateY(-1px) }
-.btn, .tool-btn, .shape-btn, .view-btn, .floor-btn, .checkbox-label, .select-lang, .btn-close, button, a { cursor:pointer; transition:filter .15s, transform .15s }
+:is(.btn, .tool-btn, .view-btn, .floor-btn, .palette-item, .checkbox-label, .select-lang, .btn-close, button, a):hover { filter:brightness(1.25); transform:translateY(-1px) }
+.btn, .tool-btn, .view-btn, .floor-btn, .checkbox-label, .select-lang, .btn-close, button, a { cursor:pointer; transition:filter .15s, transform .15s }
 
 /* ── 3. Objects: Layout Primitives (.stack & .cluster) ── */
 .stack, #app-container, .toolbar-left, .tool-group, .sidebar-right, .sidebar-scroll-content, .panel-section, .palette-section, .palette-list, .modal-content { display:flex; flex-direction:column }
@@ -97,14 +97,13 @@ a { text-decoration:none; color:inherit }
 .toolbar-left { width:calc(64px*var(--s)); border-right:1px solid var(--bd); align-items:center; padding:calc(12px*var(--s)) 0; gap:calc(14px*var(--s)); z-index:10; flex-shrink:0 }
 .tool-group { align-items:center; gap:calc(6px*var(--s)); width:100% }
 .group-label { font-size:calc(.65rem*var(--s)); color:var(--c2); text-transform:uppercase }
-:is(.tool-btn, .shape-btn) { width:calc(44px*var(--s)); height:calc(44px*var(--s)); border-radius:var(--r); border:1px solid transparent; color:var(--c1); display:flex; align-items:center; justify-content:center; background:var(--bg-c) }
-:is(.tool-btn, .shape-btn).active { background:var(--ac); color:#fff; border-color:#818cf8; box-shadow:0 0 12px rgba(99,102,241,.4) }
+.tool-btn { width:calc(44px*var(--s)); height:calc(44px*var(--s)); border-radius:var(--r); border:1px solid transparent; color:var(--c1); display:flex; align-items:center; justify-content:center; background:var(--bg-c) }
+.tool-btn.active { background:var(--ac); color:#fff; border-color:#818cf8; box-shadow:0 0 12px rgba(99,102,241,.4) }
 .tool-btn .icon { font-size:calc(1.1rem*var(--s)) }
 .tool-btn .unicode-icon { font-size:calc(1.35rem*var(--s)); line-height:1 }
 .combo-icon { position:relative; display:inline-flex; align-items:center; justify-content:center; width:1.4em; height:1.4em }
 .combo-icon .base-icon { font-size:calc(1.25rem*var(--s)); opacity:.7 }
 .combo-icon .overlay-icon { position:absolute; color:var(--danger); font-size:calc(1.05rem*var(--s)); font-weight:900; text-shadow:0 0 3px rgba(0,0,0,.95); line-height:1 }
-.unicode-shape { font-size:calc(1.2rem*var(--s)); font-weight:700; line-height:1 }
 
 /* Canvas Viewport */
 .canvas-viewport { flex:1; position:relative; background:#080c14; overflow:hidden }
@@ -195,7 +194,7 @@ a { text-decoration:none; color:inherit }
 	.toolbar-left { width:auto; height:56px; position:absolute; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); left:50%; transform:translateX(-50%); flex-direction:row; border-radius:var(--r); border:1px solid var(--bd); padding:0 12px; gap:8px; box-shadow:0 10px 30px rgba(0,0,0,.6) }
 	.tool-group { flex-direction:row; gap:4px }
 	.divider { width:1px; height:24px }
-	:is(.tool-btn,.shape-btn) { width:38px; height:38px }
+	.tool-btn { width:38px; height:38px }
 	.canvas-info-overlay { bottom:80px }
 }
 

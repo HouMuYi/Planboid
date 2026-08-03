@@ -53,14 +53,6 @@ export class Toolbar {
 			});
 		});
 
-		document.querySelectorAll('.shape-btn').forEach(btn => {
-			btn.addEventListener('click', () => {
-				document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
-				btn.classList.add('active');
-				this.state.shapeMode = btn.dataset.shape;
-			});
-		});
-
 		const btnSvg = document.getElementById('btn-export-svg');
 		const btnPng = document.getElementById('btn-export-png');
 
@@ -134,9 +126,6 @@ export class Toolbar {
 				'toolbar_tool_erase_floor',
 				'toolbar_tool_erase_wall',
 				'toolbar_tool_select',
-				'toolbar_shape_single_title',
-				'toolbar_shape_line_title',
-				'toolbar_shape_box_title',
 				'sidebar_floor_up_title',
 				'sidebar_floor_down_title',
 				'toolbar_btn_undo_title',
@@ -226,15 +215,6 @@ export class Toolbar {
 			} else if (e.key === '5') {
 				e.preventDefault();
 				document.getElementById('tool-select')?.click();
-			} else if (e.key.toLowerCase() === 'q') {
-				e.preventDefault();
-				document.getElementById('shape-single')?.click();
-			} else if (e.key.toLowerCase() === 'w') {
-				e.preventDefault();
-				document.getElementById('shape-line')?.click();
-			} else if (e.key.toLowerCase() === 'e') {
-				e.preventDefault();
-				document.getElementById('shape-box')?.click();
 			}
 		});
 	}
