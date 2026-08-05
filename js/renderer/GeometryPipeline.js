@@ -150,6 +150,10 @@ export class GeometryPipeline {
 				});
 			});
 
+			if (items.length > 0) {
+				items.sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.x - b.x);
+			}
+
 			if (items.length > 0 || isCurrent) {
 				layers.push({ z, isCurrent, alpha, desatFactor, items });
 			}
