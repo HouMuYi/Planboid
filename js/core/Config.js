@@ -12,7 +12,8 @@ export const CONFIG = Object.freeze({
 	ZOOM_MAX: 5.0, // 最近縮放倍率上限
 	ZOOM_WHEEL_FACTOR: 1.15, // 滑鼠滾輪縮放倍率 (上滾乘以該值，下滾除以該值)
 	ZOOM_ANIMATION_FACTOR: 0.35, // 平滑縮放 Lerp 動畫內插因子
-	TRANSITION_SPEED: 0.35, // 2D/3D 視角切換動畫過渡速度 (與縮放動畫一致，極速順暢)
+	TRANSITION_DURATION_MS: 500, // 2D/3D 視角切換動畫總耗時 (500ms)
+	TRANSITION_FPS_LIMIT: 30, // 2D/3D 視角切換動畫插補幀率限制 (FPS)
 	FIT_VIEW_PADDING: 1, // 畫面自動置中 (fitView) 時留白邊界 (格數)
 
 	// 操作與邊緣判定

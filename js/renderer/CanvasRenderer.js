@@ -9,6 +9,7 @@ import { BrushActionApplicator } from './BrushActionApplicator.js';
 import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
 import { InputDispatcher } from './InputDispatcher.js';
 import { IsoMath } from './IsoMath.js';
+import { RenderCacheManager } from './RenderCacheManager.js';
 
 export class CanvasRenderer {
 	/**
@@ -24,6 +25,7 @@ export class CanvasRenderer {
 		this.initOverlayCanvas();
 
 		this.isoMath = new IsoMath(CONFIG.TILE_SIZE);
+		this.cacheManager = new RenderCacheManager();
 
 		// 相機 (Pan & Zoom)
 		this.cameraX = 0;
@@ -89,7 +91,10 @@ export class CanvasRenderer {
 		window.addEventListener('resize', () => this.resize());
 		this.centerCamera();
 
-		window.addEventListener('statechange', () => this.requestRenderAll());
+		window.addEventListener('statechange', () => {
+			this.cacheManager.invalidateAll();
+			this.requestRenderAll();
+		});
 		this.requestRenderAll();
 	}
 
@@ -99,12 +104,12 @@ export class CanvasRenderer {
 
 		this.canvas.width = rect.width * dpr;
 		this.canvas.height = rect.height * dpr;
-
 		this.overlayCanvas.width = rect.width * dpr;
 		this.overlayCanvas.height = rect.height * dpr;
 
-		this.viewportWidth = rect.width;
-		this.viewportHeight = rect.height;
+		this.viewportWidth = this.canvas.width;
+		this.viewportHeight = this.canvas.height;
+		this.cacheManager.resize(this.viewportWidth, this.viewportHeight);
 
 		this.ctx.scale(dpr, dpr);
 		this.overlayCtx.scale(dpr, dpr);
@@ -195,10 +200,12 @@ export class CanvasRenderer {
 	setViewMode(mode) {
 		this.targetProgress = mode === 'iso' ? 1.0 : 0.0;
 		this.anchorGridCell = this.getCurrentCenterGridCell();
-		// 視角過渡開始，立即冷凍並隱藏網格懸停游標
+		// 視角過渡開始，記錄時間與起始進度
 		this.hoveredCell = { x: -1, y: -1, edge: null };
 		this.hoveredIntersection = { x: -1, y: -1 };
 		this.isAnimating = true;
+		this.animationStartTime = performance.now();
+		this.animationStartProgress = this.currentProgress;
 		this.requestRenderAll();
 	}
 
@@ -227,6 +234,17 @@ export class CanvasRenderer {
 		this.isTickScheduled = true;
 		requestAnimationFrame((now) => {
 			this.isTickScheduled = false;
+
+			// 僅在 2D/3D 視角動畫期間限制插補頻率 (依據 CONFIG.TRANSITION_FPS_LIMIT)
+			const minFrameInterval = 1000 / (CONFIG.TRANSITION_FPS_LIMIT || 30);
+			if (this.isAnimating && this.lastAnimTickTime && now - this.lastAnimTickTime < minFrameInterval) {
+				this.scheduleTick();
+				return;
+			}
+			if (this.isAnimating) {
+				this.lastAnimTickTime = now;
+			}
+
 			this.onTick(now);
 		});
 	}
@@ -261,23 +279,34 @@ export class CanvasRenderer {
 			window.dispatchEvent(event);
 		}
 
-		// 2. 處理 2D/3D 視角切換過渡動畫 (Perspective Lerp)
+		// 2. 處理 2D/3D 視角切換過渡動畫 (時間驅動型 Ease-InOut 2 秒曲線)
 		if (this.isAnimating) {
-			const diff = this.targetProgress - this.currentProgress;
-			if (Math.abs(diff) < 0.005) {
+			const now = performance.now();
+			const elapsed = now - (this.animationStartTime || now);
+			const duration = CONFIG.TRANSITION_DURATION_MS || 2000;
+			const t = Math.min(1.0, Math.max(0.0, elapsed / duration));
+
+			// 純線性 (Linear) 直線勻速：每毫秒進度完全相同，死板且精準
+			const startP = this.animationStartProgress ?? 0;
+			const targetP = this.targetProgress;
+			this.currentProgress = startP + (targetP - startP) * t;
+
+			if (t >= 1.0) {
 				this.currentProgress = this.targetProgress;
 				this.isAnimating = false;
 				this.anchorGridCell = null;
+				this.cacheManager.invalidateAll(); // 視角抵達定位，重置快取
 			} else {
-				this.currentProgress += diff * this.transitionSpeed;
-
 				if (this.anchorGridCell) {
 					const sidebarWidth = this.getSidebarWidth();
 					const effectiveWidth = this.viewportWidth - sidebarWidth;
 					const z = this.state.currentZLevel;
-					const newPos = this.getScreenPos(this.anchorGridCell.x, this.anchorGridCell.y, z);
-					this.cameraX = effectiveWidth / 2 - newPos.x * this.zoom;
-					this.cameraY = this.viewportHeight / 2 - newPos.y * this.zoom;
+					const pt = this.isoMath.gridToScreen(this.anchorGridCell.x, this.anchorGridCell.y, this.currentProgress);
+					const { dx, dy } = calcZTranslate(z, this.currentProgress);
+					const newPosX = pt.x + dx;
+					const newPosY = pt.y + dy;
+					this.cameraX = effectiveWidth / 2 - newPosX * this.zoom;
+					this.cameraY = this.viewportHeight / 2 - newPosY * this.zoom;
 				}
 			}
 			needsBaseRedraw = true;
@@ -387,6 +416,9 @@ export class CanvasRenderer {
 	}
 
 	drawGrid(ctx) {
+		// 視角切換動畫期間直接隱藏背景網格 (不參與動畫與幾何計算)，動畫結束後自動補回
+		if (this.isAnimating) return;
+
 		const scheme = this.state.scheme;
 		const z = this.state.currentZLevel;
 		const { dx, dy } = calcZTranslate(z, this.currentProgress);
@@ -438,6 +470,22 @@ export class CanvasRenderer {
 
 		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, this.state.otherFloorsMode);
 
+		const p = 4;
+		const w = Math.max(1, scheme.width || 0);
+		const h = Math.max(1, scheme.height || 0);
+		const pt0 = this.isoMath.gridToScreen(-p, -p, this.currentProgress);
+		const pt1 = this.isoMath.gridToScreen(w + p, -p, this.currentProgress);
+		const pt2 = this.isoMath.gridToScreen(w + p, h + p, this.currentProgress);
+		const pt3 = this.isoMath.gridToScreen(-p, h + p, this.currentProgress);
+		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * this.currentProgress;
+
+		const snapMinX = Math.floor(Math.min(pt0.x, pt1.x, pt2.x, pt3.x));
+		const snapMinY = Math.floor(Math.min(pt0.y, pt1.y, pt2.y, pt3.y) - wallHeight);
+		const snapWidth = Math.ceil(Math.max(pt0.x, pt1.x, pt2.x, pt3.x) - snapMinX);
+		const snapHeight = Math.ceil(Math.max(pt0.y, pt1.y, pt2.y, pt3.y) - snapMinY);
+
+		const isPanZooming = Boolean(this.dispatcher && (this.dispatcher.isZoomAnimating || this.isDraggingCamera));
+
 		layers.forEach(layer => {
 			const { z, isCurrent, alpha, desatFactor } = layer;
 			const { dx, dy } = calcZTranslate(z, this.currentProgress);
@@ -446,37 +494,76 @@ export class CanvasRenderer {
 			ctx.translate(dx, dy);
 			ctx.globalAlpha = alpha;
 
-			GeometryPipeline.traverseLayerPasses(layer, palette, {
-				onFloor: (x, y, floorColorId) => {
-					const rawColor = palette[floorColorId].color;
-					const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
-					this.drawTilePoly(ctx, x, y, finalColor);
-				},
-				onFloorObjects: (x, y, objArray) => {
-					GeometryPipeline.drawFloorObjects(ctx, this.isoMath, x, y, objArray, palette, this.zoom, this.currentProgress);
-				},
-				onWall: (x, y, edge, colorId) => {
-					const rawColor = palette[colorId].color;
-					const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
-					if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
-						this.drawWallQuad96px(ctx, x, y, edge, finalColor, CONFIG.WALL_FILL_ALPHA);
-					} else {
-						this.drawWallLine2D(ctx, x, y, edge, finalColor);
+			if (this.isAnimating) {
+				if (isCurrent) {
+					// 地塊層：使用 2D 快照進行仿射變換拉伸
+					const snapMinX2D = -p * CONFIG.TILE_SIZE;
+					const snapMinY2D = -p * CONFIG.TILE_SIZE;
+					const snapW2D = (w + 2 * p) * CONFIG.TILE_SIZE;
+					const snapH2D = (h + 2 * p) * CONFIG.TILE_SIZE;
+
+					const floorCache2D = this.cacheManager.getOrCreateFloor2DCache(z, snapW2D, snapH2D, (c2dCtx) => {
+						c2dCtx.translate(-snapMinX2D, -snapMinY2D);
+						this._renderPasses(c2dCtx, layer, palette, desatFactor, isCurrent, 1.0, 0.0, { floor: true });
+					});
+
+					const pVal = this.currentProgress;
+					ctx.save();
+					ctx.transform(1, 0.5 * pVal, -pVal, 1 - 0.5 * pVal, 0, 0);
+					ctx.drawImage(floorCache2D.canvas, snapMinX2D, snapMinY2D);
+					ctx.restore();
+
+					// 牆面層：動畫過渡期間即時繪製
+					this._renderPasses(ctx, layer, palette, desatFactor, isCurrent, this.zoom, this.currentProgress, { wall: true });
+				}
+			} else if (isPanZooming) {
+				const cache = this.cacheManager.getOrCreateCache(z, isCurrent, snapWidth, snapHeight, (baseCtx, labelCtx) => {
+					baseCtx.translate(-snapMinX, -snapMinY);
+					labelCtx.translate(-snapMinX, -snapMinY);
+					this._renderPasses(baseCtx, layer, palette, desatFactor, isCurrent, 1.0, this.currentProgress, { floor: true, wall: true });
+					if (isCurrent) {
+						this._renderPasses(labelCtx, layer, palette, desatFactor, isCurrent, 1.0, this.currentProgress, { label: true });
 					}
-				},
-				onWallObjects: (x, y, edge, objArray) => {
-					if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
-						GeometryPipeline.drawWallObjects3D(ctx, this.isoMath, x, y, edge, objArray, palette, this.zoom, this.currentProgress);
-					} else {
-						GeometryPipeline.drawWallObjects2D(ctx, this.isoMath, x, y, edge, objArray, palette, this.zoom, this.currentProgress);
-					}
-				},
-				onLabel: (x, y, label) => {
-					this.drawTileText(ctx, x, y, label);
-				},
-			});
+				});
+
+				ctx.drawImage(cache.base, snapMinX, snapMinY);
+				if (isCurrent) ctx.drawImage(cache.label, snapMinX, snapMinY);
+			} else {
+				// 靜止狀態：完整原生繪製
+				this._renderPasses(ctx, layer, palette, desatFactor, isCurrent, this.zoom, this.currentProgress, { floor: true, wall: true, label: isCurrent });
+			}
 
 			ctx.restore();
+		});
+	}
+
+	_renderPasses(targetCtx, layer, palette, desatFactor, isCurrent, zoom, progress, passes = {}) {
+		GeometryPipeline.traverseLayerPasses(layer, palette, {
+			onFloor: passes.floor ? (x, y, colorId) => {
+				const color = isCurrent ? palette[colorId].color : GeometryPipeline.desaturateHex(palette[colorId].color, desatFactor);
+				GeometryPipeline.drawTilePoly(targetCtx, this.isoMath, x, y, color, progress);
+			} : null,
+			onFloorObjects: passes.floor ? (x, y, objArray) => {
+				GeometryPipeline.drawFloorObjects(targetCtx, this.isoMath, x, y, objArray, palette, zoom, progress);
+			} : null,
+			onWall: passes.wall ? (x, y, edge, colorId) => {
+				const color = isCurrent ? palette[colorId].color : GeometryPipeline.desaturateHex(palette[colorId].color, desatFactor);
+				if (this.state.is3DWallsEnabled && progress > 0) {
+					GeometryPipeline.drawWallQuad96px(targetCtx, this.isoMath, x, y, edge, color, zoom, progress, CONFIG.WALL_FILL_ALPHA);
+				} else {
+					GeometryPipeline.drawWallLine2D(targetCtx, this.isoMath, x, y, edge, color, zoom, progress);
+				}
+			} : null,
+			onWallObjects: passes.wall ? (x, y, edge, objArray) => {
+				if (this.state.is3DWallsEnabled && progress > 0) {
+					GeometryPipeline.drawWallObjects3D(targetCtx, this.isoMath, x, y, edge, objArray, palette, zoom, progress);
+				} else {
+					GeometryPipeline.drawWallObjects2D(targetCtx, this.isoMath, x, y, edge, objArray, palette, zoom, progress);
+				}
+			} : null,
+			onLabel: passes.label ? (x, y, label) => {
+				GeometryPipeline.drawTileText(targetCtx, this.isoMath, x, y, label, zoom, progress);
+			} : null,
 		});
 	}
 
@@ -498,43 +585,35 @@ export class CanvasRenderer {
 
 	// 以下方法在頂層 Overlay 上繪製
 
-	drawCellHighlight(ctx, x, y, fillColor, strokeColor = '#6366f1', strokeWidth = 1.5) {
-		const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(this.isoMath, x, y, this.currentProgress);
-
+	_drawPolyShape(ctx, points, fillColor, strokeColor, strokeWidth, lineDash = []) {
 		ctx.fillStyle = fillColor;
 		ctx.strokeStyle = strokeColor;
 		ctx.lineWidth = strokeWidth / this.zoom;
+		if (lineDash.length > 0) ctx.setLineDash(lineDash.map(v => v / this.zoom));
 
 		ctx.beginPath();
-		ctx.moveTo(p0.x, p0.y);
-		ctx.lineTo(p1.x, p1.y);
-		ctx.lineTo(p2.x, p2.y);
-		ctx.lineTo(p3.x, p3.y);
+		ctx.moveTo(points[0].x, points[0].y);
+		for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
 		ctx.closePath();
 		ctx.fill();
 		ctx.stroke();
+
+		if (lineDash.length > 0) ctx.setLineDash([]);
+	}
+
+	drawCellHighlight(ctx, x, y, fillColor, strokeColor = '#6366f1', strokeWidth = 1.5) {
+		const points = GeometryPipeline.getTilePolyPoints(this.isoMath, x, y, this.currentProgress);
+		this._drawPolyShape(ctx, points, fillColor, strokeColor, strokeWidth);
 	}
 
 	drawDashedSelectionBox(ctx, minX, minY, maxX, maxY) {
-		const p0 = this.isoMath.gridToScreen(minX, minY, this.currentProgress);
-		const p1 = this.isoMath.gridToScreen(maxX + 1, minY, this.currentProgress);
-		const p2 = this.isoMath.gridToScreen(maxX + 1, maxY + 1, this.currentProgress);
-		const p3 = this.isoMath.gridToScreen(minX, maxY + 1, this.currentProgress);
-
-		ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
-		ctx.strokeStyle = '#f59e0b';
-		ctx.lineWidth = 2.5 / this.zoom;
-		ctx.setLineDash([6 / this.zoom, 4 / this.zoom]);
-
-		ctx.beginPath();
-		ctx.moveTo(p0.x, p0.y);
-		ctx.lineTo(p1.x, p1.y);
-		ctx.lineTo(p2.x, p2.y);
-		ctx.lineTo(p3.x, p3.y);
-		ctx.closePath();
-		ctx.fill();
-		ctx.stroke();
-		ctx.setLineDash([]);
+		const points = [
+			this.isoMath.gridToScreen(minX, minY, this.currentProgress),
+			this.isoMath.gridToScreen(maxX + 1, minY, this.currentProgress),
+			this.isoMath.gridToScreen(maxX + 1, maxY + 1, this.currentProgress),
+			this.isoMath.gridToScreen(minX, maxY + 1, this.currentProgress),
+		];
+		this._drawPolyShape(ctx, points, 'rgba(245, 158, 11, 0.25)', '#f59e0b', 2.5, [6, 4]);
 	}
 
 	drawPastePreview(ctx, targetX, targetY) {
@@ -617,16 +696,16 @@ export class CanvasRenderer {
 			return;
 		}
 
-		if (start.y === end.y) {
-			const y = start.y;
-			const minX = Math.min(start.x, end.x);
-			const maxX = Math.max(start.x, end.x);
-			for (let x = minX; x < maxX; x++) this.drawWallHighlight(ctx, x, y, 'north');
-		} else {
-			const x = start.x;
-			const minY = Math.min(start.y, end.y);
-			const maxY = Math.max(start.y, end.y);
-			for (let y = minY; y < maxY; y++) this.drawWallHighlight(ctx, x, y, 'west');
+		const isHorizontal = start.y === end.y;
+		const key = isHorizontal ? 'x' : 'y';
+		const edge = isHorizontal ? 'north' : 'west';
+		const min = Math.min(start[key], end[key]);
+		const max = Math.max(start[key], end[key]);
+
+		for (let i = min; i < max; i++) {
+			const x = isHorizontal ? i : start.x;
+			const y = isHorizontal ? start.y : i;
+			this.drawWallHighlight(ctx, x, y, edge);
 		}
 	}
 }

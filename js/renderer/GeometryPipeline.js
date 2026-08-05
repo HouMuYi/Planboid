@@ -10,7 +10,6 @@
 
 import { CONFIG } from '../core/Config.js';
 import { BorderEdgeNormalizer } from './BorderEdgeNormalizer.js';
-import { IsoMath } from './IsoMath.js';
 
 /**
  * 計算第 z 層樓相對於 z=0 的螢幕像素偏移量
@@ -28,41 +27,13 @@ export function calcZTranslate(z, progress = 1.0) {
 	return { dx: 0, dy: -(CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET) * z * progress };
 }
 
-/**
- * 鬼影層 (Ghost Layer) 視覺透視與衰減常數配置
- */
-const GHOST_CONFIG = {
-	get BASE_ALPHA() {
-		return CONFIG.GHOST_BASE_ALPHA;
-	},
-	get ALPHA_DECAY() {
-		return CONFIG.GHOST_ALPHA_DECAY;
-	},
-	get SATURATION_DECAY() {
-		return CONFIG.GHOST_SATURATION_DECAY;
-	},
-};
-
 export class GeometryPipeline {
-	/**
-	 * 邊線交叉點軸向鎖定：將任意懸停交叉點約束為與起點同 X 軸或同 Y 軸
-	 * (取兩軸位移量較大的一方為鎖定方向，維持邊線只能水平或垂直繪製)
-	 * @param {{x: number, y: number}} start
-	 * @param {{x: number, y: number}} raw
-	 * @returns {{x: number, y: number}}
-	 */
 	static constrainAxisPoint(start, raw) {
 		const dx = raw.x - start.x;
 		const dy = raw.y - start.y;
-		if (Math.abs(dx) >= Math.abs(dy)) {
-			return { x: raw.x, y: start.y };
-		}
-		return { x: start.x, y: raw.y };
+		return Math.abs(dx) >= Math.abs(dy) ? { x: raw.x, y: start.y } : { x: start.x, y: raw.y };
 	}
 
-	/**
-	 * 計算地塊四個頂點的螢幕投影座標 (純邏輯座標，不含 Z 軸偏移)
-	 */
 	static getTilePolyPoints(isoMath, x, y, progress = 1.0) {
 		return [
 			isoMath.gridToScreen(x, y, progress),
@@ -72,49 +43,23 @@ export class GeometryPipeline {
 		];
 	}
 
-	/**
-	 * 計算 96px 3D 牆面立體四邊形頂點 (純邏輯座標，不含 Z 軸偏移)
-	 */
 	static getWallQuad96Points(isoMath, x, y, edge, progress = 1.0) {
-		let b0, b1;
-		const e = String(edge || '').toLowerCase();
-		if (e === 'north' || e === 'n') {
-			b0 = isoMath.gridToScreen(x, y, progress);
-			b1 = isoMath.gridToScreen(x + 1, y, progress);
-		} else if (e === 'west' || e === 'w') {
-			b0 = isoMath.gridToScreen(x, y, progress);
-			b1 = isoMath.gridToScreen(x, y + 1, progress);
-		} else if (e === 'east' || e === 'e') {
-			b0 = isoMath.gridToScreen(x + 1, y, progress);
-			b1 = isoMath.gridToScreen(x + 1, y + 1, progress);
-		} else if (e === 'south' || e === 's') {
-			b0 = isoMath.gridToScreen(x, y + 1, progress);
-			b1 = isoMath.gridToScreen(x + 1, y + 1, progress);
-		}
+		const { x: nx, y: ny, edge: e } = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+		const b0 = isoMath.gridToScreen(nx, ny, progress);
+		const b1 = e === 'N' ? isoMath.gridToScreen(nx + 1, ny, progress) : (e === 'W' ? isoMath.gridToScreen(nx, ny + 1, progress) : null);
 
 		if (!b0 || !b1) return null;
 
 		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * progress;
-		const t0 = { x: b0.x, y: b0.y - wallHeight };
-		const t1 = { x: b1.x, y: b1.y - wallHeight };
-
-		return [b0, b1, t1, t0];
+		return [b0, b1, { x: b1.x, y: b1.y - wallHeight }, { x: b0.x, y: b0.y - wallHeight }];
 	}
 
-	/**
-	 * 排序並過濾指定 Z 軸視角下的 Tile 渲染陣列，按樓層分組回傳
-	 * @returns {{ z: number, alpha: number, desatFactor: number, isCurrent: boolean, items: Array }[]}
-	 */
 	static getSortedLayersToRender(tiles, currentZ, otherFloorsMode = 'ghost') {
 		let mode = otherFloorsMode;
-		if (typeof mode === 'boolean') {
-			mode = mode ? 'ghost' : 'hidden';
-		}
+		if (typeof mode === 'boolean') mode = mode ? 'ghost' : 'hidden';
 
 		const zSet = new Set([currentZ]);
-		Object.keys(tiles || {}).forEach(k => {
-			zSet.add(parseInt(k.split(',')[2], 10));
-		});
+		Object.keys(tiles || {}).forEach(k => zSet.add(parseInt(k.split(',')[2], 10)));
 
 		const sortedZLevels = Array.from(zSet).sort((a, b) => a - b);
 		const layers = [];
@@ -129,10 +74,8 @@ export class GeometryPipeline {
 
 			if (!isCurrent) {
 				if (mode === 'ghost') {
-					// 差 1 層鬼影為 BASE_ALPHA，每多隔 1 層乘一次 ALPHA_DECAY
-					alpha = Math.max(0.05, GHOST_CONFIG.BASE_ALPHA * Math.pow(GHOST_CONFIG.ALPHA_DECAY, dist - 1));
-					// 彩度留存率隨距離次方衰減，去飽和度因子 desatFactor = 1.0 - 彩度留存率
-					const saturation = Math.pow(GHOST_CONFIG.SATURATION_DECAY, dist);
+					alpha = Math.max(0.05, CONFIG.GHOST_BASE_ALPHA * Math.pow(CONFIG.GHOST_ALPHA_DECAY, dist - 1));
+					const saturation = Math.pow(CONFIG.GHOST_SATURATION_DECAY, dist);
 					desatFactor = Math.min(0.95, 1.0 - saturation);
 				} else if (mode === 'solid') {
 					alpha = 1.0;
@@ -143,12 +86,9 @@ export class GeometryPipeline {
 			const items = [];
 			Object.entries(tiles || {}).forEach(([key, tile]) => {
 				const [xStr, yStr, zStr] = key.split(',');
-				if (parseInt(zStr, 10) !== z) return;
-				items.push({
-					x: parseInt(xStr, 10),
-					y: parseInt(yStr, 10),
-					tile,
-				});
+				if (parseInt(zStr, 10) === z) {
+					items.push({ x: parseInt(xStr, 10), y: parseInt(yStr, 10), tile });
+				}
 			});
 
 			if (items.length > 0) {
@@ -306,14 +246,8 @@ export class GeometryPipeline {
 		const nyGrid = normalized.y;
 		const e = normalized.edge;
 
-		let p0, p1;
-		if (e === 'N') {
-			p0 = isoMath.gridToScreen(nxGrid, nyGrid, currentProgress);
-			p1 = isoMath.gridToScreen(nxGrid + 1, nyGrid, currentProgress);
-		} else if (e === 'W') {
-			p0 = isoMath.gridToScreen(nxGrid, nyGrid, currentProgress);
-			p1 = isoMath.gridToScreen(nxGrid, nyGrid + 1, currentProgress);
-		}
+		const p0 = isoMath.gridToScreen(nxGrid, nyGrid, currentProgress);
+		const p1 = e === 'N' ? isoMath.gridToScreen(nxGrid + 1, nyGrid, currentProgress) : (e === 'W' ? isoMath.gridToScreen(nxGrid, nyGrid + 1, currentProgress) : null);
 
 		if (!p0 || !p1) return;
 
@@ -380,7 +314,16 @@ export class GeometryPipeline {
 		ctx.closePath();
 		ctx.fill();
 
-		// 2. 平行向量 Shading 光影遮罩
+		// 動畫過渡期間 (currentProgress < 1.0)：跳過昂貴的 5 重漸層與多重高光描邊，僅做一次基礎外框描邊
+		if (currentProgress < 1.0) {
+			ctx.strokeStyle = colorHex;
+			ctx.lineWidth = 1.5 / zoom;
+			ctx.stroke();
+			ctx.restore();
+			return;
+		}
+
+		// 2. 平行向量 Shading 光影遮罩 (靜止與快照時開啟)
 		const shadingGrad = ctx.createLinearGradient(topMidX, topMidY, botMidX, botMidY);
 		shadingGrad.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
 		shadingGrad.addColorStop(1, 'rgba(0, 0, 0, 0.32)');
@@ -615,14 +558,8 @@ export class GeometryPipeline {
 		const nyGrid = normalized.y;
 		const e = normalized.edge;
 
-		let p0, p1;
-		if (e === 'N') {
-			p0 = isoMath.gridToScreen(nxGrid, nyGrid, currentProgress);
-			p1 = isoMath.gridToScreen(nxGrid + 1, nyGrid, currentProgress);
-		} else if (e === 'W') {
-			p0 = isoMath.gridToScreen(nxGrid, nyGrid, currentProgress);
-			p1 = isoMath.gridToScreen(nxGrid, nyGrid + 1, currentProgress);
-		}
+		const p0 = isoMath.gridToScreen(nxGrid, nyGrid, currentProgress);
+		const p1 = e === 'N' ? isoMath.gridToScreen(nxGrid + 1, nyGrid, currentProgress) : (e === 'W' ? isoMath.gridToScreen(nxGrid, nyGrid + 1, currentProgress) : null);
 		if (!p0 || !p1) return;
 
 		const cx = (p0.x + p1.x) / 2;
@@ -759,9 +696,8 @@ export class GeometryPipeline {
 			const p2 = { x: px + (points[2].x - cx) * baseScale, y: py + (points[2].y - cy) * baseScale };
 			const p3 = { x: px + (points[3].x - cx) * baseScale, y: py + (points[3].y - cy) * baseScale };
 
-			const safeColorId = String(objId).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-			const rawName = (item.name || '').substring(0, 2);
-			const safeName = String(rawName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+			const safeColorId = this._escapeXml(String(objId));
+			const safeName = this._escapeXml((item.name || '').substring(0, 2));
 
 			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="floor-object" data-color-id="${safeColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
 			if (safeName) {
@@ -816,9 +752,8 @@ export class GeometryPipeline {
 			const p2 = { x: px + dx, y: py + dy - dh };
 			const p3 = { x: px - dx, y: py - dy - dh };
 
-			const safeColorId = String(objId).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-			const rawName = (item.name || '').substring(0, 2);
-			const safeName = String(rawName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+			const safeColorId = this._escapeXml(String(objId));
+			const safeName = this._escapeXml((item.name || '').substring(0, 2));
 
 			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall-object" data-edge="${edge}" data-color-id="${safeColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
 			if (safeName) {
@@ -830,5 +765,9 @@ export class GeometryPipeline {
 		});
 
 		return str;
+	}
+
+	static _escapeXml(unsafe) {
+		return unsafe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 	}
 }
