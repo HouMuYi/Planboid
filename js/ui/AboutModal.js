@@ -17,7 +17,7 @@ export class AboutModal {
 
 		btnOpen?.addEventListener('click', (e) => {
 			e.stopPropagation();
-			if (this.contentContainer && !this.contentContainer.innerHTML) {
+			if (this.contentContainer) {
 				this.contentContainer.innerHTML = ABOUT_HTML;
 			}
 			if (this.modal) {
