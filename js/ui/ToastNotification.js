@@ -3,6 +3,11 @@
  */
 
 export class ToastNotification {
+	/**
+	 * @param {string} message 提示訊息
+	 * @param {'info' | 'success' | 'warning' | 'error'} type
+	 * @param {number} duration
+	 */
 	static show(message, type = 'info', duration = 2500) {
 		let container = document.getElementById('toast-container');
 		if (!container) {
@@ -11,9 +16,19 @@ export class ToastNotification {
 			document.body.appendChild(container);
 		}
 
+		// 限制最多同時顯示 5 個 Toast，防範瞬間大量訊息塞滿 DOM
+		while (container.children.length >= 5) {
+			const oldest = container.firstChild;
+			if (oldest) {
+				oldest.remove();
+			} else {
+				break;
+			}
+		}
+
 		const toast = document.createElement('div');
 		toast.className = `toast-item toast-${type}`;
-		toast.textContent = message;
+		toast.textContent = String(message ?? '');
 
 		container.appendChild(toast);
 
@@ -21,11 +36,21 @@ export class ToastNotification {
 			toast.classList.add('show');
 		});
 
-		setTimeout(() => {
+		let hideTimer = null;
+		let removeTimer = null;
+
+		const clearTimers = () => {
+			if (hideTimer) clearTimeout(hideTimer);
+			if (removeTimer) clearTimeout(removeTimer);
+		};
+
+		hideTimer = setTimeout(() => {
 			toast.classList.remove('show');
-			setTimeout(() => {
+			removeTimer = setTimeout(() => {
+				clearTimers();
 				toast.remove();
 			}, 250);
 		}, duration);
 	}
 }
+

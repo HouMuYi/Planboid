@@ -12,11 +12,13 @@ export class BorderEdgeNormalizer {
 	 * @returns {{x: number, y: number, edge: "N" | "W"}}
 	 */
 	static normalizeEdge(x, y, edge) {
-		if (!edge) return { x, y, edge: 'N' };
+		const numX = Number(x) || 0;
+		const numY = Number(y) || 0;
+		if (!edge) return { x: numX, y: numY, edge: 'N' };
 		const e = String(edge).trim().toUpperCase();
-		if (e === 'SOUTH' || e === 'S') return { x, y: y + 1, edge: 'N' };
-		if (e === 'EAST' || e === 'E') return { x: x + 1, y, edge: 'W' };
-		if (e === 'WEST' || e === 'W') return { x, y, edge: 'W' };
-		return { x, y, edge: 'N' };
+		if (e === 'SOUTH' || e === 'S') return { x: numX, y: numY + 1, edge: 'N' };
+		if (e === 'EAST' || e === 'E') return { x: numX + 1, y: numY, edge: 'W' };
+		if (e === 'WEST' || e === 'W') return { x: numX, y: numY, edge: 'W' };
+		return { x: numX, y: numY, edge: 'N' };
 	}
 }

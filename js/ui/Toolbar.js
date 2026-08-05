@@ -29,19 +29,19 @@ export class Toolbar {
 				const tool = btn.dataset.tool;
 
 				if (tool === 'floor') {
-					this.state.activeTool = 'pencil';
-					this.state.brushType = 'floor';
+					this.state.toolState.setActiveTool('pencil');
+					this.state.toolState.setBrushType('floor');
 				} else if (tool === 'wall') {
-					this.state.activeTool = 'pencil';
-					this.state.brushType = 'wall';
+					this.state.toolState.setActiveTool('pencil');
+					this.state.toolState.setBrushType('wall');
 				} else if (tool === 'erase-floor') {
-					this.state.activeTool = 'erase-floor';
-					this.state.brushType = 'floor';
+					this.state.toolState.setActiveTool('erase-floor');
+					this.state.toolState.setBrushType('floor');
 				} else if (tool === 'erase-wall') {
-					this.state.activeTool = 'erase-wall';
-					this.state.brushType = 'wall';
+					this.state.toolState.setActiveTool('erase-wall');
+					this.state.toolState.setBrushType('wall');
 				} else if (tool === 'select') {
-					this.state.activeTool = 'select';
+					this.state.toolState.setActiveTool('select');
 				}
 
 				if (tool !== 'select') {
@@ -73,7 +73,6 @@ export class Toolbar {
 		const btnFloorUp = document.getElementById('floor-up');
 		const btnFloorDown = document.getElementById('floor-down');
 		const displayFloor = document.getElementById('current-floor-display');
-		const chkGhost = document.getElementById('chk-ghost-layer');
 
 		const updateFloorDisplay = () => {
 			if (displayFloor) {
@@ -146,6 +145,14 @@ export class Toolbar {
 
 		window.addEventListener('keydown', (e) => {
 			if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
+
+			if (e.key === 'r' || e.key === 'R') {
+				if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+					e.preventDefault();
+					this.state.cycleSelectedSubTarget();
+					return;
+				}
+			}
 
 			if (e.key === 'Escape' || e.key === 'Esc') {
 				if (this.renderer?.dispatcher) {

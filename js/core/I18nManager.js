@@ -46,6 +46,7 @@ export class I18nManager {
 	 * @returns {string}
 	 */
 	t(key, params = {}, startLang = this.currentLang) {
+		if (!key || typeof key !== 'string') return String(key || '');
 		if (!window.PLANBOID_LANGUAGES) return key;
 
 		let langDict = window.PLANBOID_LANGUAGES[startLang];
@@ -68,10 +69,10 @@ export class I18nManager {
 			return key;
 		}
 
-		// 動態變數插值
+		// 動態變數插值 (使用 replaceAll 徹底排除 Regex 特殊字元引發的崩潰)
 		if (params && typeof params === 'object') {
 			Object.entries(params).forEach(([pK, pV]) => {
-				val = val.replace(new RegExp(`\\{${pK}\\}`, 'g'), pV);
+				val = val.replaceAll(`{${pK}}`, String(pV ?? ''));
 			});
 		}
 
@@ -79,13 +80,18 @@ export class I18nManager {
 	}
 
 	lookupKey(dict, key) {
-		if (!dict) return null;
-		// 1. 直接試平鋪 key (如 "header_badge")
-		if (key in dict) return dict[key];
+		if (!dict || typeof key !== 'string') return null;
+
+		// 1. 直接試平鋪 key (防範 Object 原型鏈屬性如 toString, constructor 穿透)
+		if (Object.prototype.hasOwnProperty.call(dict, key) && typeof dict[key] === 'string') {
+			return dict[key];
+		}
 
 		// 2. 試底線替換點號 (如 "header.badge" -> "header_badge")
 		const flatKey = key.replace(/\./g, '_');
-		if (flatKey in dict) return dict[flatKey];
+		if (Object.prototype.hasOwnProperty.call(dict, flatKey) && typeof dict[flatKey] === 'string') {
+			return dict[flatKey];
+		}
 
 		return null;
 	}

@@ -31,19 +31,11 @@ export class IsoMath {
 	}
 
 	/**
-	 * 螢幕座標反算網格座標
+	 * 螢幕座標反算網格座標 (支援 0~1 動態視角過渡精確反推)
 	 */
 	screenToGrid(screenX, screenY, progress = 1.0) {
-		if (progress > 0.01) {
-			const gridX = (screenX / this.halfWidth + screenY / this.halfHeight) / 2;
-			const gridY = (screenY / this.halfHeight - screenX / this.halfWidth) / 2;
-			return {
-				gridX,
-				gridY,
-				cellX: Math.floor(gridX),
-				cellY: Math.floor(gridY),
-			};
-		} else {
+		const p = Math.max(0, Math.min(1, progress));
+		if (p <= 0.001) {
 			const gridX = screenX / this.tileSize;
 			const gridY = screenY / this.tileSize;
 			return {
@@ -53,6 +45,17 @@ export class IsoMath {
 				cellY: Math.floor(gridY),
 			};
 		}
+
+		const denom = this.tileSize * (1 - p / 2 + (p * p) / 2);
+		const gridY = (screenY - (screenX * p) / 2) / denom;
+		const gridX = screenX / this.tileSize + gridY * p;
+
+		return {
+			gridX,
+			gridY,
+			cellX: Math.floor(gridX),
+			cellY: Math.floor(gridY),
+		};
 	}
 
 	/**
@@ -68,47 +71,5 @@ export class IsoMath {
 		const p3 = this.gridToScreen(rX, rY + 1, progress);
 
 		return [p0, p1, p2, p3];
-	}
-
-	/**
-	 * 取得帶入 96px 垂直高度後的牆面立體面片 4 頂點 [b0, b1, t1, t0]
-	 */
-	getWallQuad96Screen(x, y, z, edge, progress = 1.0) {
-		const [p0, p1, p2, p3] = this.getTilePolyScreen(x, y, z, progress);
-		let b0, b1;
-
-		if (edge === 'north') {
-			b0 = p0;
-			b1 = p1;
-		} else if (edge === 'west') {
-			b0 = p0;
-			b1 = p3;
-		} else if (edge === 'east') {
-			b0 = p1;
-			b1 = p2;
-		} else if (edge === 'south') {
-			b0 = p3;
-			b1 = p2;
-		}
-
-		if (!b0 || !b1) return null;
-
-		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * progress;
-		const t0 = { x: b0.x, y: b0.y - wallHeight };
-		const t1 = { x: b1.x, y: b1.y - wallHeight };
-
-		return [b0, b1, t1, t0];
-	}
-
-	/**
-	 * 解析 "x,y,z" 字串鍵為整數座標物件
-	 */
-	static parseTileKey(key) {
-		const parts = key.split(',');
-		return {
-			x: parseInt(parts[0], 10),
-			y: parseInt(parts[1], 10),
-			z: parseInt(parts[2], 10),
-		};
 	}
 }

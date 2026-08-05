@@ -53,6 +53,7 @@ a { text-decoration:none; color:inherit }
 
 /* ── 3. Objects: Layout Primitives (.stack & .cluster) ── */
 .stack, #app-container, .toolbar-left, .tool-group, .sidebar-right, .sidebar-scroll-content, .panel-section, .palette-section, .palette-list, .modal-content { display:flex; flex-direction:column }
+.stack { gap:calc(10px*var(--s)) }
 .cluster, .app-header, .logo-area, .header-center, .header-actions, .section-header, .view-overlay-controls, .floor-selector, .world-origin-inputs, .checkbox-label, .palette-item, .scheme-item, .modal-header, .canvas-info-overlay, .toggle-pill { display:flex; align-items:center }
 .cluster { gap:calc(8px*var(--s)) }
 .cluster-between { justify-content:space-between }
@@ -76,6 +77,8 @@ a { text-decoration:none; color:inherit }
 .field-label { font-size:calc(.8rem*var(--s)); color:var(--c2) }
 .input-code { font-family:var(--font-mono); resize:vertical; font-weight:600 }
 .input-color { width:48px; height:38px; border:none; cursor:pointer; border-radius:6px; padding:0; background:transparent }
+#preset-color-swatches { display:grid; grid-template-columns:repeat(8, calc(24px*var(--s))); gap:calc(6px*var(--s)); justify-content:start; margin-top:calc(4px*var(--s)) }
+.preset-swatch-item { width:calc(24px*var(--s)); height:calc(24px*var(--s)); border-radius:4px; border:1px solid var(--bd); cursor:pointer; transition:transform .15s, filter .15s }
 
 /* ── 7. Component Structure & Boundaries ── */
 #app-container { height:100vh; height:100dvh; width:100vw }
@@ -124,8 +127,8 @@ a { text-decoration:none; color:inherit }
 .sidebar-right.collapsed .toggle-icon { transform:rotate(180deg) }
 .sidebar-scroll-content { flex:1; min-height:0; gap:calc(14px*var(--s)); overflow:hidden }
 .panel-section { gap:calc(10px*var(--s)); flex-shrink:0 }
-.palette-section { flex:1; min-height:0; gap:calc(8px*var(--s)) }
-.palette-list { flex:1; min-height:0; overflow-y:auto; gap:calc(6px*var(--s)); padding:calc(8px*var(--s)); background:rgba(15,23,42,.4) }
+.palette-section, .object-palette-section { flex:1; min-height:0; gap:calc(6px*var(--s)) }
+.palette-list { flex:1; min-height:0; overflow-y:auto; gap:calc(4px*var(--s)); padding:calc(6px*var(--s)); background:rgba(15,23,42,.4) }
 .label-section { flex-shrink:0 }
 .btn-toggle-sidebar { display:flex; position:absolute; left:-32px; top:16px; width:32px; height:auto; padding:8px 2px; border-right:none; border-radius:8px 0 0 8px; flex-direction:column; gap:6px; font-size:calc(.72rem*var(--s)); line-height:1.2; z-index:101 }
 .toggle-text { writing-mode: vertical-rl; text-orientation: mixed; letter-spacing:1px; font-weight:500; font-size:calc(.72rem*var(--s)) }
@@ -140,7 +143,7 @@ a { text-decoration:none; color:inherit }
 .btn-segmented.active { background:var(--ac); color:#fff; font-weight:600; box-shadow:0 1px 4px rgba(0,0,0,.4) }
 
 /* 列表通用 ListItem 物件 */
-.palette-item, .scheme-item { gap:calc(8px*var(--s)); padding:calc(7px*var(--s)) calc(10px*var(--s)); border:1px solid var(--bd); border-radius:var(--r); background:var(--bg-c); flex-shrink:0 }
+.palette-item, .scheme-item { gap:calc(6px*var(--s)); padding:calc(4px*var(--s)) calc(8px*var(--s)); border:1px solid var(--bd); border-radius:var(--r); background:var(--bg-c); flex-shrink:0 }
 .scheme-item { cursor:pointer }
 .scheme-info { flex:1 }
 .palette-item { cursor:grab }
@@ -151,19 +154,19 @@ a { text-decoration:none; color:inherit }
 .scheme-item.pseudo-item .scheme-name { font-weight:600 }
 .palette-item.dragging { opacity:.4; border-style:dashed; border-color:var(--ac) }
 .palette-item.drag-over { border-top:2px solid var(--ac) }
-.palette-swatch { width:calc(20px*var(--s)); height:calc(20px*var(--s)); border-radius:4px; border:1px solid rgba(255,255,255,.2); flex-shrink:0 }
-.palette-name, .scheme-name { font-size:calc(.8rem*var(--s)); flex:1 }
-.btn-palette-edit { font-size:calc(.7rem*var(--s)); color:var(--c2); background:transparent; border:none; padding:2px 4px; flex-shrink:0 }
+.palette-swatch { width:calc(16px*var(--s)); height:calc(16px*var(--s)); border-radius:3px; border:1px solid rgba(255,255,255,.2); flex-shrink:0 }
+.palette-name, .scheme-name { font-size:calc(.75rem*var(--s)); flex:1 }
+.btn-palette-edit { font-size:calc(.65rem*var(--s)); color:var(--c2); background:transparent; border:none; padding:1px 3px; flex-shrink:0 }
 
 /* Modal 彈窗與 Markdown */
 .app-modal { margin:auto; border:none; background:transparent }
 .app-modal::backdrop { background:rgba(0,0,0,.75); backdrop-filter:blur(8px) }
 .modal-content { box-shadow:var(--shadow); padding:calc(24px*var(--s)); color:var(--c0) }
 .modal-body.stack { gap:calc(16px*var(--s)) }
-.modal-sm { width:min(380px,90vw) }
-.modal-md { width:min(460px,90vw) }
-.modal-lg { width:min(560px,90vw) }
-.modal-xl { width:min(720px,92vw); max-height:85vh }
+.modal-sm { width:min(calc(380px*var(--s)),90vw) }
+.modal-md { width:min(calc(460px*var(--s)),90vw) }
+.modal-lg { width:min(calc(560px*var(--s)),90vw) }
+.modal-xl { width:min(calc(720px*var(--s)),92vw); max-height:85vh }
 .modal-header { justify-content:space-between; margin-bottom:16px; flex-shrink:0 }
 .modal-title-text { font-size:calc(1.25rem*var(--s)); font-weight:700 }
 .btn-close { background:transparent; border:none; color:var(--c2); font-size:1.4rem }

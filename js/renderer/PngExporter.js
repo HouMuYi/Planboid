@@ -17,6 +17,7 @@ export class PngExporter {
 	 * @param {import("./CanvasRenderer.js").CanvasRenderer} renderer
 	 */
 	static exportToPng(stateManager, renderer) {
+		if (!stateManager || !stateManager.scheme) return;
 		const mainCanvas = document.getElementById('main-canvas');
 		if (!mainCanvas) return;
 
@@ -188,16 +189,17 @@ export class PngExporter {
 
 				// 3em 大色塊
 				ctx.fillStyle = item.color;
+				ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+				ctx.lineWidth = 1;
 				if (ctx.roundRect) {
 					ctx.beginPath();
 					ctx.roundRect(legendX + 18, itemY - 7, swWidth, swHeight, 3);
 					ctx.fill();
+					ctx.stroke();
 				} else {
 					ctx.fillRect(legendX + 18, itemY - 7, swWidth, swHeight);
+					ctx.strokeRect(legendX + 18, itemY - 7, swWidth, swHeight);
 				}
-				ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-				ctx.lineWidth = 1;
-				ctx.strokeRect(legendX + 18, itemY - 7, swWidth, swHeight);
 
 				// 冒號與名稱
 				ctx.fillStyle = '#e2e8f0';

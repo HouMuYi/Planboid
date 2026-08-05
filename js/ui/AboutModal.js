@@ -17,7 +17,7 @@ export class AboutModal {
 
 		btnOpen?.addEventListener('click', (e) => {
 			e.stopPropagation();
-			if (this.contentContainer) {
+			if (this.contentContainer && !this.contentContainer.innerHTML) {
 				this.contentContainer.innerHTML = ABOUT_HTML;
 			}
 			if (this.modal) {
@@ -31,6 +31,16 @@ export class AboutModal {
 
 		btnClose?.addEventListener('click', () => {
 			if (this.modal) {
+				if (typeof this.modal.close === 'function') {
+					this.modal.close();
+				} else {
+					this.modal.removeAttribute('open');
+				}
+			}
+		});
+
+		this.modal?.addEventListener('click', (e) => {
+			if (e.target === this.modal) {
 				if (typeof this.modal.close === 'function') {
 					this.modal.close();
 				} else {

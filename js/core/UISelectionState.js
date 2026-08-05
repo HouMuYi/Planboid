@@ -17,17 +17,59 @@ export class UISelectionState {
 	}
 
 	setSingleSelection(x, y) {
-		this.selectedCell = { x, y };
+		const safeX = Number(x);
+		const safeY = Number(y);
+		if (isNaN(safeX) || isNaN(safeY)) {
+			this.selectedCell = null;
+			return;
+		}
+		this.selectedCell = { x: safeX, y: safeY };
 		this.selectionBox = null;
 	}
 
 	setBoxSelection(minX, minY, maxX, maxY) {
-		this.selectionBox = { minX, minY, maxX, maxY };
-		this.selectedCell = { x: minX, y: minY };
+		const numMinX = Number(minX);
+		const numMinY = Number(minY);
+		const numMaxX = Number(maxX);
+		const numMaxY = Number(maxY);
+
+		if ([numMinX, numMinY, numMaxX, numMaxY].some(v => isNaN(v))) {
+			this.clearSelection();
+			return;
+		}
+
+		const realMinX = Math.min(numMinX, numMaxX);
+		const realMaxX = Math.max(numMinX, numMaxX);
+		const realMinY = Math.min(numMinY, numMaxY);
+		const realMaxY = Math.max(numMinY, numMaxY);
+
+		this.selectionBox = { minX: realMinX, minY: realMinY, maxX: realMaxX, maxY: realMaxY };
+		this.selectedCell = { x: realMinX, y: realMinY };
 	}
 
 	setClipboard(data) {
-		this.clipboard = data;
-		console.log('📋 剪貼簿更新，包含地塊數:', Object.keys(data.tiles || {}).length);
+		if (!data || typeof data !== 'object') {
+			this.clipboard = null;
+			this.isPastingMode = false;
+			console.log('📋 剪貼簿已清空');
+			return;
+		}
+
+		const tilesObj = data.tiles && typeof data.tiles === 'object' ? data.tiles : {};
+		this.clipboard = {
+			width: Math.max(1, Number(data.width) || 1),
+			height: Math.max(1, Number(data.height) || 1),
+			tiles: tilesObj
+		};
+		console.log('📋 剪貼簿更新，包含地塊數:', Object.keys(tilesObj).length);
+	}
+
+	clearClipboard() {
+		this.clipboard = null;
+		this.isPastingMode = false;
+	}
+
+	cancelPaste() {
+		this.isPastingMode = false;
 	}
 }

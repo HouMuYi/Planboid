@@ -163,7 +163,11 @@ export class InputDispatcher {
 		if (!start) return;
 
 		const raw = this.renderer.hoveredIntersection;
-		if (raw.x < 0 || raw.y < 0) return;
+		if (raw.x < 0 || raw.y < 0) {
+			this.renderer.wallStartPoint = null;
+			this.renderer.requestRenderOverlay();
+			return;
+		}
 
 		const end = GeometryPipeline.constrainAxisPoint(start, raw);
 		if (end.x === start.x && end.y === start.y) return; // 尚未移動到不同交叉點，繼續等待下一次互動
@@ -332,9 +336,10 @@ export class InputDispatcher {
 					const deltaCenterX = centerX - this.lastTouchCenterX;
 					const deltaCenterY = centerY - this.lastTouchCenterY;
 
-					this.targetCameraX = centerX - (centerX - currentTargetCamX) * (newTargetZoom / currentTargetZoom)
+					const safeTargetZoom = Math.max(0.0001, currentTargetZoom);
+					this.targetCameraX = centerX - (centerX - currentTargetCamX) * (newTargetZoom / safeTargetZoom)
 						+ deltaCenterX;
-					this.targetCameraY = centerY - (centerY - currentTargetCamY) * (newTargetZoom / currentTargetZoom)
+					this.targetCameraY = centerY - (centerY - currentTargetCamY) * (newTargetZoom / safeTargetZoom)
 						+ deltaCenterY;
 					this.targetZoom = newTargetZoom;
 
@@ -394,8 +399,9 @@ export class InputDispatcher {
 			const mouseX = e.clientX - rect.left;
 			const mouseY = e.clientY - rect.top;
 
-			this.targetCameraX = mouseX - (mouseX - currentTargetCamX) * (newTargetZoom / currentTargetZoom);
-			this.targetCameraY = mouseY - (mouseY - currentTargetCamY) * (newTargetZoom / currentTargetZoom);
+			const safeTargetZoom = Math.max(0.0001, currentTargetZoom);
+			this.targetCameraX = mouseX - (mouseX - currentTargetCamX) * (newTargetZoom / safeTargetZoom);
+			this.targetCameraY = mouseY - (mouseY - currentTargetCamY) * (newTargetZoom / safeTargetZoom);
 			this.targetZoom = newTargetZoom;
 
 			this.isZoomAnimating = true;
@@ -417,8 +423,8 @@ export class InputDispatcher {
 
 			const displayX = cellX + 1;
 			const displayY = cellY + 1;
-			const gameX = (this.state.scheme.worldOriginX || CONFIG.DEFAULT_ORIGIN_X) + cellX;
-			const gameY = (this.state.scheme.worldOriginY || CONFIG.DEFAULT_ORIGIN_Y) + cellY;
+			const gameX = (this.state?.scheme?.worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X) + cellX;
+			const gameY = (this.state?.scheme?.worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y) + cellY;
 
 			const event = new CustomEvent('gridhover', {
 				detail: {

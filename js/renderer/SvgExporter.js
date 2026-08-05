@@ -29,6 +29,7 @@ export class SvgExporter {
 	 * @returns {string} XML SVG 字串
 	 */
 	static exportSvg(scheme, isoMath, currentZ = 0, otherFloorsMode = 'ghost') {
+		if (!scheme) return '';
 		const fit = ExportCanvasPipeline.calculateFitCamera(scheme, isoMath, currentZ);
 		const palette = scheme.palette || {};
 
@@ -63,9 +64,10 @@ export class SvgExporter {
 			items.forEach(({ x, y, tile }) => {
 				if (tile.floorColorId && palette[tile.floorColorId]) {
 					const color = palette[tile.floorColorId].color;
+					const safeColorId = ExportCanvasPipeline.escapeXml(tile.floorColorId);
 					const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(isoMath, x, y, 1.0);
 					svgContent +=
-						`<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="floor" data-color-id="${tile.floorColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${color}" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />\n`;
+						`<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="floor" data-color-id="${safeColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${color}" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />\n`;
 				}
 			});
 
@@ -75,7 +77,8 @@ export class SvgExporter {
 					Object.entries(tile.walls).forEach(([edge, colorId]) => {
 						if (colorId && palette[colorId]) {
 							const color = palette[colorId].color;
-							svgContent += GeometryPipeline.getWallSvgElements(isoMath, x, y, z, edge, colorId, color);
+							const safeColorId = ExportCanvasPipeline.escapeXml(colorId);
+							svgContent += GeometryPipeline.getWallSvgElements(isoMath, x, y, z, edge, safeColorId, color);
 						}
 					});
 				}

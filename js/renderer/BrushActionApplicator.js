@@ -15,6 +15,7 @@ export class BrushActionApplicator {
 	 * 右鍵快速抹除操作
 	 */
 	applyRightClickErase(x, y, edge) {
+		if (!this.state || !this.state.scheme) return;
 		const brushType = this.state.brushType;
 		const tool = this.state.activeTool;
 
@@ -32,6 +33,7 @@ export class BrushActionApplicator {
 	 * 地塊矩形批次操作：點擊放開為單格 (minX===maxX && minY===maxY)，拖曳放開則為矩形範圍
 	 */
 	applyRectFloor(minX, minY, maxX, maxY) {
+		if (!this.state || !this.state.scheme) return;
 		const tool = this.state.activeTool;
 		const colorId = this.state.activeColorId;
 		const width = this.state.scheme.width;
@@ -59,6 +61,7 @@ export class BrushActionApplicator {
 	 * @param {{x: number, y: number}} end
 	 */
 	applyWallLine(start, end) {
+		if (!this.state || !this.state.scheme) return;
 		if (start.x === end.x && start.y === end.y) return;
 
 		const tool = this.state.activeTool;

@@ -5,12 +5,33 @@
 
 export class Utils {
 	/**
-	 * 清理檔名非法字元
+	 * 清理檔名非法字元與控制字元
 	 * @param {string} rawName
 	 * @returns {string}
 	 */
 	static sanitizeFileName(rawName) {
-		return (rawName || 'planboid').replace(/[\\/:*?"<>|]/g, '_');
+		const strName = typeof rawName === 'string' ? rawName : String(rawName || 'planboid');
+		const cleaned = strName
+			.trim()
+			.replace(/[\x00-\x1f\\/:*?"<>|\r\n]/g, '_')
+			.replace(/^\.+/, '')
+			.replace(/\.+$/, '');
+		return cleaned || 'planboid';
+	}
+
+	/**
+	 * HTML 特殊字元 XSS 防護轉義
+	 * @param {any} str
+	 * @returns {string}
+	 */
+	static escapeHtml(str) {
+		if (str === null || str === undefined) return '';
+		return String(str)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#039;');
 	}
 
 	/**
@@ -31,10 +52,13 @@ export class Utils {
 		const seconds = String(now.getSeconds()).padStart(2, '0');
 		const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
 
+		const safeSuffix = typeof suffix === 'string' ? suffix.trim() : '';
+		const safeExt = typeof ext === 'string' ? ext.trim() : '';
+
 		const parts = [safeName, timestamp];
-		if (suffix) parts.push(suffix);
+		if (safeSuffix) parts.push(safeSuffix);
 		let filename = parts.join('_');
-		if (ext) filename += `.${ext.replace(/^\./, '')}`;
+		if (safeExt) filename += `.${safeExt.replace(/^\./, '')}`;
 		return filename;
 	}
 
@@ -60,8 +84,9 @@ export class Utils {
 		}
 
 		const a = document.createElement('a');
+		a.href = filename;
+		a.download = Utils.sanitizeFileName(filename);
 		a.href = url;
-		a.download = filename;
 		document.body.appendChild(a);
 		a.click();
 		a.remove();

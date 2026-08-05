@@ -255,13 +255,24 @@
 
 						<div class="divider"></div>
 
-						<!-- 調色盤區塊：彈性延伸佔據主要剩餘空間 -->
+						<!-- 通用調色盤區塊 -->
 						<div class="panel-section palette-section">
 							<div class="section-header">
 								<h3 class="section-title" data-i18n="sidebar_palette_title">通用調色盤</h3>
 								<button class="btn" id="btn-add-palette" data-i18n="sidebar_btn_add_palette">+ 新增色塊</button>
 							</div>
 							<div class="palette-list" id="palette-container"></div>
+						</div>
+
+						<div class="divider"></div>
+
+						<!-- 物件調色盤區塊 -->
+						<div class="panel-section object-palette-section">
+							<div class="section-header">
+								<h3 class="section-title" data-i18n="sidebar_object_palette_title">物件調色盤</h3>
+								<button class="btn" id="btn-add-object-palette" data-i18n="sidebar_btn_add_object_palette">+ 新增物件</button>
+							</div>
+							<div class="palette-list" id="object-palette-container"></div>
 						</div>
 
 						<div class="divider"></div>
@@ -426,13 +437,16 @@
 							<input type="color" id="edit-palette-color" class="input-color">
 							<input type="text" id="edit-palette-hex" class="input-text input-code flex-1" placeholder="#6366F1">
 						</div>
-						<div id="preset-color-swatches" style="display: flex; flex-wrap: wrap; gap: 6px"></div>
+						<div id="preset-color-swatches"></div>
 					</div>
 					<div class="cluster cluster-between">
 						<button class="btn btn-danger" id="btn-delete-palette" data-i18n="modal_palette_btn_delete">
 							刪除色塊
 						</button>
-						<button class="btn btn-primary" id="btn-save-palette" data-i18n="modal_palette_btn_save">儲存變更</button>
+						<div class="cluster">
+							<button class="btn btn-secondary" id="btn-convert-palette-type" data-i18n="modal_palette_btn_convert_to_object">轉為物件色票</button>
+							<button class="btn btn-primary" id="btn-save-palette" data-i18n="modal_palette_btn_save">儲存變更</button>
+						</div>
 					</div>
 				</div>
 			</div>

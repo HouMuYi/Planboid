@@ -2,7 +2,7 @@
  * Config.js - 專案全域魔術數字與環境常數配置
  */
 
-export const CONFIG = {
+export const CONFIG = Object.freeze({
 	// PZ 幾何
 	TILE_SIZE: 32, // 地塊預設基礎尺寸 (px)
 	Z_VISUAL_OFFSET: 3, // 每層 Z 軸樓層視覺高程偏置係數
@@ -38,4 +38,4 @@ export const CONFIG = {
 	GHOST_BASE_ALPHA: 0.4, // 相隔 1 層鬼影之基礎不透明度
 	GHOST_ALPHA_DECAY: 0.75, // 鬼影跨層不透明度衰減率 (每多相隔 1 層)
 	GHOST_SATURATION_DECAY: 0.8, // 鬼影跨層彩度/飽和度留存率 (每多相隔 1 層)
-};
+});

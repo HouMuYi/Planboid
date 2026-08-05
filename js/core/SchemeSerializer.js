@@ -16,19 +16,21 @@ export class SchemeSerializer {
 	 * @returns {Object} 扁平化極簡方案物件
 	 */
 	static serialize(scheme) {
-		if (!scheme) return null;
+		if (!scheme || typeof scheme !== 'object') return null;
 
-		// Palette 調色盤元組陣列: [[id, name, color], ...]
+		// Palette 調色盤元組陣列: [[id, name, color, isObject], ...]
 		const paletteTuples = Object.entries(scheme.palette || {}).map(([id, item]) => [
 			id,
-			item.name,
-			item.color,
+			item?.name || '',
+			item?.color || '#000000',
+			item?.isObject ? 1 : 0,
 		]);
 
-		// 建立臨時牆面正規化 map，防止漏掉 S / E 方向牆體
+		// 建立臨時牆面與牆面物件正規化 map
 		const denseTiles = [];
 		if (scheme.tiles) {
 			const normalizedWalls = new Map();
+			const normalizedWallObjects = new Map();
 
 			Object.entries(scheme.tiles).forEach(([coordKey, tile]) => {
 				const [xStr, yStr, zStr] = coordKey.split(',');
@@ -36,8 +38,14 @@ export class SchemeSerializer {
 				const y = parseInt(yStr, 10);
 				const z = parseInt(zStr, 10);
 
+				if (isNaN(x) || isNaN(y) || isNaN(z) || !tile) return;
+
 				if (tile.floorColorId) {
 					denseTiles.push([x, y, z, 0, tile.floorColorId]);
+				}
+
+				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
+					denseTiles.push([x, y, z, 4, tile.floorObjects]);
 				}
 
 				if (tile.label) {
@@ -53,6 +61,16 @@ export class SchemeSerializer {
 						}
 					});
 				}
+
+				if (tile.wallObjects) {
+					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
+						if (Array.isArray(objArray) && objArray.length > 0) {
+							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+							const wKey = `${norm.x},${norm.y},${z},${norm.edge}`;
+							normalizedWallObjects.set(wKey, objArray);
+						}
+					});
+				}
 			});
 
 			normalizedWalls.forEach((colorId, wKey) => {
@@ -62,6 +80,15 @@ export class SchemeSerializer {
 				const z = parseInt(zStr, 10);
 				const type = (edge === 'N') ? 1 : 2;
 				denseTiles.push([x, y, z, type, colorId]);
+			});
+
+			normalizedWallObjects.forEach((objArray, wKey) => {
+				const [xStr, yStr, zStr, edge] = wKey.split(',');
+				const x = parseInt(xStr, 10);
+				const y = parseInt(yStr, 10);
+				const z = parseInt(zStr, 10);
+				const type = (edge === 'N') ? 5 : 6;
+				denseTiles.push([x, y, z, type, objArray]);
 			});
 		}
 
@@ -87,6 +114,7 @@ export class SchemeSerializer {
 		if (!rawInput) throw new Error('無效的方案資料輸入');
 
 		let obj = typeof rawInput === 'string' ? JSON.parse(rawInput) : rawInput;
+		if (!obj || typeof obj !== 'object') throw new Error('解碼目標非合法物件');
 
 		// 解析調色盤
 		const paletteMap = {};
@@ -94,15 +122,24 @@ export class SchemeSerializer {
 		if (Array.isArray(rawPalette)) {
 			rawPalette.forEach(item => {
 				if (Array.isArray(item)) {
-					const [id, name, color] = item;
-					paletteMap[id] = { name, color };
+					const [id, name, color, isObjFlag] = item;
+					if (!id) return;
+					const isObj = isObjFlag === 1 || isObjFlag === true || String(id).startsWith('obj_');
+					paletteMap[id] = { name: name || '', color: color || '#000000', ...(isObj ? { isObject: true } : {}) };
 				} else if (typeof item === 'object' && item !== null) {
 					const id = item.i || item.id;
-					paletteMap[id] = { name: item.n || item.name, color: item.c || item.color };
+					if (!id) return;
+					const isObjFlag = item.isObject || item.o;
+					const isObj = !!isObjFlag || String(id).startsWith('obj_');
+					paletteMap[id] = { name: item.n || item.name || '', color: item.c || item.color || '#000000', ...(isObj ? { isObject: true } : {}) };
 				}
 			});
 		} else if (typeof rawPalette === 'object' && rawPalette !== null) {
-			Object.assign(paletteMap, rawPalette);
+			Object.entries(rawPalette).forEach(([id, item]) => {
+				if (!item || typeof item !== 'object') return;
+				const isObj = !!item.isObject || String(id).startsWith('obj_');
+				paletteMap[id] = { ...item, ...(isObj ? { isObject: true } : {}) };
+			});
 		}
 
 		const tilesMap = {};
@@ -115,7 +152,14 @@ export class SchemeSerializer {
 		// 解析地塊元組陣列: [[x, y, z, type, val], ...]
 		if (Array.isArray(obj.d)) {
 			obj.d.forEach(tuple => {
-				const [x, y, z, type, val] = tuple;
+				if (!Array.isArray(tuple) || tuple.length < 5) return;
+				const [xRaw, yRaw, zRaw, type, val] = tuple;
+				const x = Number(xRaw);
+				const y = Number(yRaw);
+				const z = Number(zRaw);
+
+				if (isNaN(x) || isNaN(y) || isNaN(z) || val === undefined || val === null) return;
+
 				if (type === 0) {
 					const tile = getTile(x, y, z);
 					tile.floorColorId = val;
@@ -128,18 +172,31 @@ export class SchemeSerializer {
 				} else if (type === 3) {
 					const tile = getTile(x, y, z);
 					tile.label = val;
+				} else if (type === 4) {
+					const tile = getTile(x, y, z);
+					tile.floorObjects = Array.isArray(val) ? val : [val];
+				} else if (type === 5 || type === 6) {
+					const edge = (type === 5) ? 'N' : 'W';
+					const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+					const tile = getTile(norm.x, norm.y, z);
+					if (!tile.wallObjects) tile.wallObjects = {};
+					tile.wallObjects[norm.edge] = Array.isArray(val) ? val : [val];
 				}
 			});
-		} else if (typeof obj.tiles === 'object') {
+		} else if (typeof obj.tiles === 'object' && obj.tiles !== null) {
 			Object.entries(obj.tiles).forEach(([key, tile]) => {
+				if (!tile) return;
 				const [xStr, yStr, zStr] = key.split(',');
 				const x = parseInt(xStr, 10);
 				const y = parseInt(yStr, 10);
 				const z = parseInt(zStr, 10);
 
+				if (isNaN(x) || isNaN(y) || isNaN(z)) return;
+
 				const targetTile = getTile(x, y, z);
 				if (tile.floorColorId) targetTile.floorColorId = tile.floorColorId;
 				if (tile.label) targetTile.label = tile.label;
+				if (Array.isArray(tile.floorObjects)) targetTile.floorObjects = [...tile.floorObjects];
 
 				if (tile.walls) {
 					Object.entries(tile.walls).forEach(([edge, colorId]) => {
@@ -148,6 +205,17 @@ export class SchemeSerializer {
 							const normTile = getTile(norm.x, norm.y, z);
 							if (!normTile.walls) normTile.walls = {};
 							normTile.walls[norm.edge] = colorId;
+						}
+					});
+				}
+
+				if (tile.wallObjects) {
+					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
+						if (Array.isArray(objArray)) {
+							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+							const normTile = getTile(norm.x, norm.y, z);
+							if (!normTile.wallObjects) normTile.wallObjects = {};
+							normTile.wallObjects[norm.edge] = [...objArray];
 						}
 					});
 				}
@@ -174,8 +242,10 @@ export class SchemeSerializer {
 	static stringifyFormatted(compactObj) {
 		if (!compactObj) return '';
 		const pStr = JSON.stringify(compactObj.p || []);
-		const dLines = (compactObj.d || []).map(tuple => '    ' + JSON.stringify(tuple));
-		const dStr = '[\n' + dLines.join(',\n') + '\n  ]';
+		const dList = compactObj.d || [];
+		const dStr = dList.length > 0
+			? '[\n' + dList.map(tuple => '    ' + JSON.stringify(tuple)).join(',\n') + '\n  ]'
+			: '[]';
 
 		return `{\n  "v": ${compactObj.v || 2},\n  "id": ${JSON.stringify(compactObj.id || '')},\n  "n": ${JSON.stringify(compactObj.n || '')},\n  "w": ${
 			compactObj.w || CONFIG.DEFAULT_SCHEME_WIDTH

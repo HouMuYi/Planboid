@@ -20,24 +20,45 @@ export class ConfirmModal {
 				return;
 			}
 
-			msgEl.textContent = message;
+			msgEl.textContent = String(message ?? '');
+
+			let isResolved = false;
 
 			const cleanup = (result) => {
-				modal.close();
+				if (isResolved) return;
+				isResolved = true;
+
 				btnOk.removeEventListener('click', onOk);
 				btnCancel?.removeEventListener('click', onCancel);
 				btnClose?.removeEventListener('click', onCancel);
+				modal.removeEventListener('cancel', onCancel);
+				modal.removeEventListener('close', onCancel);
+				modal.removeEventListener('click', onBackdropClick);
+
+				if (modal.open) {
+					modal.close();
+				}
+
 				resolve(result);
 			};
 
 			const onOk = () => cleanup(true);
 			const onCancel = () => cleanup(false);
+			const onBackdropClick = (e) => {
+				if (e.target === modal) {
+					cleanup(false);
+				}
+			};
 
 			btnOk.addEventListener('click', onOk);
 			btnCancel?.addEventListener('click', onCancel);
 			btnClose?.addEventListener('click', onCancel);
+			modal.addEventListener('cancel', onCancel);
+			modal.addEventListener('close', onCancel);
+			modal.addEventListener('click', onBackdropClick);
 
 			modal.showModal();
 		});
 	}
 }
+

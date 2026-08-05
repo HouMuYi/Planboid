@@ -72,12 +72,31 @@ export class StateManager {
 				});
 			}
 
-			if (tile.floorColorId || tile.label) {
+			if (tile.wallObjects) {
+				Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
+					if (Array.isArray(objArray) && objArray.length > 0) {
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+						const normKey = `${norm.x},${norm.y},${zStr}`;
+						if (!updatedTiles[normKey]) {
+							updatedTiles[normKey] = { walls: {} };
+						}
+						if (!updatedTiles[normKey].wallObjects) {
+							updatedTiles[normKey].wallObjects = {};
+						}
+						updatedTiles[normKey].wallObjects[norm.edge] = objArray;
+					}
+				});
+			}
+
+			if (tile.floorColorId || tile.label || Array.isArray(tile.floorObjects)) {
 				if (!updatedTiles[key]) {
 					updatedTiles[key] = { walls: {} };
 				}
 				if (tile.floorColorId) updatedTiles[key].floorColorId = tile.floorColorId;
 				if (tile.label) updatedTiles[key].label = tile.label;
+				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
+					updatedTiles[key].floorObjects = tile.floorObjects;
+				}
 			}
 		});
 
@@ -116,17 +135,28 @@ export class StateManager {
 	set activeTool(val) {
 		this.toolState.setActiveTool(val);
 	}
+	setActiveTool(tool) {
+		this.toolState.setActiveTool(tool);
+	}
+
 	get brushType() {
 		return this.toolState.brushType;
 	}
 	set brushType(val) {
 		this.toolState.setBrushType(val);
 	}
+	setBrushType(type) {
+		this.toolState.setBrushType(type);
+	}
+
 	get activeColorId() {
 		return this.toolState.activeColorId;
 	}
 	set activeColorId(val) {
 		this.toolState.setActiveColorId(val);
+	}
+	setActiveColorId(colorId) {
+		this.toolState.setActiveColorId(colorId);
 	}
 	get ghostLayerEnabled() {
 		return this.toolState.ghostLayerEnabled;
@@ -156,6 +186,12 @@ export class StateManager {
 		this.toolState.is3DWallsEnabled = val;
 	}
 
+	clearHistory() {
+		this.undoStack = [];
+		this.redoStack = [];
+		this.pushHistory();
+	}
+
 	pushHistory() {
 		const snapshot = JSON.stringify(this.scheme);
 		if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === snapshot) {
@@ -174,8 +210,14 @@ export class StateManager {
 		const currentSnap = this.undoStack.pop();
 		this.redoStack.push(currentSnap);
 
-		const prevSnap = this.undoStack[this.undoStack.length - 1];
-		Object.assign(this.scheme, JSON.parse(prevSnap));
+		const prevSnapStr = this.undoStack[this.undoStack.length - 1];
+		const prevSnap = JSON.parse(prevSnapStr);
+		if (prevSnap.id !== this.scheme.id) {
+			this.undoStack = [currentSnap];
+			this.redoStack = [];
+			return false;
+		}
+		Object.assign(this.scheme, prevSnap);
 
 		const paletteKeys = Object.keys(this.scheme.palette || {});
 		if (!this.scheme.palette[this.activeColorId] && paletteKeys.length > 0) {
@@ -189,9 +231,14 @@ export class StateManager {
 
 	redo() {
 		if (this.redoStack.length === 0) return false;
-		const nextSnap = this.redoStack.pop();
-		this.undoStack.push(nextSnap);
-		Object.assign(this.scheme, JSON.parse(nextSnap));
+		const nextSnapStr = this.redoStack.pop();
+		const nextSnap = JSON.parse(nextSnapStr);
+		if (nextSnap.id !== this.scheme.id) {
+			this.redoStack = [];
+			return false;
+		}
+		this.undoStack.push(nextSnapStr);
+		Object.assign(this.scheme, nextSnap);
 
 		const paletteKeys = Object.keys(this.scheme.palette || {});
 		if (!this.scheme.palette[this.activeColorId] && paletteKeys.length > 0) {
@@ -228,8 +275,39 @@ export class StateManager {
 		const target = this.schemes.find(s => s.id === id);
 		if (target) {
 			target.name = newName;
-			target.width = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, newWidth));
-			target.height = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, newHeight));
+			const validW = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, newWidth));
+			const validH = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, newHeight));
+			target.width = validW;
+			target.height = validH;
+
+			// 當尺寸縮小時，清理並裁剪超出新邊界之 tiles
+			if (target.tiles) {
+				Object.keys(target.tiles).forEach(key => {
+					const [xStr, yStr, zStr] = key.split(',');
+					const x = parseInt(xStr, 10);
+					const y = parseInt(yStr, 10);
+					const tile = target.tiles[key];
+
+					if (x > validW || y > validH || (x === validW && y === validH)) {
+						delete target.tiles[key];
+					} else if (x === validW) {
+						delete tile.floorColorId;
+						delete tile.floorObjects;
+						delete tile.label;
+						if (tile.walls) delete tile.walls.N;
+						if (tile.wallObjects) delete tile.wallObjects.N;
+						this.cleanupEmptyTile(key);
+					} else if (y === validH) {
+						delete tile.floorColorId;
+						delete tile.floorObjects;
+						delete tile.label;
+						if (tile.walls) delete tile.walls.W;
+						if (tile.wallObjects) delete tile.wallObjects.W;
+						this.cleanupEmptyTile(key);
+					}
+				});
+			}
+
 			this.persist();
 			this.notifyStateChange();
 		}
@@ -244,7 +322,7 @@ export class StateManager {
 			this.scheme = this.schemes[0];
 			this.activeSchemeId = this.scheme.id;
 			this.currentZLevel = 0;
-			this.pushHistory();
+			this.clearHistory();
 		}
 		this.persist();
 		this.notifyStateChange();
@@ -300,8 +378,33 @@ export class StateManager {
 				const destY = targetY + ry;
 
 				if (destX >= 0 && destX <= this.scheme.width && destY >= 0 && destY <= this.scheme.height) {
+					if (destX === this.scheme.width && destY === this.scheme.height) return;
+
 					const destKey = `${destX},${destY},${z}`;
-					this.scheme.tiles[destKey] = JSON.parse(JSON.stringify(tileData));
+					const cloned = JSON.parse(JSON.stringify(tileData));
+
+					if (destX === this.scheme.width) {
+						delete cloned.floorColorId;
+						delete cloned.floorObjects;
+						delete cloned.label;
+						if (cloned.walls) delete cloned.walls.N;
+						if (cloned.wallObjects) delete cloned.wallObjects.N;
+					} else if (destY === this.scheme.height) {
+						delete cloned.floorColorId;
+						delete cloned.floorObjects;
+						delete cloned.label;
+						if (cloned.walls) delete cloned.walls.W;
+						if (cloned.wallObjects) delete cloned.wallObjects.W;
+					}
+
+					const hasContent = cloned.floorColorId || cloned.label ||
+						(cloned.floorObjects && cloned.floorObjects.length > 0) ||
+						(cloned.walls && Object.keys(cloned.walls).length > 0) ||
+						(cloned.wallObjects && Object.values(cloned.wallObjects).some(arr => arr && arr.length > 0));
+
+					if (hasContent) {
+						this.scheme.tiles[destKey] = cloned;
+					}
 				}
 			});
 		});
@@ -339,17 +442,32 @@ export class StateManager {
 	// Tile Mutations (正規化寫入)
 	// --------------------------------------------------------------------------
 
+	// --------------------------------------------------------------------------
+	// Tile Mutations (正規化寫入 & 物件圖層)
+	// --------------------------------------------------------------------------
+
 	setTileFloor(x, y, colorId) {
 		if (x < 0 || x >= this.scheme.width || y < 0 || y >= this.scheme.height) return;
+		if (!colorId) {
+			this.removeFloor(x, y);
+			return;
+		}
 		const key = `${x},${y},${this.currentZLevel}`;
 		if (!this.scheme.tiles[key]) {
 			this.scheme.tiles[key] = { walls: {} };
 		}
-		this.scheme.tiles[key].floorColorId = colorId;
+		const isObj = !!(this.scheme.palette && this.scheme.palette[colorId] && this.scheme.palette[colorId].isObject);
+		if (isObj) {
+			if (!Array.isArray(this.scheme.tiles[key].floorObjects)) {
+				this.scheme.tiles[key].floorObjects = [];
+			}
+			this.scheme.tiles[key].floorObjects.push(colorId);
+		} else {
+			this.scheme.tiles[key].floorColorId = colorId;
+		}
 	}
 
 	setTileWall(x, y, edge, colorId) {
-		// PZ 邊界正規化 (South ->下格 North, East ->右格 West)
 		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 		if (norm.x < 0 || norm.x > this.scheme.width || norm.y < 0 || norm.y > this.scheme.height) return;
 
@@ -363,9 +481,23 @@ export class StateManager {
 
 		if (colorId === null) {
 			delete this.scheme.tiles[key].walls[norm.edge];
+			if (this.scheme.tiles[key].wallObjects) {
+				delete this.scheme.tiles[key].wallObjects[norm.edge];
+			}
 			this.cleanupEmptyTile(key);
 		} else {
-			this.scheme.tiles[key].walls[norm.edge] = colorId;
+			const isObj = !!(this.scheme.palette && this.scheme.palette[colorId] && this.scheme.palette[colorId].isObject);
+			if (isObj) {
+				if (!this.scheme.tiles[key].wallObjects) {
+					this.scheme.tiles[key].wallObjects = {};
+				}
+				if (!Array.isArray(this.scheme.tiles[key].wallObjects[norm.edge])) {
+					this.scheme.tiles[key].wallObjects[norm.edge] = [];
+				}
+				this.scheme.tiles[key].wallObjects[norm.edge].push(colorId);
+			} else {
+				this.scheme.tiles[key].walls[norm.edge] = colorId;
+			}
 		}
 	}
 
@@ -373,6 +505,7 @@ export class StateManager {
 		const key = `${x},${y},${this.currentZLevel}`;
 		if (this.scheme.tiles[key]) {
 			delete this.scheme.tiles[key].floorColorId;
+			delete this.scheme.tiles[key].floorObjects;
 			this.cleanupEmptyTile(key);
 		}
 	}
@@ -380,8 +513,13 @@ export class StateManager {
 	removeWall(x, y, edge) {
 		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 		const key = `${norm.x},${norm.y},${this.currentZLevel}`;
-		if (this.scheme.tiles[key] && this.scheme.tiles[key].walls) {
-			delete this.scheme.tiles[key].walls[norm.edge];
+		if (this.scheme.tiles[key]) {
+			if (this.scheme.tiles[key].walls) {
+				delete this.scheme.tiles[key].walls[norm.edge];
+			}
+			if (this.scheme.tiles[key].wallObjects) {
+				delete this.scheme.tiles[key].wallObjects[norm.edge];
+			}
 			this.cleanupEmptyTile(key);
 		}
 	}
@@ -390,9 +528,11 @@ export class StateManager {
 		const tile = this.scheme.tiles[key];
 		if (!tile) return;
 		const hasFloor = !!tile.floorColorId;
+		const hasFloorObjs = Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0;
 		const hasWalls = tile.walls && Object.keys(tile.walls).length > 0;
+		const hasWallObjs = tile.wallObjects && Object.values(tile.wallObjects).some(arr => Array.isArray(arr) && arr.length > 0);
 		const hasLabel = !!tile.label;
-		if (!hasFloor && !hasWalls && !hasLabel) {
+		if (!hasFloor && !hasFloorObjs && !hasWalls && !hasWallObjs && !hasLabel) {
 			delete this.scheme.tiles[key];
 		}
 	}
@@ -403,6 +543,95 @@ export class StateManager {
 			delete this.scheme.tiles[key];
 		}
 	}
+
+	convertPaletteItemType(id, toObject) {
+		const item = this.scheme.palette[id];
+		if (!item) return;
+
+		item.isObject = !!toObject;
+
+		if (!toObject) {
+			Object.values(this.scheme.tiles).forEach(tile => {
+				if (Array.isArray(tile.floorObjects) && tile.floorObjects.includes(id)) {
+					tile.floorObjects = tile.floorObjects.filter(itemId => itemId !== id);
+					tile.floorColorId = id;
+					if (tile.floorObjects.length === 0) delete tile.floorObjects;
+				}
+				if (tile.wallObjects) {
+					Object.entries(tile.wallObjects).forEach(([edge, arr]) => {
+						if (Array.isArray(arr) && arr.includes(id)) {
+							tile.wallObjects[edge] = arr.filter(itemId => itemId !== id);
+							if (!tile.walls) tile.walls = {};
+							tile.walls[edge] = id;
+							if (tile.wallObjects[edge].length === 0) delete tile.wallObjects[edge];
+						}
+					});
+					if (Object.keys(tile.wallObjects).length === 0) delete tile.wallObjects;
+				}
+			});
+		} else {
+			Object.values(this.scheme.tiles).forEach(tile => {
+				if (tile.floorColorId === id) {
+					delete tile.floorColorId;
+					if (!Array.isArray(tile.floorObjects)) tile.floorObjects = [];
+					tile.floorObjects.push(id);
+				}
+				if (tile.walls && tile.walls.N === id) {
+					delete tile.walls.N;
+					if (!tile.wallObjects) tile.wallObjects = {};
+					if (!Array.isArray(tile.wallObjects.N)) tile.wallObjects.N = [];
+					tile.wallObjects.N.push(id);
+				}
+				if (tile.walls && tile.walls.W === id) {
+					delete tile.walls.W;
+					if (!tile.wallObjects) tile.wallObjects = {};
+					if (!Array.isArray(tile.wallObjects.W)) tile.wallObjects.W = [];
+					tile.wallObjects.W.push(id);
+				}
+			});
+		}
+
+		this.pushHistory();
+		this.notifyStateChange();
+	}
+
+	cycleSelectedSubTarget() {
+		if (!this.selectedCell) return false;
+		const { x, y } = this.selectedCell;
+		const key = `${x},${y},${this.currentZLevel}`;
+		const tile = this.scheme.tiles[key];
+		if (!tile) return false;
+
+		const subTargets = [];
+		if (tile.floorColorId) subTargets.push({ type: 'floor', id: tile.floorColorId });
+		if (Array.isArray(tile.floorObjects)) {
+			tile.floorObjects.forEach((id, idx) => subTargets.push({ type: 'floorObj', id, index: idx }));
+		}
+		if (tile.walls && tile.walls.N) subTargets.push({ type: 'wallN', id: tile.walls.N });
+		if (tile.wallObjects && Array.isArray(tile.wallObjects.N)) {
+			tile.wallObjects.N.forEach((id, idx) => subTargets.push({ type: 'wallNObj', id, index: idx }));
+		}
+		if (tile.walls && tile.walls.W) subTargets.push({ type: 'wallW', id: tile.walls.W });
+		if (tile.wallObjects && Array.isArray(tile.wallObjects.W)) {
+			tile.wallObjects.W.forEach((id, idx) => subTargets.push({ type: 'wallWObj', id, index: idx }));
+		}
+
+		if (subTargets.length <= 1) {
+			this.activeSubTarget = null;
+			return false;
+		}
+
+		let currentIndex = -1;
+		if (this.activeSubTarget) {
+			currentIndex = subTargets.findIndex(t => t.type === this.activeSubTarget.type && (t.index === undefined || t.index === this.activeSubTarget.index));
+		}
+
+		const nextIndex = (currentIndex + 1) % subTargets.length;
+		this.activeSubTarget = subTargets[nextIndex];
+		this.notifyStateChange();
+		return true;
+	}
+
 
 	batchOperation(callback) {
 		callback();
@@ -422,7 +651,7 @@ export class StateManager {
 
 	updatePaletteItem(id, { name, color }) {
 		if (this.scheme.palette[id]) {
-			this.scheme.palette[id] = { name, color };
+			this.scheme.palette[id] = { ...this.scheme.palette[id], name, color };
 			this.pushHistory();
 			this.notifyStateChange();
 		}
@@ -431,6 +660,36 @@ export class StateManager {
 	deletePaletteItem(id) {
 		if (this.scheme.palette[id]) {
 			delete this.scheme.palette[id];
+
+			if (this.scheme.tiles) {
+				Object.keys(this.scheme.tiles).forEach(key => {
+					const tile = this.scheme.tiles[key];
+					if (tile.floorColorId === id) {
+						delete tile.floorColorId;
+					}
+					if (Array.isArray(tile.floorObjects)) {
+						tile.floorObjects = tile.floorObjects.filter(objId => objId !== id);
+						if (tile.floorObjects.length === 0) delete tile.floorObjects;
+					}
+					if (tile.walls) {
+						Object.keys(tile.walls).forEach(edge => {
+							if (tile.walls[edge] === id) delete tile.walls[edge];
+						});
+						if (Object.keys(tile.walls).length === 0) delete tile.walls;
+					}
+					if (tile.wallObjects) {
+						Object.keys(tile.wallObjects).forEach(edge => {
+							if (Array.isArray(tile.wallObjects[edge])) {
+								tile.wallObjects[edge] = tile.wallObjects[edge].filter(objId => objId !== id);
+								if (tile.wallObjects[edge].length === 0) delete tile.wallObjects[edge];
+							}
+						});
+						if (Object.keys(tile.wallObjects).length === 0) delete tile.wallObjects;
+					}
+					this.cleanupEmptyTile(key);
+				});
+			}
+
 			const paletteKeys = Object.keys(this.scheme.palette);
 			if (this.activeColorId === id || !this.scheme.palette[this.activeColorId]) {
 				this.activeColorId = paletteKeys.length > 0 ? paletteKeys[0] : '';

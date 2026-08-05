@@ -8,12 +8,6 @@ import { Utils } from '../core/Utils.js';
 import { IsoMath } from './IsoMath.js';
 
 export class ExportCanvasPipeline {
-	/**
-	 * 導出通用的檔名安全字串 (委派至 Utils)
-	 */
-	static getSafeFileName(rawName) {
-		return Utils.sanitizeFileName(rawName);
-	}
 
 	/**
 	 * 產出帶有時間戳 (YYYYMMDD_HHmmss) 的共用安全匯出檔名 (委派至 Utils)
@@ -44,8 +38,8 @@ export class ExportCanvasPipeline {
 	 */
 	static calculateExportBounds(scheme) {
 		const isoMath = new IsoMath(32);
-		const w = scheme.width;
-		const h = scheme.height;
+		const w = scheme?.width || 1;
+		const h = scheme?.height || 1;
 
 		const p00 = isoMath.gridToScreen(0, 0, 1.0);
 		const p10 = isoMath.gridToScreen(w, 0, 1.0);

@@ -7,6 +7,7 @@ import { i18n } from './I18nManager.js';
 import { SchemeSerializer } from './SchemeSerializer.js';
 
 const STORAGE_KEY = 'planboid_data_v4';
+const LEGACY_STORAGE_KEYS = ['planboid_data_v3', 'planboid_data_v2', 'planboid_data'];
 
 export class StorageManager {
 	/**
@@ -25,13 +26,30 @@ export class StorageManager {
 			palette: {
 				'color_road': { color: '#334155', name: i18n.t('defaults_palette_road') || '道路' },
 				'color_indoor': { color: '#B38147', name: i18n.t('defaults_palette_indoor') || '室內空間' },
+				'obj_door': { color: '#e11d48', name: '🚪', isObject: true },
+				'obj_window': { color: '#f59e0b', name: '🪟', isObject: true },
+				'obj_sink': { color: '#38bdf8', name: '🚰', isObject: true },
+				'obj_bucket': { color: '#1e40af', name: '🪣', isObject: true },
+				'obj_ladder': { color: '#991b1b', name: '🪜', isObject: true },
 			},
 		};
 	}
 
 	static loadData() {
 		try {
-			const jsonStr = localStorage.getItem(STORAGE_KEY);
+			let jsonStr = localStorage.getItem(STORAGE_KEY);
+			// 自動相容遷移：若 v4 無資料，嘗試讀取舊版 Storage Keys
+			if (!jsonStr) {
+				for (const legacyKey of LEGACY_STORAGE_KEYS) {
+					const legacyDataStr = localStorage.getItem(legacyKey);
+					if (legacyDataStr) {
+						jsonStr = legacyDataStr;
+						console.log(`[StorageManager] 成功由舊版 Key (${legacyKey}) 遷移資料至 v4`);
+						break;
+					}
+				}
+			}
+
 			if (!jsonStr) {
 				const defaultScheme = this.getDefaultScheme();
 				const initialData = {
@@ -41,11 +59,37 @@ export class StorageManager {
 				this.saveData(initialData);
 				return initialData;
 			}
+
 			const data = JSON.parse(jsonStr);
-			if (data && Array.isArray(data.schemes)) {
-				data.schemes = data.schemes.map(s => SchemeSerializer.deserialize(s));
+			if (data && Array.isArray(data.schemes) && data.schemes.length > 0) {
+				const defaultPalette = this.getDefaultScheme().palette;
+				data.schemes = data.schemes.map(s => {
+					const scheme = SchemeSerializer.deserialize(s);
+					// 相容性修復：為舊方案自動補充預設物件色票 (🚪 🪟 🚰 🪣 🪜)
+					if (scheme && scheme.palette) {
+						Object.entries(defaultPalette).forEach(([objId, defaultItem]) => {
+							if (defaultItem.isObject && !scheme.palette[objId]) {
+								scheme.palette[objId] = { ...defaultItem };
+							}
+						});
+					}
+					return scheme;
+				});
+				// 確保 activeSchemeId 有效
+				if (!data.activeSchemeId || !data.schemes.some(s => s.id === data.activeSchemeId)) {
+					data.activeSchemeId = data.schemes[0].id;
+				}
+				this.saveData(data);
+				return data;
 			}
-			return data;
+
+			const defaultScheme = this.getDefaultScheme();
+			const fallbackData = {
+				activeSchemeId: defaultScheme.id,
+				schemes: [defaultScheme],
+			};
+			this.saveData(fallbackData);
+			return fallbackData;
 		} catch (e) {
 			console.error('載入本地資料失敗，重置為預設方案:', e);
 			const defaultScheme = this.getDefaultScheme();

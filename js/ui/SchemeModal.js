@@ -57,6 +57,12 @@ export class SchemeModal {
 			this.modal?.close();
 		});
 
+		this.modal?.addEventListener('click', (e) => {
+			if (e.target === this.modal) {
+				this.modal.close();
+			}
+		});
+
 		// 頂部方案名稱與尺寸點擊直接切換為編輯模式並開啟 Modal
 		const activeNameEl = document.getElementById('active-scheme-name');
 		const activeDimEl = document.getElementById('active-scheme-dim');
@@ -73,9 +79,9 @@ export class SchemeModal {
 
 		// 建立 / 更新 按鈕
 		this.btnSaveEditor?.addEventListener('click', () => {
-			const name = this.inputName.value.trim() || i18n.t('modal_schemes_name_placeholder');
-			const width = parseInt(this.inputW.value, 10) || CONFIG.DEFAULT_SCHEME_WIDTH;
-			const height = parseInt(this.inputH.value, 10) || CONFIG.DEFAULT_SCHEME_HEIGHT;
+			const name = this.inputName?.value?.trim() || i18n.t('modal_schemes_name_placeholder');
+			const width = parseInt(this.inputW?.value, 10) || CONFIG.DEFAULT_SCHEME_WIDTH;
+			const height = parseInt(this.inputH?.value, 10) || CONFIG.DEFAULT_SCHEME_HEIGHT;
 			const worldX = parseInt(this.inputWorldX?.value, 10) || CONFIG.DEFAULT_ORIGIN_X;
 			const worldY = parseInt(this.inputWorldY?.value, 10) || CONFIG.DEFAULT_ORIGIN_Y;
 
@@ -119,9 +125,9 @@ export class SchemeModal {
 
 		// 另存新方案按鈕
 		this.btnSaveAsNew?.addEventListener('click', () => {
-			const name = this.inputName.value.trim() || i18n.t('modal_schemes_name_placeholder');
-			const width = parseInt(this.inputW.value, 10) || CONFIG.DEFAULT_SCHEME_WIDTH;
-			const height = parseInt(this.inputH.value, 10) || CONFIG.DEFAULT_SCHEME_HEIGHT;
+			const name = this.inputName?.value?.trim() || i18n.t('modal_schemes_name_placeholder');
+			const width = parseInt(this.inputW?.value, 10) || CONFIG.DEFAULT_SCHEME_WIDTH;
+			const height = parseInt(this.inputH?.value, 10) || CONFIG.DEFAULT_SCHEME_HEIGHT;
 			const worldX = parseInt(this.inputWorldX?.value, 10) || CONFIG.DEFAULT_ORIGIN_X;
 			const worldY = parseInt(this.inputWorldY?.value, 10) || CONFIG.DEFAULT_ORIGIN_Y;
 
@@ -153,7 +159,7 @@ export class SchemeModal {
 		});
 
 		// 💾 匯出 JSON 檔案 (採用極簡平鋪結構與單行元組格式)
-		const btnExportJson = document.getElementById('btn-export-json') || document.getElementById('btn-export');
+		const btnExportJson = document.getElementById('btn-export-json');
 		btnExportJson?.addEventListener('click', () => {
 			const compactObj = SchemeSerializer.serialize(this.state.scheme);
 			const formattedJsonStr = SchemeSerializer.stringifyFormatted(compactObj);
@@ -162,7 +168,7 @@ export class SchemeModal {
 		});
 
 		// 📂 匯入 JSON 檔案
-		const btnImportJson = document.getElementById('btn-import-json') || document.getElementById('btn-import');
+		const btnImportJson = document.getElementById('btn-import-json');
 		btnImportJson?.addEventListener('click', () => {
 			const fileInput = document.createElement('input');
 			fileInput.type = 'file';
@@ -178,7 +184,7 @@ export class SchemeModal {
 						this.processImportSchemeObj(rawObj);
 						ToastNotification.show(i18n.t('toast_scheme_imported') || '方案匯入成功！', 'success');
 					} catch (err) {
-						ToastNotification.show('讀取 JSON 檔案失敗，請檢查格式', 'error');
+						ToastNotification.show(i18n.t('toast_import_json_error'), 'error');
 					}
 				};
 				reader.readAsText(file);
@@ -195,7 +201,7 @@ export class SchemeModal {
 				await navigator.clipboard.writeText(jsonStr);
 				ToastNotification.show(i18n.t('toast_clipboard_exported') || '已成功將方案文字複製至剪貼簿！', 'success');
 			} catch (err) {
-				ToastNotification.show('複製至剪貼簿失敗，請檢查權限', 'error');
+				ToastNotification.show(i18n.t('toast_export_clipboard_error'), 'error');
 			}
 		});
 
@@ -296,106 +302,6 @@ export class SchemeModal {
 
 		this.renderSchemeList();
 		this.updateHeaderInfo();
-	}
-
-	/**
-	 * 將 scheme 轉換為極簡平鋪陣列 (Dense Flat Tuple List) 結構
-	 * d: [ [x, y, z, type, val], ... ]
-	 * type: 0 = 塊 (floor), 1 = 北牆 (north wall), 2 = 西牆 (west wall), 3 = 標籤 (label)
-	 */
-	static compactScheme(scheme) {
-		const paletteMap = {};
-		const paletteList = [];
-		if (scheme.palette) {
-			Object.entries(scheme.palette).forEach(([id, item], idx) => {
-				paletteMap[id] = idx;
-				paletteList.push({ n: item.name, c: item.color });
-			});
-		}
-
-		const denseTuples = [];
-		if (scheme.tiles) {
-			Object.entries(scheme.tiles).forEach(([key, tile]) => {
-				const [x, y, z] = key.split(',').map(Number);
-				if (tile.floorColorId !== undefined && paletteMap[tile.floorColorId] !== undefined) {
-					denseTuples.push([x, y, z, 0, paletteMap[tile.floorColorId]]);
-				}
-				if (tile.walls) {
-					if (tile.walls.north && paletteMap[tile.walls.north] !== undefined) {
-						denseTuples.push([x, y, z, 1, paletteMap[tile.walls.north]]);
-					}
-					if (tile.walls.west && paletteMap[tile.walls.west] !== undefined) {
-						denseTuples.push([x, y, z, 2, paletteMap[tile.walls.west]]);
-					}
-				}
-				if (tile.label) {
-					denseTuples.push([x, y, z, 3, tile.label]);
-				}
-			});
-		}
-
-		return {
-			n: scheme.name,
-			w: scheme.width,
-			h: scheme.height,
-			ox: scheme.worldOriginX || CONFIG.DEFAULT_ORIGIN_X,
-			oy: scheme.worldOriginY || CONFIG.DEFAULT_ORIGIN_Y,
-			p: paletteList,
-			d: denseTuples,
-		};
-	}
-
-	/**
-	 * 將極簡平鋪陣列 (Dense Flat Tuple List) 還原為標準 Scheme 結構 (相容舊版結構)
-	 */
-	static decompactScheme(compactObj) {
-		if (compactObj.tiles || compactObj.width) {
-			return compactObj; // 舊版 Full Scheme 相容
-		}
-
-		const palette = {};
-		const paletteIdMap = {};
-		if (Array.isArray(compactObj.p)) {
-			compactObj.p.forEach((item, idx) => {
-				const id = 'p_' + idx;
-				paletteIdMap[idx] = id;
-				palette[id] = { name: item.n, color: item.c };
-			});
-		} else if (compactObj.p) {
-			Object.assign(palette, compactObj.p);
-		}
-
-		const tiles = {};
-		if (Array.isArray(compactObj.d)) {
-			compactObj.d.forEach(tuple => {
-				const [x, y, z, type, val] = tuple;
-				const key = `${x},${y},${z}`;
-				if (!tiles[key]) tiles[key] = {};
-
-				if (type === 0) {
-					const colorId = paletteIdMap[val] !== undefined ? paletteIdMap[val] : val;
-					tiles[key].floorColorId = colorId;
-				} else if (type === 1 || type === 2) {
-					if (!tiles[key].walls) tiles[key].walls = {};
-					const colorId = paletteIdMap[val] !== undefined ? paletteIdMap[val] : val;
-					const wallEdge = type === 1 ? 'north' : 'west';
-					tiles[key].walls[wallEdge] = colorId;
-				} else if (type === 3) {
-					tiles[key].label = val;
-				}
-			});
-		}
-
-		return {
-			id: 'scheme_' + Date.now(),
-			name: compactObj.n || '匯入方案',
-			width: compactObj.w || CONFIG.DEFAULT_SCHEME_WIDTH,
-			height: compactObj.h || CONFIG.DEFAULT_SCHEME_HEIGHT,
-			worldOriginX: compactObj.ox || CONFIG.DEFAULT_ORIGIN_X,
-			worldOriginY: compactObj.oy || CONFIG.DEFAULT_ORIGIN_Y,
-			palette,
-			tiles,
-		};
 	}
 
 	setEditorToEditMode(schemeId) {
@@ -503,7 +409,7 @@ export class SchemeModal {
 					this.setEditorToEditMode(scheme.id);
 					this.renderSchemeList();
 					this.updateHeaderInfo();
-					ToastNotification.show(`已切換至方案: ${scheme.name}`, 'info');
+					ToastNotification.show(i18n.t('toast_scheme_switched', { name: scheme.name }), 'info');
 				});
 				actionsDiv.appendChild(btnSwitch);
 
@@ -511,7 +417,7 @@ export class SchemeModal {
 					const btnDel = document.createElement('button');
 					btnDel.className = 'btn btn-danger';
 					btnDel.textContent = '🗑️';
-					btnDel.title = i18n.t('modal_schemes_btn_delete_title', {}, 'zh') || '刪除方案';
+					btnDel.title = i18n.t('modal_schemes_btn_delete_title');
 					btnDel.addEventListener('click', async () => {
 						const confirmed = await ConfirmModal.show(i18n.t('modal_schemes_confirm_delete', { name: scheme.name }));
 						if (confirmed) {

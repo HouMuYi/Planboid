@@ -136,8 +136,9 @@ export class CanvasRenderer {
 	centerCamera() {
 		const sidebarWidth = this.getSidebarWidth();
 		const effectiveWidth = this.viewportWidth - sidebarWidth;
-		const scheme = this.state.scheme;
-		const z = this.state.currentZLevel;
+		const scheme = this.state ? this.state.scheme : null;
+		if (!scheme) return;
+		const z = this.state ? this.state.currentZLevel : 0;
 		const basePos = this.isoMath.gridToScreen(scheme.width / 2, scheme.height / 2, this.currentProgress);
 		const { dx, dy } = calcZTranslate(z, this.currentProgress);
 		this.cameraX = effectiveWidth / 2 - (basePos.x + dx) * this.zoom;
@@ -293,20 +294,6 @@ export class CanvasRenderer {
 		if (this.isAnimating || (this.dispatcher && this.dispatcher.isZoomAnimating)) {
 			this.scheduleTick();
 		}
-	}
-
-	desaturateHex(hex, factor = 0.7) {
-		if (!hex || hex.length < 7) return '#64748b';
-		let r = parseInt(hex.substring(1, 3), 16);
-		let g = parseInt(hex.substring(3, 5), 16);
-		let b = parseInt(hex.substring(5, 7), 16);
-
-		const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-		r = Math.round(r + (gray - r) * factor);
-		g = Math.round(g + (gray - g) * factor);
-		b = Math.round(b + (gray - b) * factor);
-
-		return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 	}
 
 	renderAll() {
@@ -468,6 +455,13 @@ export class CanvasRenderer {
 				}
 			});
 
+			// Pass 1.5: 地塊物件 (Floor Objects)
+			items.forEach(({ x, y, tile }) => {
+				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
+					GeometryPipeline.drawFloorObjects(ctx, this.isoMath, x, y, tile.floorObjects, palette, this.zoom, this.currentProgress);
+				}
+			});
+
 			// Pass 2: 牆體
 			items.forEach(({ x, y, tile }) => {
 				if (tile.walls) {
@@ -479,6 +473,21 @@ export class CanvasRenderer {
 								this.drawWallQuad96px(ctx, x, y, edge, finalColor, CONFIG.WALL_FILL_ALPHA);
 							} else {
 								this.drawWallLine2D(ctx, x, y, edge, finalColor);
+							}
+						}
+					});
+				}
+			});
+
+			// Pass 2.5: 牆面物件 (Wall Objects)
+			items.forEach(({ x, y, tile }) => {
+				if (tile.wallObjects) {
+					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
+						if (Array.isArray(objArray) && objArray.length > 0) {
+							if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
+								GeometryPipeline.drawWallObjects3D(ctx, this.isoMath, x, y, edge, objArray, palette, this.zoom, this.currentProgress);
+							} else {
+								GeometryPipeline.drawWallObjects2D(ctx, this.isoMath, x, y, edge, objArray, palette, this.zoom, this.currentProgress);
 							}
 						}
 					});
