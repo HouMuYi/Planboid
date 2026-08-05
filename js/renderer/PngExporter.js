@@ -101,51 +101,46 @@ export class PngExporter {
 		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, stateManager.otherFloorsMode);
 
 		layers.forEach(layer => {
-			const { z, isCurrent, alpha, desatFactor, items } = layer;
+			const { z, isCurrent, alpha, desatFactor } = layer;
 			const { dx, dy } = calcZTranslate(z, currentProgress);
 
 			ctx.save();
 			ctx.translate(dx, dy);
 			ctx.globalAlpha = alpha;
 
-			// Pass 1: Floor Polygons
-			items.forEach(({ x, y, tile }) => {
-				if (tile.floorColorId && palette[tile.floorColorId]) {
-					const rawColor = palette[tile.floorColorId].color;
+			GeometryPipeline.traverseLayerPasses(layer, palette, {
+				onFloor: (x, y, floorColorId) => {
+					const rawColor = palette[floorColorId].color;
 					const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
 
 					ctx.save();
 					ctx.globalAlpha = alpha;
 					GeometryPipeline.drawTilePoly(ctx, isoMath, x, y, finalColor, currentProgress);
 					ctx.restore();
-				}
-			});
-
-			// Pass 2: Wall Quads & Lines
-			items.forEach(({ x, y, tile }) => {
-				if (tile.walls) {
-					Object.entries(tile.walls).forEach(([edge, colorId]) => {
-						if (colorId && palette[colorId]) {
-							const rawColor = palette[colorId].color;
-							const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
-							if (stateManager.is3DWallsEnabled && currentProgress > 0) {
-								GeometryPipeline.drawWallQuad96px(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress, CONFIG.WALL_FILL_ALPHA);
-							} else {
-								GeometryPipeline.drawWallLine2D(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress);
-							}
-						}
-					});
-				}
-			});
-
-			// Pass 3: Labels
-			if (isCurrent) {
-				items.forEach(({ x, y, tile }) => {
-					if (tile.label) {
-						GeometryPipeline.drawTileText(ctx, isoMath, x, y, tile.label, fit.zoom, currentProgress);
+				},
+				onFloorObjects: (x, y, objArray) => {
+					GeometryPipeline.drawFloorObjects(ctx, isoMath, x, y, objArray, palette, fit.zoom, currentProgress);
+				},
+				onWall: (x, y, edge, colorId) => {
+					const rawColor = palette[colorId].color;
+					const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
+					if (stateManager.is3DWallsEnabled && currentProgress > 0) {
+						GeometryPipeline.drawWallQuad96px(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress, CONFIG.WALL_FILL_ALPHA);
+					} else {
+						GeometryPipeline.drawWallLine2D(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress);
 					}
-				});
-			}
+				},
+				onWallObjects: (x, y, edge, objArray) => {
+					if (stateManager.is3DWallsEnabled && currentProgress > 0) {
+						GeometryPipeline.drawWallObjects3D(ctx, isoMath, x, y, edge, objArray, palette, fit.zoom, currentProgress);
+					} else {
+						GeometryPipeline.drawWallObjects2D(ctx, isoMath, x, y, edge, objArray, palette, fit.zoom, currentProgress);
+					}
+				},
+				onLabel: (x, y, label) => {
+					GeometryPipeline.drawTileText(ctx, isoMath, x, y, label, fit.zoom, currentProgress);
+				},
+			});
 
 			ctx.restore();
 		});
@@ -173,7 +168,7 @@ export class PngExporter {
 			}
 
 			ctx.fillStyle = '#a5b4fc';
-			ctx.font = 'bold 14px Inter, sans-serif';
+			ctx.font = `bold 14px ${CONFIG.FONT_SANS}`;
 			ctx.textBaseline = 'middle';
 			ctx.fillText(title, legendX + 18, legendY + 24);
 
@@ -203,7 +198,7 @@ export class PngExporter {
 
 				// 冒號與名稱
 				ctx.fillStyle = '#e2e8f0';
-				ctx.font = '600 13px Inter, sans-serif';
+				ctx.font = `600 13px ${CONFIG.FONT_SANS}`;
 				ctx.fillText(`: ${item.name}`, legendX + 18 + swWidth + 10, itemY);
 			});
 		}

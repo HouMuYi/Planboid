@@ -105,6 +105,7 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'modal_confirm_ok': 'Confirm Delete',
 	'modal_confirm_title': '⚠️ Action Confirmation',
 	'prompt_import_text_placeholder': '{ "n": "..." }',
+	'prompt_import_text_title': 'Please paste or enter scheme text string:',
 
 	'modal_palette_title_edit': 'Edit Palette Item',
 	'modal_palette_title_add': 'Add Swatch',

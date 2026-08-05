@@ -35,7 +35,21 @@ export const CONFIG = Object.freeze({
 	COLOR_GRID_NORMAL: 'rgba(255, 255, 255, 0.08)', // 畫布輔助網格線顏色
 	COLOR_GRID_BOUNDS: 'rgba(99, 102, 241, 0.5)', // 地塊外框邊界網格線顏色
 	WALL_FILL_ALPHA: 0.6, // 3D 牆面面片基礎不透明度
+	// 鬼影層配置
 	GHOST_BASE_ALPHA: 0.4, // 相隔 1 層鬼影之基礎不透明度
 	GHOST_ALPHA_DECAY: 0.75, // 鬼影跨層不透明度衰減率 (每多相隔 1 層)
 	GHOST_SATURATION_DECAY: 0.8, // 鬼影跨層彩度/飽和度留存率 (每多相隔 1 層)
+
+	// 物件色票與標籤統一視覺配置
+	OBJECT_PANEL_BG: 'rgba(15, 23, 42, 0.15)', // 物件面板半透明背景色
+	OBJECT_TEXT_COLOR: '#000000', // 物件文字主要填充顏色
+	OBJECT_STROKE_COLOR: '#ffffff', // 物件文字描邊/白邊顏色
+	OBJECT_STROKE_WIDTH: 1, // 物件文字描邊/白邊粗細 (px)
+	OBJECT_FONT_RATIO: 0.4, // 物件文字大小相對於面板尺寸之比例
+	OBJECT_FONT_MIN: 8, // 物件文字小尺寸保底下限 (px)
+
+	// 全站標準字型配置
+	FONT_SANS: '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Microsoft YaHei", "微軟雅黑", sans-serif',
+	FONT_SERIF: '"Noto Serif TC", "Songti TC", "PMingLiU", "新細明體", "Songti SC", "SimSun", "宋體", serif',
+	FONT_MONO: '"Ubuntu Mono", Consolas, Menlo, Monaco, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Microsoft YaHei", "微軟雅黑", monospace',
 });

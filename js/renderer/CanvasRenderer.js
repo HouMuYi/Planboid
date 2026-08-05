@@ -439,69 +439,42 @@ export class CanvasRenderer {
 		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, this.state.otherFloorsMode);
 
 		layers.forEach(layer => {
-			const { z, isCurrent, alpha, desatFactor, items } = layer;
+			const { z, isCurrent, alpha, desatFactor } = layer;
 			const { dx, dy } = calcZTranslate(z, this.currentProgress);
 
 			ctx.save();
 			ctx.translate(dx, dy);
 			ctx.globalAlpha = alpha;
 
-			// Pass 1: 地塊多邊形
-			items.forEach(({ x, y, tile }) => {
-				if (tile.floorColorId && palette[tile.floorColorId]) {
-					const rawColor = palette[tile.floorColorId].color;
+			GeometryPipeline.traverseLayerPasses(layer, palette, {
+				onFloor: (x, y, floorColorId) => {
+					const rawColor = palette[floorColorId].color;
 					const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
 					this.drawTilePoly(ctx, x, y, finalColor);
-				}
-			});
-
-			// Pass 1.5: 地塊物件 (Floor Objects)
-			items.forEach(({ x, y, tile }) => {
-				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
-					GeometryPipeline.drawFloorObjects(ctx, this.isoMath, x, y, tile.floorObjects, palette, this.zoom, this.currentProgress);
-				}
-			});
-
-			// Pass 2: 牆體
-			items.forEach(({ x, y, tile }) => {
-				if (tile.walls) {
-					Object.entries(tile.walls).forEach(([edge, colorId]) => {
-						if (colorId && palette[colorId]) {
-							const rawColor = palette[colorId].color;
-							const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
-							if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
-								this.drawWallQuad96px(ctx, x, y, edge, finalColor, CONFIG.WALL_FILL_ALPHA);
-							} else {
-								this.drawWallLine2D(ctx, x, y, edge, finalColor);
-							}
-						}
-					});
-				}
-			});
-
-			// Pass 2.5: 牆面物件 (Wall Objects)
-			items.forEach(({ x, y, tile }) => {
-				if (tile.wallObjects) {
-					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
-						if (Array.isArray(objArray) && objArray.length > 0) {
-							if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
-								GeometryPipeline.drawWallObjects3D(ctx, this.isoMath, x, y, edge, objArray, palette, this.zoom, this.currentProgress);
-							} else {
-								GeometryPipeline.drawWallObjects2D(ctx, this.isoMath, x, y, edge, objArray, palette, this.zoom, this.currentProgress);
-							}
-						}
-					});
-				}
-			});
-
-			// Pass 3: 文字標籤
-			if (isCurrent) {
-				items.forEach(({ x, y, tile }) => {
-					if (tile.label) {
-						this.drawTileText(ctx, x, y, tile.label);
+				},
+				onFloorObjects: (x, y, objArray) => {
+					GeometryPipeline.drawFloorObjects(ctx, this.isoMath, x, y, objArray, palette, this.zoom, this.currentProgress);
+				},
+				onWall: (x, y, edge, colorId) => {
+					const rawColor = palette[colorId].color;
+					const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
+					if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
+						this.drawWallQuad96px(ctx, x, y, edge, finalColor, CONFIG.WALL_FILL_ALPHA);
+					} else {
+						this.drawWallLine2D(ctx, x, y, edge, finalColor);
 					}
-				});
-			}
+				},
+				onWallObjects: (x, y, edge, objArray) => {
+					if (this.state.is3DWallsEnabled && this.currentProgress > 0) {
+						GeometryPipeline.drawWallObjects3D(ctx, this.isoMath, x, y, edge, objArray, palette, this.zoom, this.currentProgress);
+					} else {
+						GeometryPipeline.drawWallObjects2D(ctx, this.isoMath, x, y, edge, objArray, palette, this.zoom, this.currentProgress);
+					}
+				},
+				onLabel: (x, y, label) => {
+					this.drawTileText(ctx, x, y, label);
+				},
+			});
 
 			ctx.restore();
 		});

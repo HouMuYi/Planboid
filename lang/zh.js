@@ -42,8 +42,8 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'toolbar_btn_redo_title': '重做（Ctrl+Y）',
 	'toolbar_btn_cancel_op_title': '中斷操作（Esc）',
 
-	'viewport_view_iso': '菱形（2:1）',
-	'viewport_view_iso_title': '2:1 菱形視角',
+	'viewport_view_iso': '等軸測（2:1）',
+	'viewport_view_iso_title': '2:1 等軸測視角',
 	'viewport_view_ortho': '正交（1:1）',
 	'viewport_view_ortho_title': '1:1 正交視角',
 	'viewport_toggle_3d_walls': '立體牆面',
@@ -61,7 +61,7 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'sidebar_floor_up_title': '▲ 上層（Z）',
 	'sidebar_floor_down': '▼ 下層',
 	'sidebar_floor_down_title': '▼ 下層（X）',
-	'sidebar_other_floors_label': '其他樓層顯示',
+	'sidebar_other_floors_label': '其他樓層顯示：',
 	'sidebar_other_floors_hidden': '隱藏',
 	'sidebar_other_floors_hidden_title': '隱藏其他所有樓層',
 	'sidebar_other_floors_ghost': '虛影',
@@ -105,6 +105,7 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'modal_confirm_ok': '確定刪除',
 	'modal_confirm_title': '⚠️ 操作確認',
 	'prompt_import_text_placeholder': '{ "n": "..." }',
+	'prompt_import_text_title': '請貼上或輸入方案文字內容：',
 
 	'modal_palette_title_edit': '編輯色塊',
 	'modal_palette_title_add': '新增色塊',

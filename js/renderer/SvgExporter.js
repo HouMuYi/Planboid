@@ -3,6 +3,7 @@
  * 架構原則：按樓層分組 <g> 統一套用 transform 偏移，子元素使用純邏輯座標。
  */
 
+import { CONFIG } from '../core/Config.js';
 import { Utils } from '../core/Utils.js';
 import { ExportCanvasPipeline } from './ExportCanvasPipeline.js';
 import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
@@ -55,46 +56,38 @@ export class SvgExporter {
 		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, otherFloorsMode);
 
 		layers.forEach(layer => {
-			const { z, isCurrent, alpha, items } = layer;
+			const { z, alpha } = layer;
 			const { dx, dy } = calcZTranslate(z, 1.0);
 
 			svgContent += `<g id="layer-z${z}" data-z="${z}" transform="translate(${dx}, ${dy})" opacity="${alpha}">\n`;
 
-			// Pass 1: 地塊多邊形
-			items.forEach(({ x, y, tile }) => {
-				if (tile.floorColorId && palette[tile.floorColorId]) {
-					const color = palette[tile.floorColorId].color;
-					const safeColorId = ExportCanvasPipeline.escapeXml(tile.floorColorId);
+			GeometryPipeline.traverseLayerPasses(layer, palette, {
+				onFloor: (x, y, floorColorId) => {
+					const color = palette[floorColorId].color;
+					const safeColorId = ExportCanvasPipeline.escapeXml(floorColorId);
 					const [p0, p1, p2, p3] = GeometryPipeline.getTilePolyPoints(isoMath, x, y, 1.0);
 					svgContent +=
 						`<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="floor" data-color-id="${safeColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${color}" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />\n`;
-				}
+				},
+				onFloorObjects: (x, y, objArray) => {
+					svgContent += GeometryPipeline.getFloorObjectsSvgElements(isoMath, x, y, z, objArray, palette);
+				},
+				onWall: (x, y, edge, colorId) => {
+					const color = palette[colorId].color;
+					const safeColorId = ExportCanvasPipeline.escapeXml(colorId);
+					svgContent += GeometryPipeline.getWallSvgElements(isoMath, x, y, z, edge, safeColorId, color);
+				},
+				onWallObjects: (x, y, edge, objArray) => {
+					svgContent += GeometryPipeline.getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette);
+				},
+				onLabel: (x, y, label) => {
+					const center = isoMath.gridToScreen(x + 0.5, y + 0.5, 1.0);
+					const safeLabel = ExportCanvasPipeline.escapeXml(label);
+					const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
+					svgContent +=
+						`<text data-x="${x}" data-y="${y}" data-z="${z}" data-type="label" x="${center.x}" y="${center.y}" fill="#ffffff" font-size="13" font-family="${safeFont}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${safeLabel}</text>\n`;
+				},
 			});
-
-			// Pass 2: 牆面面片 (呼叫 GeometryPipeline 權威 SVG 標籤管道)
-			items.forEach(({ x, y, tile }) => {
-				if (tile.walls) {
-					Object.entries(tile.walls).forEach(([edge, colorId]) => {
-						if (colorId && palette[colorId]) {
-							const color = palette[colorId].color;
-							const safeColorId = ExportCanvasPipeline.escapeXml(colorId);
-							svgContent += GeometryPipeline.getWallSvgElements(isoMath, x, y, z, edge, safeColorId, color);
-						}
-					});
-				}
-			});
-
-			// Pass 3: 文字標籤 (僅當前樓層)
-			if (isCurrent) {
-				items.forEach(({ x, y, tile }) => {
-					if (tile.label) {
-						const center = isoMath.gridToScreen(x + 0.5, y + 0.5, 1.0);
-						const safeLabel = ExportCanvasPipeline.escapeXml(tile.label);
-						svgContent +=
-							`<text data-x="${x}" data-y="${y}" data-z="${z}" data-type="label" x="${center.x}" y="${center.y}" fill="#ffffff" font-size="13" font-family="Inter, sans-serif" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${safeLabel}</text>\n`;
-					}
-				});
-			}
 
 			svgContent += `</g>\n`;
 		});
@@ -106,6 +99,7 @@ export class SvgExporter {
 		if (legendData) {
 			const { x: legX, y: legY, width: legWidth, height: legHeight, swWidth, swHeight, itemHeight, headerHeight, title, items } = legendData;
 			const safeTitle = ExportCanvasPipeline.escapeXml(title);
+			const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
 
 			const actualLegX = viewBoxX + legX;
 			const actualLegY = viewBoxY + legY;
@@ -113,7 +107,7 @@ export class SvgExporter {
 			svgContent += `<g id="planboid-legend-layer" transform="translate(${actualLegX}, ${actualLegY})">\n`;
 			svgContent +=
 				`<rect width="${legWidth}" height="${legHeight}" fill="rgba(17, 24, 39, 0.92)" stroke="rgba(255, 255, 255, 0.18)" stroke-width="1.2" rx="10" ry="10" />\n`;
-			svgContent += `<text x="18" y="28" fill="#a5b4fc" font-size="14" font-family="Inter, sans-serif" font-weight="bold">${safeTitle}</text>\n`;
+			svgContent += `<text x="18" y="28" fill="#a5b4fc" font-size="14" font-family="${safeFont}" font-weight="bold">${safeTitle}</text>\n`;
 			svgContent += `<line x1="18" y1="38" x2="${legWidth - 18}" y2="38" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />\n`;
 
 			items.forEach(item => {
@@ -124,7 +118,7 @@ export class SvgExporter {
 				}" width="${swWidth}" height="${swHeight}" fill="${item.color}" rx="3" ry="3" stroke="rgba(255,255,255,0.25)" stroke-width="1" />\n`;
 				svgContent += `<text x="${
 					18 + swWidth + 10
-				}" y="${itemY}" fill="#e2e8f0" font-size="13" font-family="Inter, sans-serif" font-weight="600">: ${safeName}</text>\n`;
+				}" y="${itemY}" fill="#e2e8f0" font-size="13" font-family="${safeFont}" font-weight="600">: ${safeName}</text>\n`;
 			});
 
 			svgContent += `</g>\n`;

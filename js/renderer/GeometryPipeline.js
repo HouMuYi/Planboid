@@ -164,6 +164,67 @@ export class GeometryPipeline {
 	}
 
 	/**
+	 * 統一層級 Pass 遍歷器：供 CanvasRenderer、PngExporter 與 SvgExporter 共享 Pass 1~3 的遍歷順序
+	 */
+	static traverseLayerPasses(layer, palette, callbacks = {}) {
+		const { isCurrent, items } = layer;
+		const { onFloor, onFloorObjects, onWall, onWallObjects, onLabel } = callbacks;
+
+		// Pass 1: 地塊多邊形
+		if (onFloor) {
+			items.forEach(({ x, y, tile }) => {
+				if (tile.floorColorId && palette[tile.floorColorId]) {
+					onFloor(x, y, tile.floorColorId, tile);
+				}
+			});
+		}
+
+		// Pass 1.5: 地塊物件 (Floor Objects)
+		if (onFloorObjects) {
+			items.forEach(({ x, y, tile }) => {
+				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
+					onFloorObjects(x, y, tile.floorObjects, tile);
+				}
+			});
+		}
+
+		// Pass 2: 牆面面片與邊線
+		if (onWall) {
+			items.forEach(({ x, y, tile }) => {
+				if (tile.walls) {
+					Object.entries(tile.walls).forEach(([edge, colorId]) => {
+						if (colorId && palette[colorId]) {
+							onWall(x, y, edge, colorId, tile);
+						}
+					});
+				}
+			});
+		}
+
+		// Pass 2.5: 牆面物件 (Wall Objects)
+		if (onWallObjects) {
+			items.forEach(({ x, y, tile }) => {
+				if (tile.wallObjects) {
+					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
+						if (Array.isArray(objArray) && objArray.length > 0) {
+							onWallObjects(x, y, edge, objArray, tile);
+						}
+					});
+				}
+			});
+		}
+
+		// Pass 3: 文字標籤 (僅當前樓層)
+		if (onLabel && isCurrent) {
+			items.forEach(({ x, y, tile }) => {
+				if (tile.label) {
+					onLabel(x, y, tile.label, tile);
+				}
+			});
+		}
+	}
+
+	/**
 	 * 計算能夠在指定 Viewport 下「恰恰好包覆全畫布與所有樓層地塊」的最佳 Camera X, Y 與 Zoom
 	 */
 	static calculateFitCameraPos(
@@ -408,7 +469,7 @@ export class GeometryPipeline {
 
 		ctx.save();
 		ctx.fillStyle = '#ffffff';
-		ctx.font = `bold ${Math.max(10, 12 / zoom)}px Inter, sans-serif`;
+		ctx.font = `bold ${Math.max(10, 12 / zoom)}px ${CONFIG.FONT_SANS}`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
 		ctx.shadowColor = 'rgba(0,0,0,0.9)';
@@ -468,6 +529,27 @@ export class GeometryPipeline {
 	}
 
 	/**
+	 * 統一物件面板文字與描邊繪製管道 (全模式共用 CONFIG.OBJECT_* 常數配置)
+	 */
+	static drawObjectTextLabel(ctx, text, px, py, boxSize) {
+		if (!text) return;
+		const rawName = String(text).substring(0, 2);
+		if (!rawName) return;
+
+		const fontSize = Math.max(CONFIG.OBJECT_FONT_MIN, boxSize * CONFIG.OBJECT_FONT_RATIO);
+		ctx.font = `bold ${fontSize}px ${CONFIG.FONT_SANS}`;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+
+		ctx.strokeStyle = CONFIG.OBJECT_STROKE_COLOR;
+		ctx.lineWidth = CONFIG.OBJECT_STROKE_WIDTH;
+		ctx.strokeText(rawName, px, py);
+
+		ctx.fillStyle = CONFIG.OBJECT_TEXT_COLOR;
+		ctx.fillText(rawName, px, py);
+	}
+
+	/**
 	 * 權威地塊物件繪製 (支援多重疊加、微縮小與階梯偏移，黑字白邊，精確 ISO 圓角菱形)
 	 */
 	static drawFloorObjects(ctx, isoMath, x, y, objArray, palette, zoom, currentProgress = 1.0) {
@@ -508,34 +590,22 @@ export class GeometryPipeline {
 			ctx.save();
 			ctx.strokeStyle = item.color;
 			ctx.lineWidth = 2.5 / zoom;
-			ctx.fillStyle = 'rgba(15, 23, 42, 0.15)';
+			ctx.fillStyle = CONFIG.OBJECT_PANEL_BG;
 
 			// 使用 2:1 ISO 仿射圓角多邊形算術
 			this.drawIsoRoundedPolygon(ctx, [p0, p1, p2, p3], 0.15);
 			ctx.fill();
 			ctx.stroke();
 
-			const name = (item.name || '').substring(0, 2);
-			if (name) {
-				const fontSize = Math.max(8, (CONFIG.TILE_SIZE * 0.35 * scale));
-				ctx.font = `bold ${fontSize}px Inter, "Noto Sans TC", sans-serif`;
-				ctx.textAlign = 'center';
-				ctx.textBaseline = 'middle';
-
-				ctx.strokeStyle = '#ffffff';
-				ctx.lineWidth = 3;
-				ctx.strokeText(name, px, py);
-
-				ctx.fillStyle = '#000000';
-				ctx.fillText(name, px, py);
-			}
+			const sideLength = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+			this.drawObjectTextLabel(ctx, item.name, px, py, sideLength);
 
 			ctx.restore();
 		});
 	}
 
 	/**
-	 * 權威 2D 牆面物件繪製 (斷線嵌入式，圓角矩形，去除死白背景)
+	 * 權威 2D 牆面物件繪製 (斷線嵌入式，正方形圓角，去除死白背景)
 	 */
 	static drawWallObjects2D(ctx, isoMath, x, y, edge, objArray, palette, zoom, currentProgress = 0) {
 		if (!Array.isArray(objArray) || objArray.length === 0) return;
@@ -574,35 +644,26 @@ export class GeometryPipeline {
 			const px = cx + shiftX;
 			const py = cy + shiftY;
 
-			const name = (item.name || '').substring(0, 2);
-			const boxW = Math.max(16, (CONFIG.TILE_SIZE * 0.4)) * baseScale;
-			const boxH = Math.max(12, (CONFIG.TILE_SIZE * 0.3)) * baseScale;
+			const boxSize = Math.max(16, (CONFIG.TILE_SIZE * 0.75)) * baseScale;
 
 			ctx.save();
-			ctx.fillStyle = 'rgba(15, 23, 42, 0.15)';
+			ctx.fillStyle = CONFIG.OBJECT_PANEL_BG;
 			ctx.strokeStyle = item.color;
 			ctx.lineWidth = 2 / zoom;
 
 			ctx.beginPath();
-			ctx.roundRect(px - boxW / 2, py - boxH / 2, boxW, boxH, 4);
+			ctx.roundRect(px - boxSize / 2, py - boxSize / 2, boxSize, boxSize, 4);
 			ctx.fill();
 			ctx.stroke();
 
-			if (name) {
-				const fontSize = Math.max(8, boxH * 0.7);
-				ctx.font = `bold ${fontSize}px Inter, "Noto Sans TC", sans-serif`;
-				ctx.textAlign = 'center';
-				ctx.textBaseline = 'middle';
-				ctx.fillStyle = '#000000';
-				ctx.fillText(name, px, py);
-			}
+			this.drawObjectTextLabel(ctx, item.name, px, py, boxSize);
 
 			ctx.restore();
 		});
 	}
 
 	/**
-	 * 權威 3D 牆面物件繪製 (立於牆面的正方形圓角面板，無死白背景)
+	 * 權威 3D 牆面物件繪製 (立於牆面的正方形圓角面板，四邊長度完全相等呈正菱形)
 	 */
 	static drawWallObjects3D(ctx, isoMath, x, y, edge, objArray, palette, zoom, currentProgress = 1.0) {
 		if (!Array.isArray(objArray) || objArray.length === 0) return;
@@ -619,8 +680,8 @@ export class GeometryPipeline {
 		// 底邊方向半向量 (平行於牆面)
 		const dirX = (b1.x - b0.x) / 2;
 		const dirY = (b1.y - b0.y) / 2;
-		// 正方形面板高度 (與 3D 底邊長度一致，呈現 1:1 正方形立面)
-		const halfUp = Math.hypot(dirX, dirY) * 0.85;
+		// 正方形面板高度 (與底邊半向量長度完全一致，保證四邊長度完全相等呈正菱形)
+		const halfUp = Math.hypot(dirX, dirY);
 
 		// 依疊加總數決定基礎縮放（疊加越多，全體縮越小）
 		const baseScale = Math.max(0.4, 0.75 - Math.max(0, total - 1) * 0.06);
@@ -648,7 +709,7 @@ export class GeometryPipeline {
 			const p3 = { x: px - dx, y: py - dy - dh };
 
 			ctx.save();
-			ctx.fillStyle = 'rgba(15, 23, 42, 0.15)';
+			ctx.fillStyle = CONFIG.OBJECT_PANEL_BG;
 			ctx.strokeStyle = item.color;
 			ctx.lineWidth = 2.5 / zoom;
 
@@ -657,22 +718,117 @@ export class GeometryPipeline {
 			ctx.fill();
 			ctx.stroke();
 
-			const name = (item.name || '').substring(0, 2);
-			if (name) {
-				const fontSize = Math.max(8, CONFIG.TILE_SIZE * 0.3 * baseScale);
-				ctx.font = `bold ${fontSize}px Inter, "Noto Sans TC", sans-serif`;
-				ctx.textAlign = 'center';
-				ctx.textBaseline = 'middle';
-
-				ctx.strokeStyle = '#ffffff';
-				ctx.lineWidth = 2.5;
-				ctx.strokeText(name, px, py);
-
-				ctx.fillStyle = '#000000';
-				ctx.fillText(name, px, py);
-			}
+			const boxSize = dh * 2;
+			this.drawObjectTextLabel(ctx, item.name, px, py, boxSize);
 
 			ctx.restore();
 		});
+	}
+
+	/**
+	 * 權威地塊物件 SVG 向量標籤生成管道 (SVG 匯出專用)
+	 */
+	static getFloorObjectsSvgElements(isoMath, x, y, z, objArray, palette) {
+		if (!Array.isArray(objArray) || objArray.length === 0) return '';
+
+		const points = this.getTilePolyPoints(isoMath, x, y, 1.0);
+		const cx = (points[0].x + points[2].x) / 2;
+		const cy = (points[0].y + points[2].y) / 2;
+		const total = objArray.length;
+
+		const halfW = Math.abs(points[1].x - points[3].x) / 2;
+		const halfH = Math.abs(points[2].y - points[0].y) / 2;
+
+		const baseScale = Math.max(0.5, 0.95 - Math.max(0, total - 1) * 0.06);
+		const stepRatio = 0.08;
+		const stepX = halfW * stepRatio;
+		const stepY = halfH * stepRatio;
+
+		let str = '';
+		objArray.forEach((objId, idx) => {
+			const item = palette[objId];
+			if (!item || !item.color) return;
+
+			const shiftX = (idx - (total - 1) / 2) * stepX;
+			const shiftY = (idx - (total - 1) / 2) * stepY;
+			const px = cx + shiftX;
+			const py = cy + shiftY;
+
+			const p0 = { x: px + (points[0].x - cx) * baseScale, y: py + (points[0].y - cy) * baseScale };
+			const p1 = { x: px + (points[1].x - cx) * baseScale, y: py + (points[1].y - cy) * baseScale };
+			const p2 = { x: px + (points[2].x - cx) * baseScale, y: py + (points[2].y - cy) * baseScale };
+			const p3 = { x: px + (points[3].x - cx) * baseScale, y: py + (points[3].y - cy) * baseScale };
+
+			const safeColorId = String(objId).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+			const rawName = (item.name || '').substring(0, 2);
+			const safeName = String(rawName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="floor-object" data-color-id="${safeColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
+			if (safeName) {
+				const sideLength = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+				const fontSize = Math.max(CONFIG.OBJECT_FONT_MIN, sideLength * CONFIG.OBJECT_FONT_RATIO);
+				const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
+				str += `<text x="${px}" y="${py}" fill="${CONFIG.OBJECT_TEXT_COLOR}" stroke="${CONFIG.OBJECT_STROKE_COLOR}" stroke-width="${CONFIG.OBJECT_STROKE_WIDTH}" font-size="${fontSize}" font-family="${safeFont}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${safeName}</text>\n`;
+			}
+		});
+
+		return str;
+	}
+
+	/**
+	 * 權威牆面物件 SVG 向量標籤生成管道 (SVG 匯出專用)
+	 */
+	static getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette) {
+		if (!Array.isArray(objArray) || objArray.length === 0) return '';
+
+		const quad = this.getWallQuad96Points(isoMath, x, y, edge, 1.0);
+		if (!quad) return '';
+
+		const [b0, b1, t1, t0] = quad;
+		const cx = (b0.x + b1.x + t1.x + t0.x) / 4;
+		const cy = (b0.y + b1.y + t1.y + t0.y) / 4 - (CONFIG.TILE_SIZE * 0.15);
+		const total = objArray.length;
+
+		const dirX = (b1.x - b0.x) / 2;
+		const dirY = (b1.y - b0.y) / 2;
+		const halfUp = Math.hypot(dirX, dirY);
+
+		const baseScale = Math.max(0.4, 0.75 - Math.max(0, total - 1) * 0.06);
+		const stepX = dirX * 0.15;
+		const stepY = Math.abs(dirY) * 0.15;
+
+		let str = '';
+		objArray.forEach((objId, idx) => {
+			const item = palette[objId];
+			if (!item || !item.color) return;
+
+			const shiftX = (idx - (total - 1) / 2) * stepX;
+			const shiftY = (idx - (total - 1) / 2) * stepY;
+			const px = cx + shiftX;
+			const py = cy + shiftY;
+
+			const dx = dirX * baseScale;
+			const dy = dirY * baseScale;
+			const dh = halfUp * baseScale;
+
+			const p0 = { x: px - dx, y: py - dy + dh };
+			const p1 = { x: px + dx, y: py + dy + dh };
+			const p2 = { x: px + dx, y: py + dy - dh };
+			const p3 = { x: px - dx, y: py - dy - dh };
+
+			const safeColorId = String(objId).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+			const rawName = (item.name || '').substring(0, 2);
+			const safeName = String(rawName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall-object" data-edge="${edge}" data-color-id="${safeColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
+			if (safeName) {
+				const boxSize = dh * 2;
+				const fontSize = Math.max(CONFIG.OBJECT_FONT_MIN, boxSize * CONFIG.OBJECT_FONT_RATIO);
+				const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
+				str += `<text x="${px}" y="${py}" fill="${CONFIG.OBJECT_TEXT_COLOR}" stroke="${CONFIG.OBJECT_STROKE_COLOR}" stroke-width="${CONFIG.OBJECT_STROKE_WIDTH}" font-size="${fontSize}" font-family="${safeFont}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${safeName}</text>\n`;
+			}
+		});
+
+		return str;
 	}
 }
