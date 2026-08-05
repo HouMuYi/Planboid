@@ -251,4 +251,91 @@ export class SchemeSerializer {
 			compactObj.w || CONFIG.DEFAULT_SCHEME_WIDTH
 		},\n  "h": ${compactObj.h || CONFIG.DEFAULT_SCHEME_HEIGHT},\n  "ox": ${compactObj.ox ?? CONFIG.DEFAULT_ORIGIN_X},\n  "oy": ${compactObj.oy ?? CONFIG.DEFAULT_ORIGIN_Y},\n  "p": ${pStr},\n  "d": ${dStr}\n}`;
 	}
+
+	/**
+	 * 將 Scheme 物件高倍率無損壓縮為前綴 Base64 字串 ("PZB1:...")
+	 * 採用原生 CompressionStream (deflate-raw)，體積可暴減 85% ~ 95%
+	 * @param {Object} scheme
+	 * @returns {Promise<string>} PZB1: 前綴壓縮 Base64 字串
+	 */
+	static async compressToString(scheme) {
+		const compactObj = this.serialize(scheme);
+		if (!compactObj) return '';
+		const jsonStr = JSON.stringify(compactObj);
+
+		try {
+			if (typeof window !== 'undefined' && 'CompressionStream' in window) {
+				const encoder = new TextEncoder();
+				const data = encoder.encode(jsonStr);
+				const cs = new CompressionStream('deflate-raw');
+				const writer = cs.writable.getWriter();
+				writer.write(data);
+				writer.close();
+
+				const compressedBuffer = await new Response(cs.readable).arrayBuffer();
+				const bytes = new Uint8Array(compressedBuffer);
+
+				let binaryStr = '';
+				const chunkSize = 0x8000; // 32KB 分塊拼接，防止 Call Stack 溢位
+				for (let i = 0; i < bytes.length; i += chunkSize) {
+					binaryStr += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+				}
+				const base64 = btoa(binaryStr);
+				return 'PZB1:' + base64;
+			}
+		} catch (e) {
+			console.warn('[SchemeSerializer] CompressionStream 壓縮失敗，自動降級為明文 JSON:', e);
+		}
+		return jsonStr;
+	}
+
+	/**
+	 * 權威向下相容解碼器：支援新版 PZB1: 壓縮字串、舊版無壓縮明文 JSON 與原始物件
+	 * @param {string|Object} rawInput
+	 * @returns {Promise<Object>} 還原 Scheme 領域模型
+	 */
+	static async decompressFromString(rawInput) {
+		if (!rawInput) throw new Error('無效的方案資料輸入');
+
+		if (typeof rawInput === 'object' && rawInput !== null) {
+			return this.deserialize(rawInput);
+		}
+
+		const str = String(rawInput).trim();
+		if (!str) throw new Error('空白方案字串');
+
+		// 1. 新版 PZB1: 高倍率解壓路徑
+		if (str.startsWith('PZB1:')) {
+			try {
+				const base64 = str.substring(5);
+				const binaryStr = atob(base64);
+				const bytes = new Uint8Array(binaryStr.length);
+				for (let i = 0; i < binaryStr.length; i++) {
+					bytes[i] = binaryStr.charCodeAt(i);
+				}
+
+				if (typeof window !== 'undefined' && 'DecompressionStream' in window) {
+					const ds = new DecompressionStream('deflate-raw');
+					const writer = ds.writable.getWriter();
+					writer.write(bytes);
+					writer.close();
+
+					const decompressedBuffer = await new Response(ds.readable).arrayBuffer();
+					const jsonStr = new TextDecoder().decode(decompressedBuffer);
+					return this.deserialize(JSON.parse(jsonStr));
+				}
+			} catch (e) {
+				console.error('[SchemeSerializer] 解壓 PZB1: 方案字串失敗:', e);
+				throw new Error('壓縮方案字串損毀或解碼失敗');
+			}
+		}
+
+		// 2. 向下相容路徑：舊版無壓縮 JSON 明文或美化 JSON
+		try {
+			const obj = JSON.parse(str);
+			return this.deserialize(obj);
+		} catch (e) {
+			throw new Error('無法解析的方案內容格式');
+		}
+	}
 }

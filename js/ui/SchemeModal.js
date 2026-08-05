@@ -192,20 +192,19 @@ export class SchemeModal {
 			fileInput.click();
 		});
 
-		// 📋 複製極簡文字至剪貼簿
+		// 📋 複製極簡壓縮文字至剪貼簿 (高壓縮率 PZB1: 格式)
 		const btnExportClip = document.getElementById('btn-export-clipboard');
 		btnExportClip?.addEventListener('click', async () => {
 			try {
-				const compactObj = SchemeSerializer.serialize(this.state.scheme);
-				const jsonStr = JSON.stringify(compactObj);
-				await navigator.clipboard.writeText(jsonStr);
+				const compressedStr = await SchemeSerializer.compressToString(this.state.scheme);
+				await navigator.clipboard.writeText(compressedStr);
 				ToastNotification.show(i18n.t('toast_clipboard_exported') || '已成功將方案文字複製至剪貼簿！', 'success');
 			} catch (err) {
 				ToastNotification.show(i18n.t('toast_export_clipboard_error'), 'error');
 			}
 		});
 
-		// 📝 貼上/輸入極簡文字匯入 (零原生 prompt 彈窗)
+		// 📝 貼上/輸入極簡文字匯入 (零原生 prompt 彈窗，向下相容 PZB1: 與舊版明文 JSON)
 		const btnImportText = document.getElementById('btn-import-text');
 		btnImportText?.addEventListener('click', async () => {
 			let clipboardText = '';
@@ -217,15 +216,14 @@ export class SchemeModal {
 				// Ignore clipboard read error
 			}
 
-			// 優先嘗試直接解析剪貼簿中合法的 JSON 內容
+			// 優先嘗試直接解析剪貼簿中合法的 PZB1: 或 JSON 內容
 			if (clipboardText && clipboardText.trim()) {
 				try {
-					const rawObj = JSON.parse(clipboardText.trim());
-					this.processImportSchemeObj(rawObj);
+					await this.processImportSchemeText(clipboardText.trim());
 					ToastNotification.show(i18n.t('toast_text_imported') || '已自動從剪貼簿成功匯入方案！', 'success');
 					return;
 				} catch (e) {
-					// 非合法 JSON，開盒體讓使用者確認/貼上
+					// 非合法格式，開盒體讓使用者確認/貼上
 				}
 			}
 
@@ -240,13 +238,12 @@ export class SchemeModal {
 			this.hideTextImportBox();
 		});
 
-		this.btnSubmitTextImport?.addEventListener('click', () => {
+		this.btnSubmitTextImport?.addEventListener('click', async () => {
 			const val = this.inputTextSchemeData?.value || '';
 			if (!val.trim()) return;
 
 			try {
-				const rawObj = JSON.parse(val.trim());
-				this.processImportSchemeObj(rawObj);
+				await this.processImportSchemeText(val.trim());
 				this.hideTextImportBox();
 				this.modal?.close();
 				ToastNotification.show(i18n.t('toast_text_imported') || '方案文字匯入成功！', 'success');
@@ -273,6 +270,30 @@ export class SchemeModal {
 			this.boxTextImport.style.display = 'none';
 			if (this.inputTextSchemeData) this.inputTextSchemeData.value = '';
 		}
+	}
+
+	async processImportSchemeText(rawTextOrObj) {
+		const scheme = await SchemeSerializer.decompressFromString(rawTextOrObj);
+		scheme.id = 'scheme_' + Date.now();
+		this.state.normalizeSchemeTiles(scheme);
+
+		const existingIdx = this.state.schemes.findIndex(s => s.name === scheme.name);
+		if (existingIdx === -1) {
+			this.state.schemes.push(scheme);
+		} else {
+			this.state.schemes[existingIdx] = scheme;
+		}
+
+		this.state.activeSchemeId = scheme.id;
+		this.state.scheme = scheme;
+		this.state.currentZLevel = scheme.currentLevel || 0;
+		this.state.clearHistory();
+		this.state.persist();
+		this.state.notifyStateChange();
+
+		this.setEditorToEditMode(scheme.id);
+		this.renderSchemeList();
+		this.updateHeaderInfo();
 	}
 
 	processImportSchemeObj(rawObj) {
