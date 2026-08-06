@@ -84,24 +84,64 @@ export class ExportCanvasPipeline {
 	}
 
 	/**
-	 * 導出放大 1.2 倍、且為 [大色塊]: [名稱] 格式的圖例 (Legend) 排版數據
+	 * 導出 1.2x 圖例 (Legend) 佈局數據與色塊 renderList
 	 * @param {Object} palette
-	 * @returns {Object} 图例排版規格與條目
+	 * @returns {Object} 圖例排版規格與 renderList
 	 */
 	static getLegendLayoutData(palette) {
 		const paletteEntries = Object.values(palette || {});
 		if (paletteEntries.length === 0) return null;
 
+		const normalItems = paletteEntries.filter(item => !item.isObject);
+		const objectItems = paletteEntries.filter(item => item.isObject);
+		const hasDivider = normalItems.length > 0 && objectItems.length > 0;
+
 		const scale = 1.2; // 1.2 倍整體尺寸放大
 		const legendX = Math.round(28 * scale);
 		const legendY = Math.round(28 * scale);
 		const itemHeight = Math.round(30 * scale); // 36px 行高
+		const dividerGap = Math.round(14 * scale); // 色塊分類分隔線間距 (17px)
 		const legendWidth = Math.round(260 * scale); // 312px 寬度
 		const headerHeight = Math.round(48 * scale); // 58px 標題區高度
-		const legendHeight = Math.round(headerHeight + paletteEntries.length * itemHeight + 12 * scale);
 
 		const swWidth = Math.round(38 * scale); // ~3em 寬的大色塊 (45px)
 		const swHeight = Math.round(15 * scale); // 18px 高
+
+		let currentY = headerHeight;
+		const renderList = [];
+
+		// 通用色塊
+		normalItems.forEach(item => {
+			renderList.push({
+				type: 'item',
+				color: item.color,
+				name: item.name,
+				y: currentY,
+			});
+			currentY += itemHeight;
+		});
+
+		// 若同時包含通用色塊與物件色塊，插入分隔線數據
+		if (hasDivider) {
+			renderList.push({
+				type: 'divider',
+				y: currentY - Math.round(itemHeight / 2) + Math.round(dividerGap / 2),
+			});
+			currentY += dividerGap;
+		}
+
+		// 物件色塊
+		objectItems.forEach(item => {
+			renderList.push({
+				type: 'item',
+				color: item.color,
+				name: item.name,
+				y: currentY,
+			});
+			currentY += itemHeight;
+		});
+
+		const legendHeight = Math.round(currentY + 12 * scale);
 
 		return {
 			scale,
@@ -114,11 +154,7 @@ export class ExportCanvasPipeline {
 			itemHeight,
 			headerHeight,
 			title: i18n.t('export_svg_legend_title') || '圖例',
-			items: paletteEntries.map((item, index) => ({
-				index,
-				color: item.color,
-				name: item.name,
-			})),
+			renderList,
 		};
 	}
 }

@@ -53,6 +53,15 @@
 					<button class="btn" id="btn-about" data-i18n-title="header_btn_about_title" title="關於專案與團隊致謝">
 						ℹ️ <span class="btn-text" data-i18n="header_btn_about">關於</span>
 					</button>
+					<a
+						class="btn"
+						id="btn-github-repo"
+						href="https://github.com/HouMuYi/Planboid"
+						target="_blank"
+						rel="noopener"
+						data-i18n-title="header_btn_github_title"
+						title="造訪 GitHub 原始碼倉庫"
+					>⭐</a>
 					<button class="btn" id="btn-export-svg" data-i18n-title="header_btn_svg_title" title="匯出高畫質向量 SVG 圖檔 (含圖例)">
 						📐 <span class="btn-text" data-i18n="header_btn_svg">SVG</span>
 					</button>
@@ -136,7 +145,7 @@
 						</button>
 					</div>
 
-					<div class="divider desktop-only"></div>
+					<hr class="divider desktop-only">
 
 					<div class="tool-group desktop-only">
 						<span class="group-label" data-i18n="toolbar_group_history">歷史</span>
@@ -194,7 +203,7 @@
 									id="floor-up"
 									data-i18n="sidebar_floor_up"
 									data-i18n-title="sidebar_floor_up_title"
-									title="▲ 上層（Z）"
+									title="▲ 上層"
 								>
 									▲ 上層
 								</button>
@@ -206,13 +215,13 @@
 									id="floor-down"
 									data-i18n="sidebar_floor_down"
 									data-i18n-title="sidebar_floor_down_title"
-									title="▼ 下層（X）"
+									title="▼ 下層"
 								>
 									▼ 下層
 								</button>
 							</div>
 							<div class="other-floors-control">
-								<span class="field-label" data-i18n="sidebar_other_floors_label">其他樓層顯示：</span>
+								<div class="field-label-text micro-text subtle-text floor-mode-label" data-i18n="sidebar_other_floors_label">其他樓層顯示：</div>
 								<div class="segmented-control" id="other-floors-group">
 									<button
 										class="btn btn-segmented"
@@ -237,23 +246,23 @@
 										data-mode="solid"
 										data-i18n="sidebar_other_floors_solid"
 										data-i18n-title="sidebar_other_floors_solid_title"
-										title="以完整實心呈現其他樓層"
+										title="完整顯示其他樓層"
 									>
-										實心
+										完整
 									</button>
 								</div>
 							</div>
 							<label
 								class="toggle-pill"
 								data-i18n-title="viewport_toggle_3d_walls_title"
-								title="立體牆面（Home／End）"
+								title="立體牆面"
 							>
 								<input type="checkbox" id="chk-3d-walls" checked>
 								<span data-i18n="viewport_toggle_3d_walls">立體牆面</span>
 							</label>
 						</div>
 
-						<div class="divider"></div>
+						<hr class="divider">
 
 						<!-- 通用調色盤區塊 -->
 						<div class="panel-section palette-section">
@@ -264,7 +273,7 @@
 							<div class="palette-list" id="palette-container"></div>
 						</div>
 
-						<div class="divider"></div>
+						<hr class="divider">
 
 						<!-- 物件調色盤區塊 -->
 						<div class="panel-section object-palette-section">
@@ -275,7 +284,7 @@
 							<div class="palette-list" id="object-palette-container"></div>
 						</div>
 
-						<div class="divider"></div>
+						<hr class="divider">
 
 						<!-- 區域與標籤區塊 -->
 						<div class="panel-section label-section">
@@ -303,22 +312,7 @@
 								disabled
 							>
 						</div>
-
-						<div class="divider"></div>
-
-						<!-- GitHub 倉庫連結區塊 (OOCSS 套用既有 .panel-section 與 .btn) -->
-						<div class="panel-section">
-							<a
-								href="https://github.com/HouMuYi/Planboid"
-								target="_blank"
-								rel="noopener"
-								class="btn w-full"
-								data-i18n-title="sidebar_github_link_title"
-								title="造訪 GitHub 原始碼倉庫"
-							>
-								<span>⭐ <span data-i18n="sidebar_github_link">GitHub 專案倉庫</span></span>
-							</a>
-						</div>
+					</div>
 					</div>
 				</aside>
 			</main>

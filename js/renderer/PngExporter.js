@@ -145,13 +145,12 @@ export class PngExporter {
 			ctx.restore();
 		});
 
-		// 結束地塊與牆面相機變換矩陣
 		ctx.restore();
 
-		// 4. Pass 4: 繪製全新 1.2x 大色塊 [色塊]: [名稱] 圖例 (固定於圖片絕對左上角)
+		// Pass 4: 繪製圖例 (Legend)
 		const legendData = ExportCanvasPipeline.getLegendLayoutData(palette);
 		if (legendData) {
-			const { x: legendX, y: legendY, width: legendWidth, height: legendHeight, swWidth, swHeight, itemHeight, headerHeight, title, items } = legendData;
+			const { x: legendX, y: legendY, width: legendWidth, height: legendHeight, swWidth, swHeight, title, renderList } = legendData;
 
 			ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
 			ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
@@ -179,27 +178,36 @@ export class PngExporter {
 			ctx.lineTo(legendX + legendWidth - 18, legendY + 38);
 			ctx.stroke();
 
-			items.forEach(item => {
-				const itemY = legendY + headerHeight + item.index * itemHeight;
+			renderList.forEach(entry => {
+				const itemY = legendY + entry.y;
 
-				// 3em 大色塊
-				ctx.fillStyle = item.color;
-				ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-				ctx.lineWidth = 1;
-				if (ctx.roundRect) {
+				if (entry.type === 'divider') {
+					ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+					ctx.lineWidth = 1;
 					ctx.beginPath();
-					ctx.roundRect(legendX + 18, itemY - 7, swWidth, swHeight, 3);
-					ctx.fill();
+					ctx.moveTo(legendX + 18, itemY);
+					ctx.lineTo(legendX + legendWidth - 18, itemY);
 					ctx.stroke();
-				} else {
-					ctx.fillRect(legendX + 18, itemY - 7, swWidth, swHeight);
-					ctx.strokeRect(legendX + 18, itemY - 7, swWidth, swHeight);
-				}
+				} else if (entry.type === 'item') {
+					// 3em 大色塊
+					ctx.fillStyle = entry.color;
+					ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+					ctx.lineWidth = 1;
+					if (ctx.roundRect) {
+						ctx.beginPath();
+						ctx.roundRect(legendX + 18, itemY - 7, swWidth, swHeight, 3);
+						ctx.fill();
+						ctx.stroke();
+					} else {
+						ctx.fillRect(legendX + 18, itemY - 7, swWidth, swHeight);
+						ctx.strokeRect(legendX + 18, itemY - 7, swWidth, swHeight);
+					}
 
-				// 冒號與名稱
-				ctx.fillStyle = '#e2e8f0';
-				ctx.font = `600 13px ${CONFIG.FONT_SANS}`;
-				ctx.fillText(`: ${item.name}`, legendX + 18 + swWidth + 10, itemY);
+					// 冒號與名稱
+					ctx.fillStyle = '#e2e8f0';
+					ctx.font = `600 13px ${CONFIG.FONT_SANS}`;
+					ctx.fillText(`: ${entry.name}`, legendX + 18 + swWidth + 10, itemY);
+				}
 			});
 		}
 

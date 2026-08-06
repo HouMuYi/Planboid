@@ -61,8 +61,8 @@ a { text-decoration:none; color:inherit }
 
 /* ── 4. Object: .panel & .box (通用容器物件) ── */
 .panel { background:var(--bg-p); backdrop-filter:var(--blur); border:1px solid var(--bd); border-radius:var(--r) }
-.box { background:var(--bg-c); border:1px solid var(--bd); border-radius:var(--r); padding:calc(12px*var(--s)); gap:calc(8px*var(--s)) }
-.divider { width:32px; height:1px; background:var(--bd); flex-shrink:0 }
+hr.divider, .divider { width:100%; height:1px; background:var(--bd); border:none; margin:0; flex-shrink:0 }
+.toolbar-left hr.divider, .toolbar-left .divider { width:32px }
 
 /* ── 5. Object: .btn (通用按鈕物件，全 em 相對單位) ── */
 .btn { padding:.45em .85em; border-radius:var(--r); font-size:calc(.8rem*var(--s)); font-weight:500; background:var(--bg-c); color:var(--c0); border:1px solid var(--bd); display:inline-flex; align-items:center; justify-content:center; gap:.4em; white-space:nowrap }
@@ -117,7 +117,7 @@ a { text-decoration:none; color:inherit }
 .view-btn.active { background:var(--ac); color:#fff; font-weight:600 }
 .toggle-pill { gap:6px; padding:calc(6px*var(--s)) calc(12px*var(--s)); color:var(--c1) }
 .toggle-pill input { accent-color:var(--ac) }
-.canvas-info-overlay { position:absolute; bottom:calc(16px*var(--s)); left:calc(16px*var(--s)); padding:calc(6px*var(--s)) calc(14px*var(--s)); font-size:calc(.75rem*var(--s)); font-family:var(--font-mono); gap:8px }
+.canvas-info-overlay { position:absolute; bottom:calc(16px*var(--s)); left:calc(16px*var(--s)); padding:calc(6px*var(--s)) calc(14px*var(--s)); font-size:calc(.75rem*var(--s)); font-family:var(--font-mono); gap:8px; pointer-events:none }
 .canvas-hotkeys-overlay { left:auto; right:calc(16px*var(--s) + var(--sidebar-offset, 0px)); white-space:pre-line; text-align:right; transition:right .3s cubic-bezier(.4,0,.2,1) }
 .dot { color:var(--c2) }
 

@@ -94,10 +94,10 @@ export class SvgExporter {
 
 		svgContent += `</g>\n`;
 
-		// Pass 4: 繪製全新 1.2x 放大之 [大色塊]: [名稱] 向量圖例 (固定於 SVG 圖片絕對左上角)
+		// Pass 4: 繪製圖例 (Legend)
 		const legendData = ExportCanvasPipeline.getLegendLayoutData(palette);
 		if (legendData) {
-			const { x: legX, y: legY, width: legWidth, height: legHeight, swWidth, swHeight, itemHeight, headerHeight, title, items } = legendData;
+			const { x: legX, y: legY, width: legWidth, height: legHeight, swWidth, swHeight, title, renderList } = legendData;
 			const safeTitle = ExportCanvasPipeline.escapeXml(title);
 			const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
 
@@ -110,15 +110,18 @@ export class SvgExporter {
 			svgContent += `<text x="18" y="28" fill="#a5b4fc" font-size="14" font-family="${safeFont}" font-weight="bold">${safeTitle}</text>\n`;
 			svgContent += `<line x1="18" y1="38" x2="${legWidth - 18}" y2="38" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />\n`;
 
-			items.forEach(item => {
-				const itemY = headerHeight + item.index * itemHeight;
-				const safeName = ExportCanvasPipeline.escapeXml(item.name);
-				svgContent += `<rect x="18" y="${
-					itemY - 12
-				}" width="${swWidth}" height="${swHeight}" fill="${item.color}" rx="3" ry="3" stroke="rgba(255,255,255,0.25)" stroke-width="1" />\n`;
-				svgContent += `<text x="${
-					18 + swWidth + 10
-				}" y="${itemY}" fill="#e2e8f0" font-size="13" font-family="${safeFont}" font-weight="600">: ${safeName}</text>\n`;
+			renderList.forEach(entry => {
+				if (entry.type === 'divider') {
+					svgContent += `<line x1="18" y1="${entry.y}" x2="${legWidth - 18}" y2="${entry.y}" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" />\n`;
+				} else if (entry.type === 'item') {
+					const safeName = ExportCanvasPipeline.escapeXml(entry.name);
+					svgContent += `<rect x="18" y="${
+						entry.y - 12
+					}" width="${swWidth}" height="${swHeight}" fill="${entry.color}" rx="3" ry="3" stroke="rgba(255,255,255,0.25)" stroke-width="1" />\n`;
+					svgContent += `<text x="${
+						18 + swWidth + 10
+					}" y="${entry.y}" fill="#e2e8f0" font-size="13" font-family="${safeFont}" font-weight="600">: ${safeName}</text>\n`;
+				}
 			});
 
 			svgContent += `</g>\n`;
