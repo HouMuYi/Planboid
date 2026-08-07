@@ -401,9 +401,11 @@ export class SchemeModal {
 			nameSpan.className = 'scheme-name';
 			nameSpan.textContent = scheme.name;
 
+			const schemeBytes = StorageManager.getSchemeSizeBytes(scheme);
+			const schemeKB = (schemeBytes / 1024).toFixed(1);
 			const sizeSpan = document.createElement('span');
 			sizeSpan.className = 'scheme-size';
-			sizeSpan.textContent = ` ${SchemeModal.formatDimension(scheme.width, scheme.height, scheme.worldOriginX, scheme.worldOriginY)}`;
+			sizeSpan.textContent = ` ${SchemeModal.formatDimension(scheme.width, scheme.height, scheme.worldOriginX, scheme.worldOriginY)} · ${schemeKB} KB`;
 
 			infoDiv.appendChild(nameSpan);
 			infoDiv.appendChild(sizeSpan);
@@ -461,6 +463,9 @@ export class SchemeModal {
 			this.schemeListContainer.appendChild(itemDiv);
 		});
 
+		// 更新儲存容量監控條 UI
+		this.updateStorageUsageUI();
+
 		// 列表最下方「（新方案⋯⋯）」偽方案項目
 		const isNewSelected = this.editingSchemeId === null;
 		const pseudoDiv = document.createElement('div');
@@ -482,5 +487,30 @@ export class SchemeModal {
 		});
 
 		this.schemeListContainer.appendChild(pseudoDiv);
+	}
+
+	/**
+	 * 更新 localStorage 儲存容量監控條 UI (原生 HTML5 meter 語義標籤)
+	 */
+	updateStorageUsageUI() {
+		const textEl = document.getElementById('scheme-storage-text');
+		const meterEl = document.getElementById('scheme-storage-meter');
+		const boxEl = document.querySelector('.scheme-storage-box');
+		if (!textEl || !meterEl) return;
+
+		const usage = StorageManager.getStorageUsage();
+		const usageTemplate = i18n.t('modal_schemes_storage_usage') || '{used} KB / 5 MB ({percent}%)';
+		textEl.textContent = usageTemplate.replace('{used}', usage.totalKB).replace('{percent}', usage.percent);
+
+		meterEl.value = usage.percentNumber;
+		meterEl.classList.toggle('is-warning', usage.isWarning);
+		meterEl.classList.toggle('is-danger', usage.isDanger);
+
+		// 確保原生的 title 屬性在 UI 更新時動態賦值至圓形幫助問號圖示
+		const tooltipText = i18n.t('modal_schemes_storage_capacity_tooltip');
+		const helpIcon = document.getElementById('scheme-storage-help-icon');
+		if (tooltipText && helpIcon) {
+			helpIcon.title = tooltipText;
+		}
 	}
 }

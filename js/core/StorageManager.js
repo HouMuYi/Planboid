@@ -115,4 +115,51 @@ export class StorageManager {
 			console.error('寫入 localStorage 失敗:', e);
 		}
 	}
+
+	/**
+	 * 計算單一方案經過 Tuple 序列化後的字節數 (UTF-16 雙位元組算數)
+	 */
+	static getSchemeSizeBytes(scheme) {
+		if (!scheme) return 0;
+		const serialized = SchemeSerializer.serialize(scheme);
+		const jsonStr = JSON.stringify(serialized);
+		return jsonStr.length * 2;
+	}
+
+	/**
+	 * 計算全站 localStorage 已用容量與 5MB 標準配額使用率
+	 */
+	static getStorageUsage() {
+		let totalBytes = 0;
+		let planboidBytes = 0;
+
+		try {
+			for (let i = 0; i < localStorage.length; i++) {
+				const key = localStorage.key(i);
+				if (!key) continue;
+				const val = localStorage.getItem(key) || '';
+				const itemBytes = (key.length + val.length) * 2;
+				totalBytes += itemBytes;
+				if (key === STORAGE_KEY) {
+					planboidBytes = itemBytes;
+				}
+			}
+		} catch (e) {
+			console.error('[StorageManager] 讀取容量失敗:', e);
+		}
+
+		const quotaBytes = 5 * 1024 * 1024; // 5MB 標準配額 (5,242,880 Bytes)
+		const percentNumber = Math.min(100, (totalBytes / quotaBytes) * 100);
+
+		return {
+			totalBytes,
+			planboidBytes,
+			totalKB: (totalBytes / 1024).toFixed(1),
+			planboidKB: (planboidBytes / 1024).toFixed(1),
+			percent: percentNumber.toFixed(1),
+			percentNumber,
+			isWarning: percentNumber >= 70 && percentNumber < 85,
+			isDanger: percentNumber >= 85,
+		};
+	}
 }

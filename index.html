@@ -337,6 +337,29 @@
 					<button class="btn-close" id="btn-close-scheme-modal">✕</button>
 				</div>
 				<div class="modal-body stack">
+					<!-- 儲存容量監控盒體 (HTML5 原生 meter 語義標籤與 OOCSS .box 物件) -->
+					<div class="scheme-storage-box box stack">
+						<div class="cluster cluster-between">
+							<div class="cluster">
+								<span
+									class="icon-help-badge"
+									id="scheme-storage-help-icon"
+									data-i18n-title="modal_schemes_storage_capacity_tooltip"
+									title="受限於瀏覽器標準規範，LocalStorage 的硬性容量上限通常固定為 5 MB。本工具雖已對資料進行極致壓縮，但上限仍由瀏覽器決定。若空間不足請匯出 JSON 備份——跟作者哭小是沒用的，請找 W3C 與 WHATWG 哭訴。"
+								>?</span>
+								<label for="scheme-storage-meter" class="field-label" data-i18n="modal_schemes_storage_capacity">儲存空間：</label>
+							</div>
+							<span class="micro-text text-muted" id="scheme-storage-text">0 KB / 5 MB (0%)</span>
+						</div>
+						<meter
+							id="scheme-storage-meter"
+							class="meter"
+							min="0"
+							max="100"
+							value="0"
+						></meter>
+					</div>
+
 					<!-- 方案編輯/建立盒體 -->
 					<div class="scheme-create-box box stack">
 						<input type="hidden" id="scheme-editor-id" value="">

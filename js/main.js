@@ -9,9 +9,11 @@ import { AboutModal } from './ui/AboutModal.js';
 import { PalettePanel } from './ui/PalettePanel.js';
 import { SchemeModal } from './ui/SchemeModal.js';
 import { Toolbar } from './ui/Toolbar.js';
+import { TooltipManager } from './ui/TooltipManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 	const stateManager = new StateManager();
+	const tooltipManager = new TooltipManager();
 
 	const canvas = document.getElementById('main-canvas');
 	const renderer = new CanvasRenderer(canvas, stateManager);

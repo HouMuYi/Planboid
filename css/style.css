@@ -63,6 +63,21 @@ a { text-decoration:none; color:inherit }
 .panel { background:var(--bg-p); backdrop-filter:var(--blur); border:1px solid var(--bd); border-radius:var(--r) }
 hr.divider, .divider { width:100%; height:1px; background:var(--bd); border:none; margin:0; flex-shrink:0 }
 .toolbar-left hr.divider, .toolbar-left .divider { width:32px }
+.scheme-storage-box { cursor:default }
+.icon-help-badge { display:inline-flex; align-items:center; justify-content:center; width:calc(16px*var(--s)); height:calc(16px*var(--s)); border-radius:50%; background:rgba(148,163,184,.15); border:1px solid var(--bd); color:var(--c2); font-size:calc(.7rem*var(--s)); font-weight:600; cursor:help; transition:background-color .15s, color .15s, border-color .15s }
+.icon-help-badge:hover { background:var(--ac); color:#fff; border-color:var(--ac) }
+meter.meter { width:100%; height:calc(6px*var(--s)); border:1px solid var(--bd); border-radius:999px; background:var(--bg); appearance:none; -webkit-appearance:none; overflow:hidden }
+meter.meter::-webkit-meter-bar { background:var(--bg); border:none; border-radius:999px; pointer-events:none }
+meter.meter::-webkit-meter-optimum-value { background:var(--ac); transition:width .3s; pointer-events:none }
+meter.meter::-moz-meter-bar { background:var(--ac); transition:width .3s; pointer-events:none }
+meter.meter.is-warning::-webkit-meter-optimum-value { background:#f59e0b }
+meter.meter.is-warning::-moz-meter-bar { background:#f59e0b }
+meter.meter.is-danger::-webkit-meter-optimum-value { background:var(--danger) }
+meter.meter.is-danger::-moz-meter-bar { background:var(--danger) }
+
+/* ── 8. Custom Tooltip System (#global-tooltip) ── */
+.custom-tooltip { position:fixed; z-index:9999; pointer-events:none; opacity:0; transform:translateY(4px); transition:opacity .15s cubic-bezier(.4,0,.2,1), transform .15s cubic-bezier(.4,0,.2,1); background:var(--bg-p); backdrop-filter:var(--blur); border:1px solid var(--bd); border-radius:var(--r); color:var(--c0); font-size:calc(.78rem*var(--s)); line-height:1.45; padding:calc(6px*var(--s)) calc(10px*var(--s)); max-width:calc(280px*var(--s)); box-shadow:0 8px 24px rgba(0,0,0,.35); white-space:pre-wrap; word-break:break-word }
+.custom-tooltip.visible { opacity:1; transform:translateY(0) }
 
 /* ── 5. Object: .btn (通用按鈕物件，全 em 相對單位) ── */
 .btn { padding:.45em .85em; border-radius:var(--r); font-size:calc(.8rem*var(--s)); font-weight:500; background:var(--bg-c); color:var(--c0); border:1px solid var(--bd); display:inline-flex; align-items:center; justify-content:center; gap:.4em; white-space:nowrap }
