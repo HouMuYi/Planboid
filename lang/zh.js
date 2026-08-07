@@ -102,8 +102,8 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'modal_schemes_btn_delete_title': '刪除方案',
 	'modal_schemes_confirm_delete': '確定要刪除方案「{name}」嗎？',
 	'modal_schemes_storage_capacity': '儲存空間：',
-	'modal_schemes_storage_capacity_tooltip': '受限於瀏覽器標準規範，LocalStorage 的硬性容量上限通常固定為 5 MB。本工具雖已對資料進行極致壓縮，但上限仍由瀏覽器決定。若空間不足請匯出 JSON 備份——跟作者哭小是沒用的，請找 W3C 與 WHATWG 哭訴。',
-	'modal_schemes_storage_usage': '{used} KB / 5 MB ({percent}%)',
+	'modal_schemes_storage_capacity_tooltip': '受限於瀏覽器標準規範，全網域 LocalStorage 的硬性容量上限通常固定為 5 MiB（此處統計包含全站整體資料結構與設定，故高於單方案淨體積）。本工具雖已對資料進行極致壓縮，但上限仍由瀏覽器決定。若空間不足請匯出 JSON 備份——跟作者哭小是沒用的，請找 W3C 與 WHATWG 哭訴。',
+	'modal_schemes_storage_usage': '{used} KiB / 5 MiB（{percent}%）（其他用量：{other} KiB）',
 
 	'modal_confirm_cancel': '取消',
 	'modal_confirm_ok': '確定刪除',

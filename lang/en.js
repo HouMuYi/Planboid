@@ -101,8 +101,8 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'modal_schemes_btn_delete_title': 'Delete Scheme',
 	'modal_schemes_confirm_delete': 'Are you sure you want to delete scheme "{name}"?',
 	'modal_schemes_storage_capacity': 'Storage:',
-	'modal_schemes_storage_capacity_tooltip': 'Restricted by browser standards, LocalStorage hard quota is capped at 5 MB. Data is compressed, but browser limits still apply. Export to JSON if space runs low — crying to the author won’t help; go cry to W3C and WHATWG.',
-	'modal_schemes_storage_usage': '{used} KB / 5 MB ({percent}%)',
+	'modal_schemes_storage_capacity_tooltip': 'Restricted by browser standards, domain-wide LocalStorage hard quota is capped at 5 MiB (includes overall data structures & settings, thus higher than single scheme net size). Data is compressed, but browser limits still apply. Export to JSON if space runs low — crying to the author won’t help; go cry to W3C and WHATWG.',
+	'modal_schemes_storage_usage': '{used} KiB / 5 MiB ({percent}%) (Other: {other} KiB)',
 
 	'modal_confirm_cancel': 'Cancel',
 	'modal_confirm_ok': 'Confirm Delete',

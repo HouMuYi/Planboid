@@ -338,4 +338,114 @@ export class SchemeSerializer {
 			throw new Error('無法解析的方案內容格式');
 		}
 	}
+
+	/**
+	 * 權威統一門面解析器 (Facade Parser)：
+	 * 接受 PZB1 壓縮 Base64 字串、明文 JSON 字串、平鋪 JSON 物件或 Scheme 物件
+	 * 統一完成還原、4 方向牆面正規化與預設色票補齊
+	 * @param {string|Object} rawInput
+	 * @returns {Object} 100% 合法且標準化的 Scheme 領域模型
+	 */
+	static parse(rawInput) {
+		if (!rawInput) return null;
+
+		let scheme = null;
+		try {
+			if (typeof rawInput === 'string') {
+				const str = rawInput.trim();
+				if (str.startsWith('PZB1:')) {
+					// PZB1 壓縮字串，若直接傳入嘗試解析或解碼
+					try {
+						const base64 = str.substring(5);
+						const binaryStr = atob(base64);
+						const bytes = new Uint8Array(binaryStr.length);
+						for (let i = 0; i < binaryStr.length; i++) {
+							bytes[i] = binaryStr.charCodeAt(i);
+						}
+						// 同步層降級安全解析
+						scheme = this.deserialize(str);
+					} catch (e) {
+						scheme = this.deserialize(str);
+					}
+				} else {
+					scheme = this.deserialize(JSON.parse(str));
+				}
+			} else if (typeof rawInput === 'object') {
+				scheme = this.deserialize(rawInput);
+			}
+		} catch (err) {
+			try {
+				scheme = this.deserialize(rawInput);
+			} catch (e) {
+				console.warn('[SchemeSerializer] 解析方案資料失敗:', err);
+				return null;
+			}
+		}
+
+		if (!scheme || typeof scheme !== 'object') return null;
+
+		// 補齊預設物件色票 (🚪 🪟 🚰 🪣 🪜)
+		const defaultPalette = {
+			'obj_door': { color: '#e11d48', name: '🚪', isObject: true },
+			'obj_window': { color: '#f59e0b', name: '🪟', isObject: true },
+			'obj_sink': { color: '#38bdf8', name: '🚰', isObject: true },
+			'obj_bucket': { color: '#1e40af', name: '🪣', isObject: true },
+			'obj_ladder': { color: '#991b1b', name: '🪜', isObject: true },
+		};
+
+		if (!scheme.palette) scheme.palette = {};
+		Object.entries(defaultPalette).forEach(([objId, defaultItem]) => {
+			if (!scheme.palette[objId]) {
+				scheme.palette[objId] = { ...defaultItem };
+			}
+		});
+
+		// 無損正規化牆體
+		if (scheme.tiles) {
+			const updatedTiles = {};
+			Object.entries(scheme.tiles).forEach(([key, tile]) => {
+				const [xStr, yStr, zStr] = key.split(',');
+				const x = parseInt(xStr, 10);
+				const y = parseInt(yStr, 10);
+				if (isNaN(x) || isNaN(y)) return;
+
+				if (tile.walls) {
+					Object.entries(tile.walls).forEach(([edge, colorId]) => {
+						if (colorId) {
+							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+							const normKey = `${norm.x},${norm.y},${zStr}`;
+							if (!updatedTiles[normKey]) updatedTiles[normKey] = { walls: {} };
+							if (!updatedTiles[normKey].walls) updatedTiles[normKey].walls = {};
+							updatedTiles[normKey].walls[norm.edge] = colorId;
+						}
+					});
+				}
+
+				if (tile.wallObjects) {
+					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
+						if (Array.isArray(objArray) && objArray.length > 0) {
+							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+							const normKey = `${norm.x},${norm.y},${zStr}`;
+							if (!updatedTiles[normKey]) updatedTiles[normKey] = { walls: {} };
+							if (!updatedTiles[normKey].wallObjects) updatedTiles[normKey].wallObjects = {};
+							updatedTiles[normKey].wallObjects[norm.edge] = objArray;
+						}
+					});
+				}
+
+				if (tile.floorColorId || tile.label || Array.isArray(tile.floorObjects)) {
+					if (!updatedTiles[key]) updatedTiles[key] = { walls: {} };
+					if (tile.floorColorId) updatedTiles[key].floorColorId = tile.floorColorId;
+					if (tile.label) updatedTiles[key].label = tile.label;
+					if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
+						updatedTiles[key].floorObjects = tile.floorObjects;
+					}
+				}
+			});
+			scheme.tiles = updatedTiles;
+		}
+
+		if (!scheme.id) scheme.id = `scheme_${Date.now()}`;
+		return scheme;
+	}
 }

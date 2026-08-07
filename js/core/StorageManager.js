@@ -62,24 +62,24 @@ export class StorageManager {
 
 			const data = JSON.parse(jsonStr);
 			if (data && Array.isArray(data.schemes) && data.schemes.length > 0) {
-				const defaultPalette = this.getDefaultScheme().palette;
-				data.schemes = data.schemes.map(s => {
-					const scheme = SchemeSerializer.deserialize(s);
-					// 相容性修復：為舊方案自動補充預設物件色票 (🚪 🪟 🚰 🪣 🪜)
-					if (scheme && scheme.palette) {
-						Object.entries(defaultPalette).forEach(([objId, defaultItem]) => {
-							if (defaultItem.isObject && !scheme.palette[objId]) {
-								scheme.palette[objId] = { ...defaultItem };
-							}
-						});
-					}
-					return scheme;
-				});
+				// 透過權威門面解析器 100% 同步穩健解析所有載體（PZB1 / 明文 JSON / 舊版物件）
+				const deserializedSchemes = data.schemes
+					.map(s => SchemeSerializer.parse(s))
+					.filter(Boolean);
+
+				if (deserializedSchemes.length > 0) {
+					data.schemes = deserializedSchemes;
+				} else {
+					const defaultScheme = this.getDefaultScheme();
+					data.schemes = [defaultScheme];
+					data.activeSchemeId = defaultScheme.id;
+				}
+
 				// 確保 activeSchemeId 有效
 				if (!data.activeSchemeId || !data.schemes.some(s => s.id === data.activeSchemeId)) {
 					data.activeSchemeId = data.schemes[0].id;
 				}
-				this.saveData(data);
+
 				return data;
 			}
 
@@ -132,6 +132,7 @@ export class StorageManager {
 	static getStorageUsage() {
 		let totalBytes = 0;
 		let planboidBytes = 0;
+		let otherBytes = 0;
 
 		try {
 			for (let i = 0; i < localStorage.length; i++) {
@@ -142,20 +143,24 @@ export class StorageManager {
 				totalBytes += itemBytes;
 				if (key === STORAGE_KEY) {
 					planboidBytes = itemBytes;
+				} else {
+					otherBytes += itemBytes;
 				}
 			}
 		} catch (e) {
 			console.error('[StorageManager] 讀取容量失敗:', e);
 		}
 
-		const quotaBytes = 5 * 1024 * 1024; // 5MB 標準配額 (5,242,880 Bytes)
+		const quotaBytes = 5 * 1024 * 1024; // 5 MiB 標準配額 (5,242,880 Bytes)
 		const percentNumber = Math.min(100, (totalBytes / quotaBytes) * 100);
 
 		return {
 			totalBytes,
 			planboidBytes,
-			totalKB: (totalBytes / 1024).toFixed(1),
-			planboidKB: (planboidBytes / 1024).toFixed(1),
+			otherBytes,
+			totalKiB: (totalBytes / 1024).toFixed(1),
+			planboidKiB: (planboidBytes / 1024).toFixed(1),
+			otherKiB: (otherBytes / 1024).toFixed(1),
 			percent: percentNumber.toFixed(1),
 			percentNumber,
 			isWarning: percentNumber >= 70 && percentNumber < 85,

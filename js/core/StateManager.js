@@ -11,6 +11,7 @@ import { UISelectionState } from './UISelectionState.js';
 
 export class StateManager {
 	constructor() {
+		// 100% 同步讀取 StorageManager，確保構造函數完成時資料即為權威資料，絕不發動非同步覆蓋
 		const storedData = StorageManager.loadData();
 		this.schemes = storedData.schemes || [];
 		this.activeSchemeId = storedData.activeSchemeId;
@@ -699,8 +700,8 @@ export class StateManager {
 		}
 	}
 
-	persist() {
-		StorageManager.saveData({
+	async persist() {
+		await StorageManager.saveData({
 			activeSchemeId: this.activeSchemeId,
 			schemes: this.schemes,
 		});

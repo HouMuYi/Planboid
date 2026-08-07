@@ -180,8 +180,7 @@ export class SchemeModal {
 				const reader = new FileReader();
 				reader.onload = (event) => {
 					try {
-						const rawObj = JSON.parse(event.target.result);
-						this.processImportSchemeObj(rawObj);
+						this.importScheme(event.target.result);
 						ToastNotification.show(i18n.t('toast_scheme_imported') || '方案匯入成功！', 'success');
 					} catch (err) {
 						ToastNotification.show(i18n.t('toast_import_json_error'), 'error');
@@ -219,7 +218,7 @@ export class SchemeModal {
 			// 優先嘗試直接解析剪貼簿中合法的 PZB1: 或 JSON 內容
 			if (clipboardText && clipboardText.trim()) {
 				try {
-					await this.processImportSchemeText(clipboardText.trim());
+					this.importScheme(clipboardText.trim());
 					ToastNotification.show(i18n.t('toast_text_imported') || '已自動從剪貼簿成功匯入方案！', 'success');
 					return;
 				} catch (e) {
@@ -238,12 +237,12 @@ export class SchemeModal {
 			this.hideTextImportBox();
 		});
 
-		this.btnSubmitTextImport?.addEventListener('click', async () => {
+		this.btnSubmitTextImport?.addEventListener('click', () => {
 			const val = this.inputTextSchemeData?.value || '';
 			if (!val.trim()) return;
 
 			try {
-				await this.processImportSchemeText(val.trim());
+				this.importScheme(val.trim());
 				this.hideTextImportBox();
 				this.modal?.close();
 				ToastNotification.show(i18n.t('toast_text_imported') || '方案文字匯入成功！', 'success');
@@ -272,34 +271,16 @@ export class SchemeModal {
 		}
 	}
 
-	async processImportSchemeText(rawTextOrObj) {
-		const scheme = await SchemeSerializer.decompressFromString(rawTextOrObj);
+	/**
+	 * 權威方案匯入入口：接收 PZB1 壓縮字串、明文 JSON 字串、JSON 物件或標準 Scheme 物件
+	 * 統一透過 SchemeSerializer.parse() 門面完成解碼、色票補齊與權威切換
+	 * @param {string|Object} rawInput
+	 */
+	importScheme(rawInput) {
+		const scheme = SchemeSerializer.parse(rawInput);
+		if (!scheme) throw new Error('無法解析的方案格式');
+
 		scheme.id = 'scheme_' + Date.now();
-		this.state.normalizeSchemeTiles(scheme);
-
-		const existingIdx = this.state.schemes.findIndex(s => s.name === scheme.name);
-		if (existingIdx === -1) {
-			this.state.schemes.push(scheme);
-		} else {
-			this.state.schemes[existingIdx] = scheme;
-		}
-
-		this.state.activeSchemeId = scheme.id;
-		this.state.scheme = scheme;
-		this.state.currentZLevel = scheme.currentLevel || 0;
-		this.state.clearHistory();
-		this.state.persist();
-		this.state.notifyStateChange();
-
-		this.setEditorToEditMode(scheme.id);
-		this.renderSchemeList();
-		this.updateHeaderInfo();
-	}
-
-	processImportSchemeObj(rawObj) {
-		const scheme = SchemeSerializer.deserialize(rawObj);
-		scheme.id = 'scheme_' + Date.now();
-		this.state.normalizeSchemeTiles(scheme);
 
 		const existingIdx = this.state.schemes.findIndex(s => s.name === scheme.name);
 		if (existingIdx === -1) {
@@ -317,10 +298,12 @@ export class SchemeModal {
 			this.state.activeColorId = paletteKeys[0];
 		}
 
+		this.state.clearHistory();
 		this.state.pushHistory();
 		this.state.persist();
 		this.state.notifyStateChange();
 
+		this.setEditorToEditMode(scheme.id);
 		this.renderSchemeList();
 		this.updateHeaderInfo();
 	}
@@ -402,10 +385,10 @@ export class SchemeModal {
 			nameSpan.textContent = scheme.name;
 
 			const schemeBytes = StorageManager.getSchemeSizeBytes(scheme);
-			const schemeKB = (schemeBytes / 1024).toFixed(1);
+			const schemeKiB = (schemeBytes / 1024).toFixed(1);
 			const sizeSpan = document.createElement('span');
 			sizeSpan.className = 'scheme-size';
-			sizeSpan.textContent = ` ${SchemeModal.formatDimension(scheme.width, scheme.height, scheme.worldOriginX, scheme.worldOriginY)} · ${schemeKB} KB`;
+			sizeSpan.textContent = ` ${SchemeModal.formatDimension(scheme.width, scheme.height, scheme.worldOriginX, scheme.worldOriginY)} · ${schemeKiB} KiB`;
 
 			infoDiv.appendChild(nameSpan);
 			infoDiv.appendChild(sizeSpan);
@@ -499,8 +482,11 @@ export class SchemeModal {
 		if (!textEl || !meterEl) return;
 
 		const usage = StorageManager.getStorageUsage();
-		const usageTemplate = i18n.t('modal_schemes_storage_usage') || '{used} KB / 5 MB ({percent}%)';
-		textEl.textContent = usageTemplate.replace('{used}', usage.totalKB).replace('{percent}', usage.percent);
+		const usageTemplate = i18n.t('modal_schemes_storage_usage') || '{used} KiB / 5 MiB ({percent}%) (其他: {other} KiB)';
+		textEl.textContent = usageTemplate
+			.replace('{used}', usage.totalKiB)
+			.replace('{percent}', usage.percent)
+			.replace('{other}', usage.otherKiB);
 
 		meterEl.value = usage.percentNumber;
 		meterEl.classList.toggle('is-warning', usage.isWarning);
