@@ -75,8 +75,10 @@ meter.meter.is-warning::-moz-meter-bar { background:#f59e0b }
 meter.meter.is-danger::-webkit-meter-optimum-value { background:var(--danger) }
 meter.meter.is-danger::-moz-meter-bar { background:var(--danger) }
 
-/* ── 8. Custom Tooltip System (#global-tooltip) ── */
+/* ── 8. Custom Tooltip System (#global-tooltip & HTML5 Popover Top Layer) ── */
 .custom-tooltip { position:fixed; z-index:9999; pointer-events:none; opacity:0; transform:translateY(4px); transition:opacity .15s cubic-bezier(.4,0,.2,1), transform .15s cubic-bezier(.4,0,.2,1); background:var(--bg-p); backdrop-filter:var(--blur); border:1px solid var(--bd); border-radius:var(--r); color:var(--c0); font-size:calc(.78rem*var(--s)); line-height:1.45; padding:calc(6px*var(--s)) calc(10px*var(--s)); max-width:calc(280px*var(--s)); box-shadow:0 8px 24px rgba(0,0,0,.35); white-space:pre-wrap; word-break:break-word }
+.custom-tooltip[popover] { margin:0; inset:auto; border:1px solid var(--bd) }
+.custom-tooltip[popover]::backdrop { background:transparent; pointer-events:none }
 .custom-tooltip.visible { opacity:1; transform:translateY(0) }
 
 /* ── 5. Object: .btn (通用按鈕物件，全 em 相對單位) ── */

@@ -505,12 +505,5 @@ export class SchemeModal {
 		meterEl.value = usage.percentNumber;
 		meterEl.classList.toggle('is-warning', usage.isWarning);
 		meterEl.classList.toggle('is-danger', usage.isDanger);
-
-		// 確保原生的 title 屬性在 UI 更新時動態賦值至圓形幫助問號圖示
-		const tooltipText = i18n.t('modal_schemes_storage_capacity_tooltip');
-		const helpIcon = document.getElementById('scheme-storage-help-icon');
-		if (tooltipText && helpIcon) {
-			helpIcon.title = tooltipText;
-		}
 	}
 }

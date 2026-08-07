@@ -1,20 +1,19 @@
-/**
- * TooltipManager.js - 全站通用自訂懸浮提示管理器 (自動接管 title 屬性、防原生黑框、智慧邊界檢測)
- */
+import { i18n } from '../core/I18nManager.js';
 
 export class TooltipManager {
 	constructor() {
 		this.tooltipEl = null;
 		this.currentTargetEl = null;
-		this.rawTitleMap = new WeakMap(); // 儲存原生的 title 屬性備份
+		this.rawTitleMap = new WeakMap(); // 僅在記憶體中暫存挪動後的靜態 title 文字
 		this.init();
 	}
 
 	init() {
-		// 建立全域唯一的 Tooltip 浮層
+		// 建立全域唯一的 Tooltip 浮層 (啟用 HTML5 Popover 原生 Top Layer 特權)
 		this.tooltipEl = document.createElement('div');
 		this.tooltipEl.id = 'global-tooltip';
 		this.tooltipEl.className = 'custom-tooltip';
+		this.tooltipEl.setAttribute('popover', 'manual');
 		this.tooltipEl.setAttribute('role', 'tooltip');
 		this.tooltipEl.setAttribute('aria-hidden', 'true');
 		document.body.appendChild(this.tooltipEl);
@@ -28,28 +27,70 @@ export class TooltipManager {
 	}
 
 	handleMouseOver(e) {
-		const target = e.target.closest('[title], [data-tooltip-text]');
-		if (!target || target === this.tooltipEl) return;
+		const isTargetHelpIcon = Boolean(e.target && (e.target.id === 'scheme-storage-help-icon' || e.target.closest('#scheme-storage-help-icon')));
 
-		// 若元素有原生的 title，先擷取並備份，然後拔掉 title 屬性防止瀏覽器原生黑框彈出
-		let text = target.dataset.tooltipText;
-		if (target.hasAttribute('title')) {
-			const titleAttr = target.getAttribute('title');
-			if (titleAttr && titleAttr.trim()) {
-				text = titleAttr.trim();
-				target.dataset.tooltipText = text;
-				this.rawTitleMap.set(target, titleAttr);
-			}
-			target.removeAttribute('title');
+		if (isTargetHelpIcon) {
+			console.group('[TooltipDebug] 🔍 scheme-storage-help-icon 觸發 mouseover');
+			console.log('1. e.target:', e.target);
+			console.log('2. e.target.id:', e.target.id);
+			console.log('3. e.target.dataset:', { ...e.target.dataset });
+			console.log('4. closest([data-i18n-title], [title]):', e.target.closest('[data-i18n-title], [title]'));
 		}
 
-		if (!text || !text.trim()) return;
+		const target = e.target.closest('[data-i18n-title], [title]');
+		if (!target || target === this.tooltipEl) {
+			if (isTargetHelpIcon) {
+				console.warn('[TooltipDebug] ❌ 未匹配到目標元素 (target 被過濾或為 tooltipEl)');
+				console.groupEnd();
+			}
+			return;
+		}
+
+		let text = '';
+
+		// 1. 若有 data-i18n-title，優先即時查詢動態字典 (保證切換語言 100% 即時反應)
+		if (target.dataset.i18nTitle) {
+			text = i18n.t(target.dataset.i18nTitle);
+			if (isTargetHelpIcon) console.log('5. data.i18nTitle 字典查詢結果:', text);
+			if (target.hasAttribute('title')) {
+				target.removeAttribute('title'); // 拔掉原生 title 防醜黑框
+			}
+		} else if (target.hasAttribute('title')) {
+			// 2. 若為普通靜態 title，將內容「挪」至記憶體 WeakMap 中，並從 DOM 拔除 title 屬性
+			const rawVal = target.getAttribute('title').trim();
+			if (rawVal) {
+				text = rawVal;
+				this.rawTitleMap.set(target, rawVal);
+			}
+			target.removeAttribute('title');
+			if (isTargetHelpIcon) console.log('5. 靜態 title 挪動結果:', text);
+		} else if (this.rawTitleMap.has(target)) {
+			// 3. 從記憶體中取出先前已挪動的靜態文字
+			text = this.rawTitleMap.get(target);
+			if (isTargetHelpIcon) console.log('5. WeakMap 記憶體取出結果:', text);
+		}
+
+		if (!text || !text.trim()) {
+			if (isTargetHelpIcon) {
+				console.warn('[TooltipDebug] ❌ text 為空，無法呈現 Tooltip');
+				console.groupEnd();
+			}
+			return;
+		}
 
 		this.currentTargetEl = target;
 		this.tooltipEl.textContent = text;
 		this.tooltipEl.classList.add('visible');
 		this.tooltipEl.setAttribute('aria-hidden', 'false');
 		this.positionTooltip(e);
+
+		try {
+			if (this.tooltipEl.showPopover && !this.tooltipEl.matches(':popover-open')) {
+				this.tooltipEl.showPopover();
+			}
+		} catch (err) {
+			// Fallback for browsers without popover
+		}
 	}
 
 	handleMouseMove(e) {
@@ -70,18 +111,18 @@ export class TooltipManager {
 	}
 
 	hide() {
-		if (this.currentTargetEl) {
-			// 離開時若原先有原生 title，恢復其屬性確保 Accessibility 無障礙相容
-			const rawTitle = this.rawTitleMap.get(this.currentTargetEl);
-			if (rawTitle && !this.currentTargetEl.hasAttribute('title')) {
-				this.currentTargetEl.setAttribute('title', rawTitle);
-			}
-			this.currentTargetEl = null;
-		}
+		this.currentTargetEl = null;
 
 		if (this.tooltipEl) {
 			this.tooltipEl.classList.remove('visible');
 			this.tooltipEl.setAttribute('aria-hidden', 'true');
+			try {
+				if (this.tooltipEl.hidePopover && this.tooltipEl.matches(':popover-open')) {
+					this.tooltipEl.hidePopover();
+				}
+			} catch (err) {
+				// Fallback
+			}
 		}
 	}
 
