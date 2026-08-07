@@ -27,31 +27,14 @@ export class TooltipManager {
 	}
 
 	handleMouseOver(e) {
-		const isTargetHelpIcon = Boolean(e.target && (e.target.id === 'scheme-storage-help-icon' || e.target.closest('#scheme-storage-help-icon')));
-
-		if (isTargetHelpIcon) {
-			console.group('[TooltipDebug] 🔍 scheme-storage-help-icon 觸發 mouseover');
-			console.log('1. e.target:', e.target);
-			console.log('2. e.target.id:', e.target.id);
-			console.log('3. e.target.dataset:', { ...e.target.dataset });
-			console.log('4. closest([data-i18n-title], [title]):', e.target.closest('[data-i18n-title], [title]'));
-		}
-
 		const target = e.target.closest('[data-i18n-title], [title]');
-		if (!target || target === this.tooltipEl) {
-			if (isTargetHelpIcon) {
-				console.warn('[TooltipDebug] ❌ 未匹配到目標元素 (target 被過濾或為 tooltipEl)');
-				console.groupEnd();
-			}
-			return;
-		}
+		if (!target || target === this.tooltipEl) return;
 
 		let text = '';
 
 		// 1. 若有 data-i18n-title，優先即時查詢動態字典 (保證切換語言 100% 即時反應)
 		if (target.dataset.i18nTitle) {
 			text = i18n.t(target.dataset.i18nTitle);
-			if (isTargetHelpIcon) console.log('5. data.i18nTitle 字典查詢結果:', text);
 			if (target.hasAttribute('title')) {
 				target.removeAttribute('title'); // 拔掉原生 title 防醜黑框
 			}
@@ -63,20 +46,12 @@ export class TooltipManager {
 				this.rawTitleMap.set(target, rawVal);
 			}
 			target.removeAttribute('title');
-			if (isTargetHelpIcon) console.log('5. 靜態 title 挪動結果:', text);
 		} else if (this.rawTitleMap.has(target)) {
 			// 3. 從記憶體中取出先前已挪動的靜態文字
 			text = this.rawTitleMap.get(target);
-			if (isTargetHelpIcon) console.log('5. WeakMap 記憶體取出結果:', text);
 		}
 
-		if (!text || !text.trim()) {
-			if (isTargetHelpIcon) {
-				console.warn('[TooltipDebug] ❌ text 為空，無法呈現 Tooltip');
-				console.groupEnd();
-			}
-			return;
-		}
+		if (!text || !text.trim()) return;
 
 		this.currentTargetEl = target;
 		this.tooltipEl.textContent = text;
