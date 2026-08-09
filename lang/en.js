@@ -137,4 +137,5 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'toast_scheme_switched': 'Switched to scheme: "{name}"',
 	'toast_import_json_error': 'Failed to read JSON file, please check format!',
 	'toast_export_clipboard_error': 'Failed to copy to clipboard, please check permissions!',
+	'toast_tab_synced': 'Synced latest changes from another tab!',
 };

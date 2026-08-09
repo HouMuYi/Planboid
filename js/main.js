@@ -4,6 +4,7 @@
 
 import { i18n } from './core/I18nManager.js';
 import { StateManager } from './core/StateManager.js';
+import { TabSyncManager } from './core/TabSyncManager.js';
 import { CanvasRenderer } from './renderer/CanvasRenderer.js';
 import { AboutModal } from './ui/AboutModal.js';
 import { PalettePanel } from './ui/PalettePanel.js';
@@ -13,6 +14,7 @@ import { TooltipManager } from './ui/TooltipManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 	const stateManager = new StateManager();
+	const tabSyncManager = new TabSyncManager(stateManager);
 	const tooltipManager = new TooltipManager();
 
 	const canvas = document.getElementById('main-canvas');

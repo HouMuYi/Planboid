@@ -2,13 +2,15 @@
  * ToastNotification.js - 零原生彈窗之全站高質感 Toast 浮動提示元件
  */
 
+import { CONFIG } from '../core/Config.js';
+
 export class ToastNotification {
 	/**
 	 * @param {string} message 提示訊息
 	 * @param {'info' | 'success' | 'warning' | 'error'} type
 	 * @param {number} duration
 	 */
-	static show(message, type = 'info', duration = 2500) {
+	static show(message, type = 'info', duration = CONFIG.TOAST_DURATION_MS) {
 		let container = document.getElementById('toast-container');
 		if (!container) {
 			container = document.createElement('div');
@@ -16,8 +18,8 @@ export class ToastNotification {
 			document.body.appendChild(container);
 		}
 
-		// 限制最多同時顯示 5 個 Toast，防範瞬間大量訊息塞滿 DOM
-		while (container.children.length >= 5) {
+		// 限制最多同時顯示上限，防範瞬間大量訊息塞滿 DOM
+		while (container.children.length >= (CONFIG.TOAST_MAX_COUNT || 5)) {
 			const oldest = container.firstChild;
 			if (oldest) {
 				oldest.remove();

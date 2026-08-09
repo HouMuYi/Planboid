@@ -138,4 +138,5 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'toast_scheme_switched': '已切換至方案：「{name}」',
 	'toast_import_json_error': '讀取 JSON 檔案失敗，請檢查格式！',
 	'toast_export_clipboard_error': '複製至剪貼簿失敗，請檢查權限！',
+	'toast_tab_synced': '已自動同步其他分頁的最新變更！',
 };

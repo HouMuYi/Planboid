@@ -22,6 +22,8 @@ export const CONFIG = Object.freeze({
 
 	// 領域與狀態限制
 	HISTORY_MAX_STEPS: 30, // Undo / Redo 歷史紀錄最大步數
+	TOAST_DURATION_MS: 5000, // Toast 浮動提示預設顯示時間 (ms)
+	TOAST_MAX_COUNT: 5, // Toast 浮動提示最大同時顯示數量
 	SCHEME_SIZE_MIN: 10, // 方案寬度與高度最小網格限制
 	SCHEME_SIZE_MAX: 300, // 方案寬度與高度最大網格限制
 	Z_LEVEL_MIN: -17, // 最底層 Z 軸樓層限制
