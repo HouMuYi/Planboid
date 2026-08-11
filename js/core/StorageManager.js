@@ -6,8 +6,16 @@ import { CONFIG } from './Config.js';
 import { i18n } from './I18nManager.js';
 import { SchemeSerializer } from './SchemeSerializer.js';
 
-const STORAGE_KEY = 'planboid_data_v4';
-const LEGACY_STORAGE_KEYS = ['planboid_data_v3', 'planboid_data_v2', 'planboid_data'];
+// 動態由 CONFIG.SCHEMA_VERSION 衍生主鍵與歷史向下相容鍵名列表
+const STORAGE_KEY = `planboid_data_v${CONFIG.SCHEMA_VERSION}`;
+const LEGACY_STORAGE_KEYS = (() => {
+	const keys = [];
+	for (let i = CONFIG.SCHEMA_VERSION - 1; i >= 2; i--) {
+		keys.push(`planboid_data_v${i}`);
+	}
+	keys.push('planboid_data');
+	return keys;
+})();
 
 export class StorageManager {
 	/**
@@ -38,13 +46,16 @@ export class StorageManager {
 	static loadData() {
 		try {
 			let jsonStr = localStorage.getItem(STORAGE_KEY);
-			// 自動相容遷移：若 v4 無資料，嘗試讀取舊版 Storage Keys
+			let migratedFromKey = null;
+
+			// 自動相容遷移：若當前版號 Key 無資料，嘗試讀取舊版 Storage Keys
 			if (!jsonStr) {
 				for (const legacyKey of LEGACY_STORAGE_KEYS) {
 					const legacyDataStr = localStorage.getItem(legacyKey);
 					if (legacyDataStr) {
 						jsonStr = legacyDataStr;
-						console.log(`[StorageManager] 成功由舊版 Key (${legacyKey}) 遷移資料至 v4`);
+						migratedFromKey = legacyKey;
+						console.log(`[StorageManager] 成功由舊版 Key (${legacyKey}) 遷移資料至 ${STORAGE_KEY}`);
 						break;
 					}
 				}
@@ -62,7 +73,7 @@ export class StorageManager {
 
 			const data = JSON.parse(jsonStr);
 			if (data && Array.isArray(data.schemes) && data.schemes.length > 0) {
-				// 透過權威門面解析器 100% 同步穩健解析所有載體（PZB1 / 明文 JSON / 舊版物件）
+				// 透過權威門面解析器 100% 同步穩健解析所有載體（PZB1~PZB5 / 明文 JSON / 舊版物件）
 				const deserializedSchemes = data.schemes
 					.map(s => SchemeSerializer.parse(s))
 					.filter(Boolean);
@@ -78,6 +89,12 @@ export class StorageManager {
 				// 確保 activeSchemeId 有效
 				if (!data.activeSchemeId || !data.schemes.some(s => s.id === data.activeSchemeId)) {
 					data.activeSchemeId = data.schemes[0].id;
+				}
+
+				// 若成功由舊版 Key 遷移，將升級為 v5 的資料寫入並徹底清理刪除舊 Key 釋放容量
+				if (migratedFromKey) {
+					this.saveData(data);
+					this.clearLegacyStorageKeys();
 				}
 
 				return data;
@@ -113,6 +130,22 @@ export class StorageManager {
 			localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 		} catch (e) {
 			console.error('寫入 localStorage 失敗:', e);
+		}
+	}
+
+	/**
+	 * 清理歷史舊版 LocalStorage 鍵名，釋放瀏覽器儲存容量
+	 */
+	static clearLegacyStorageKeys() {
+		try {
+			for (const legacyKey of LEGACY_STORAGE_KEYS) {
+				if (localStorage.getItem(legacyKey) !== null) {
+					localStorage.removeItem(legacyKey);
+					console.log(`[StorageManager] 已成功清理舊版 LocalStorage 鍵名: ${legacyKey}`);
+				}
+			}
+		} catch (e) {
+			console.warn('[StorageManager] 清理舊版 LocalStorage 鍵名失敗:', e);
 		}
 	}
 

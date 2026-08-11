@@ -21,6 +21,7 @@ export const CONFIG = Object.freeze({
 	EDGE_SNAP_MAX: 0.75, // 網格內判定牆面邊緣吸附上限 (75%)
 
 	// 領域與狀態限制
+	SCHEMA_VERSION: 5, // 全站當前大一統架構版本號 (v5)
 	HISTORY_MAX_STEPS: 30, // Undo / Redo 歷史紀錄最大步數
 	TOAST_DURATION_MS: 5000, // Toast 浮動提示預設顯示時間 (ms)
 	TOAST_MAX_COUNT: 5, // Toast 浮動提示最大同時顯示數量

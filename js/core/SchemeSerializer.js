@@ -2,7 +2,7 @@
  * SchemeSerializer.js - 方案極簡 JSON 權威序列化深模組 (Deep Module)
  * 1. 保留固定方案 ID (scheme.id)，確保瀏覽器重新整理後完美記憶當前所選方案
  * 2. Palette 調色盤採用元組陣列 `p: [[id, name, color], ...]`
- * 3. Tiles 地塊採用元組陣列 `d: [[x, y, z, type, val], ...]`
+ * 3. Tiles 地塊採用元組陣列 `d: [[x, y, z, ...], ...]` (v5 複合格式)
  * 4. 牆面 100% 無損正規化 (自動將 S/E 邊線轉化為對應格點之 N/W 邊線)
  */
 
@@ -11,7 +11,7 @@ import { BorderEdgeNormalizer } from '../renderer/BorderEdgeNormalizer.js';
 
 export class SchemeSerializer {
 	/**
-	 * 將完整的 Scheme 數據結構壓縮為極簡平鋪 JSON 物件
+	 * 將 Scheme 領域模型序列化為同格多層複合元組 (v5 規格)
 	 * @param {Object} scheme
 	 * @returns {Object} 扁平化極簡方案物件
 	 */
@@ -26,12 +26,17 @@ export class SchemeSerializer {
 			item?.isObject ? 1 : 0,
 		]);
 
-		// 建立臨時牆面與牆面物件正規化 map
-		const denseTiles = [];
-		if (scheme.tiles) {
-			const normalizedWalls = new Map();
-			const normalizedWallObjects = new Map();
+		// 同格多層複合元組 Map: coordKey -> { floor, wallN, wallW, label, floorObjs, wallNObjs, wallWObjs }
+		const tileMap = new Map();
+		const getComposite = (x, y, z) => {
+			const key = `${x},${y},${z}`;
+			if (!tileMap.has(key)) {
+				tileMap.set(key, { x, y, z, f: 0, wN: 0, wW: 0, l: 0, fo: 0, woN: 0, woW: 0 });
+			}
+			return tileMap.get(key);
+		};
 
+		if (scheme.tiles) {
 			Object.entries(scheme.tiles).forEach(([coordKey, tile]) => {
 				const [xStr, yStr, zStr] = coordKey.split(',');
 				const x = parseInt(xStr, 10);
@@ -39,25 +44,21 @@ export class SchemeSerializer {
 				const z = parseInt(zStr, 10);
 
 				if (isNaN(x) || isNaN(y) || isNaN(z) || !tile) return;
+				const comp = getComposite(x, y, z);
 
-				if (tile.floorColorId) {
-					denseTiles.push([x, y, z, 0, tile.floorColorId]);
-				}
-
+				if (tile.floorColorId) comp.f = tile.floorColorId;
+				if (tile.label) comp.l = tile.label;
 				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
-					denseTiles.push([x, y, z, 4, tile.floorObjects]);
-				}
-
-				if (tile.label) {
-					denseTiles.push([x, y, z, 3, tile.label]);
+					comp.fo = tile.floorObjects;
 				}
 
 				if (tile.walls) {
 					Object.entries(tile.walls).forEach(([edge, colorId]) => {
 						if (colorId) {
 							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-							const wKey = `${norm.x},${norm.y},${z},${norm.edge}`;
-							normalizedWalls.set(wKey, colorId);
+							const normComp = getComposite(norm.x, norm.y, z);
+							if (norm.edge === 'N') normComp.wN = colorId;
+							else if (norm.edge === 'W') normComp.wW = colorId;
 						}
 					});
 				}
@@ -66,34 +67,34 @@ export class SchemeSerializer {
 					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
 						if (Array.isArray(objArray) && objArray.length > 0) {
 							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-							const wKey = `${norm.x},${norm.y},${z},${norm.edge}`;
-							normalizedWallObjects.set(wKey, objArray);
+							const normComp = getComposite(norm.x, norm.y, z);
+							if (norm.edge === 'N') normComp.woN = objArray;
+							else if (norm.edge === 'W') normComp.woW = objArray;
 						}
 					});
 				}
 			});
-
-			normalizedWalls.forEach((colorId, wKey) => {
-				const [xStr, yStr, zStr, edge] = wKey.split(',');
-				const x = parseInt(xStr, 10);
-				const y = parseInt(yStr, 10);
-				const z = parseInt(zStr, 10);
-				const type = (edge === 'N') ? 1 : 2;
-				denseTiles.push([x, y, z, type, colorId]);
-			});
-
-			normalizedWallObjects.forEach((objArray, wKey) => {
-				const [xStr, yStr, zStr, edge] = wKey.split(',');
-				const x = parseInt(xStr, 10);
-				const y = parseInt(yStr, 10);
-				const z = parseInt(zStr, 10);
-				const type = (edge === 'N') ? 5 : 6;
-				denseTiles.push([x, y, z, type, objArray]);
-			});
 		}
 
+		// 轉換為複合元組陣列，並進行尾部 0 截斷優化
+		const denseTiles = [];
+		tileMap.forEach(comp => {
+			// 完整槽位: [x, y, z, floor, wallN, wallW, label, floorObjs, wallNObjs, wallWObjs]
+			const tuple = [comp.x, comp.y, comp.z, comp.f, comp.wN, comp.wW, comp.l, comp.fo, comp.woN, comp.woW];
+
+			// 尾部 0 截斷
+			while (tuple.length > 3 && tuple[tuple.length - 1] === 0) {
+				tuple.pop();
+			}
+
+			// 若除了座標外完全沒有內容，則不輸出
+			if (tuple.length > 3) {
+				denseTiles.push(tuple);
+			}
+		});
+
 		return {
-			v: 2,
+			v: CONFIG.SCHEMA_VERSION || 5,
 			id: scheme.id || `scheme_${Date.now()}`,
 			n: scheme.name || '未命名方案',
 			w: scheme.width || CONFIG.DEFAULT_SCHEME_WIDTH,
@@ -106,7 +107,7 @@ export class SchemeSerializer {
 	}
 
 	/**
-	 * 將輸入的 JSON 字串或 JSON 物件解碼還原為標準 Scheme 物件
+	 * 將輸入的 JSON 字串或 JSON 物件解碼還原為標準 Scheme 物件 (支援 v5 複合元組與 v2~v4 舊單項元組)
 	 * @param {string|Object} rawInput
 	 * @returns {Object} 標準化 Scheme 領域模型
 	 */
@@ -149,38 +150,90 @@ export class SchemeSerializer {
 			return tilesMap[key];
 		};
 
-		// 解析地塊元組陣列: [[x, y, z, type, val], ...]
+		// 解析地塊元組陣列 (智慧判定 v5 複合元組 vs v2~v4 舊單項元組)
 		if (Array.isArray(obj.d)) {
 			obj.d.forEach(tuple => {
-				if (!Array.isArray(tuple) || tuple.length < 5) return;
-				const [xRaw, yRaw, zRaw, type, val] = tuple;
-				const x = Number(xRaw);
-				const y = Number(yRaw);
-				const z = Number(zRaw);
+				if (!Array.isArray(tuple) || tuple.length < 4) return;
+				const x = Number(tuple[0]);
+				const y = Number(tuple[1]);
+				const z = Number(tuple[2]);
+				if (isNaN(x) || isNaN(y) || isNaN(z)) return;
 
-				if (isNaN(x) || isNaN(y) || isNaN(z) || val === undefined || val === null) return;
+				// 判斷是否為舊版單項元組 (tuple[3] 為整數 0~6 代表單項類型)
+				const isLegacyTypeTuple = (
+					typeof tuple[3] === 'number' &&
+					tuple[3] >= 0 && tuple[3] <= 6 &&
+					tuple.length <= 5 &&
+					(obj.v === undefined || obj.v < 5)
+				);
 
-				if (type === 0) {
-					const tile = getTile(x, y, z);
-					tile.floorColorId = val;
-				} else if (type === 1 || type === 2) {
-					const edge = (type === 1) ? 'N' : 'W';
-					const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-					const tile = getTile(norm.x, norm.y, z);
-					if (!tile.walls) tile.walls = {};
-					tile.walls[norm.edge] = val;
-				} else if (type === 3) {
-					const tile = getTile(x, y, z);
-					tile.label = val;
-				} else if (type === 4) {
-					const tile = getTile(x, y, z);
-					tile.floorObjects = Array.isArray(val) ? val : [val];
-				} else if (type === 5 || type === 6) {
-					const edge = (type === 5) ? 'N' : 'W';
-					const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-					const tile = getTile(norm.x, norm.y, z);
-					if (!tile.wallObjects) tile.wallObjects = {};
-					tile.wallObjects[norm.edge] = Array.isArray(val) ? val : [val];
+				if (isLegacyTypeTuple) {
+					// 舊版 v2~v4 解碼分支
+					const type = tuple[3];
+					const val = tuple[4];
+					if (val === undefined || val === null || val === 0) return;
+
+					if (type === 0) {
+						getTile(x, y, z).floorColorId = val;
+					} else if (type === 1 || type === 2) {
+						const edge = (type === 1) ? 'N' : 'W';
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+						const tile = getTile(norm.x, norm.y, z);
+						if (!tile.walls) tile.walls = {};
+						tile.walls[norm.edge] = val;
+					} else if (type === 3) {
+						getTile(x, y, z).label = val;
+					} else if (type === 4) {
+						getTile(x, y, z).floorObjects = Array.isArray(val) ? val : [val];
+					} else if (type === 5 || type === 6) {
+						const edge = (type === 5) ? 'N' : 'W';
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+						const tile = getTile(norm.x, norm.y, z);
+						if (!tile.wallObjects) tile.wallObjects = {};
+						tile.wallObjects[norm.edge] = Array.isArray(val) ? val : [val];
+					}
+				} else {
+					// 新版 v5 同格多層複合元組解碼分支
+					// [x, y, z, floor, wallN, wallW, label, floorObjs, wallNObjs, wallWObjs]
+					const floor = tuple[3];
+					const wallN = tuple[4];
+					const wallW = tuple[5];
+					const label = tuple[6];
+					const floorObjs = tuple[7];
+					const wallNObjs = tuple[8];
+					const wallWObjs = tuple[9];
+
+					if (floor && floor !== 0) getTile(x, y, z).floorColorId = floor;
+					if (label && label !== 0) getTile(x, y, z).label = label;
+					if (Array.isArray(floorObjs) && floorObjs.length > 0) getTile(x, y, z).floorObjects = floorObjs;
+
+					if (wallN && wallN !== 0) {
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'N');
+						const tile = getTile(norm.x, norm.y, z);
+						if (!tile.walls) tile.walls = {};
+						tile.walls[norm.edge] = wallN;
+					}
+
+					if (wallW && wallW !== 0) {
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'W');
+						const tile = getTile(norm.x, norm.y, z);
+						if (!tile.walls) tile.walls = {};
+						tile.walls[norm.edge] = wallW;
+					}
+
+					if (Array.isArray(wallNObjs) && wallNObjs.length > 0) {
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'N');
+						const tile = getTile(norm.x, norm.y, z);
+						if (!tile.wallObjects) tile.wallObjects = {};
+						tile.wallObjects[norm.edge] = wallNObjs;
+					}
+
+					if (Array.isArray(wallWObjs) && wallWObjs.length > 0) {
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'W');
+						const tile = getTile(norm.x, norm.y, z);
+						if (!tile.wallObjects) tile.wallObjects = {};
+						tile.wallObjects[norm.edge] = wallWObjs;
+					}
 				}
 			});
 		} else if (typeof obj.tiles === 'object' && obj.tiles !== null) {
@@ -235,7 +288,7 @@ export class SchemeSerializer {
 	}
 
 	/**
-	 * 輸出美化 JSON 字串，使子陣列元組 [x,y,z,type,val] 保持單行
+	 * 輸出美化 JSON 字串，使子陣列元組保持單行
 	 * @param {Object} compactObj
 	 * @returns {string} 格式化 JSON 字串
 	 */
@@ -247,24 +300,25 @@ export class SchemeSerializer {
 			? '[\n' + dList.map(tuple => '    ' + JSON.stringify(tuple)).join(',\n') + '\n  ]'
 			: '[]';
 
-		return `{\n  "v": ${compactObj.v || 2},\n  "id": ${JSON.stringify(compactObj.id || '')},\n  "n": ${JSON.stringify(compactObj.n || '')},\n  "w": ${
+		return `{\n  "v": ${compactObj.v || CONFIG.SCHEMA_VERSION || 5},\n  "id": ${JSON.stringify(compactObj.id || '')},\n  "n": ${JSON.stringify(compactObj.n || '')},\n  "w": ${
 			compactObj.w || CONFIG.DEFAULT_SCHEME_WIDTH
 		},\n  "h": ${compactObj.h || CONFIG.DEFAULT_SCHEME_HEIGHT},\n  "ox": ${compactObj.ox ?? CONFIG.DEFAULT_ORIGIN_X},\n  "oy": ${compactObj.oy ?? CONFIG.DEFAULT_ORIGIN_Y},\n  "p": ${pStr},\n  "d": ${dStr}\n}`;
 	}
 
 	/**
-	 * 將 Scheme 物件高倍率無損壓縮為前綴 Base64 字串 ("PZB1:...")
+	 * 將 Scheme 物件高倍率無損壓縮為前綴 Base64 字串 (使用 CONFIG.SCHEMA_VERSION 動態衍生 "PZB5:...")
 	 * 採用原生 CompressionStream (deflate-raw)，體積可暴減 85% ~ 95%
 	 * @param {Object} scheme
-	 * @returns {Promise<string>} PZB1: 前綴壓縮 Base64 字串
+	 * @returns {Promise<string>} 壓縮 Base64 字串
 	 */
 	static async compressToString(scheme) {
 		const compactObj = this.serialize(scheme);
 		if (!compactObj) return '';
 		const jsonStr = JSON.stringify(compactObj);
 
+		const prefix = `PZB${CONFIG.SCHEMA_VERSION || 5}:`;
 		try {
-			if (typeof window !== 'undefined' && 'CompressionStream' in window) {
+			if (typeof CompressionStream !== 'undefined') {
 				const encoder = new TextEncoder();
 				const data = encoder.encode(jsonStr);
 				const cs = new CompressionStream('deflate-raw');
@@ -281,7 +335,7 @@ export class SchemeSerializer {
 					binaryStr += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
 				}
 				const base64 = btoa(binaryStr);
-				return 'PZB1:' + base64;
+				return prefix + base64;
 			}
 		} catch (e) {
 			console.warn('[SchemeSerializer] CompressionStream 壓縮失敗，自動降級為明文 JSON:', e);
@@ -290,7 +344,7 @@ export class SchemeSerializer {
 	}
 
 	/**
-	 * 權威向下相容解碼器：支援新版 PZB1: 壓縮字串、舊版無壓縮明文 JSON 與原始物件
+	 * 權威向下相容解碼器：支援 PZB 壓縮字串 (Regex 自動相容任意 PZB1:~PZB5: 前綴)、舊版無壓縮明文 JSON 與原始物件
 	 * @param {string|Object} rawInput
 	 * @returns {Promise<Object>} 還原 Scheme 領域模型
 	 */
@@ -304,17 +358,18 @@ export class SchemeSerializer {
 		const str = String(rawInput).trim();
 		if (!str) throw new Error('空白方案字串');
 
-		// 1. 新版 PZB1: 高倍率解壓路徑
-		if (str.startsWith('PZB1:')) {
+		// 1. PZB 標頭匹配 (Regex 相容 PZB1:~PZB5:)
+		const pzbMatch = str.match(/^PZB\d+:(.+)$/s);
+		if (pzbMatch) {
 			try {
-				const base64 = str.substring(5);
+				const base64 = pzbMatch[1];
 				const binaryStr = atob(base64);
 				const bytes = new Uint8Array(binaryStr.length);
 				for (let i = 0; i < binaryStr.length; i++) {
 					bytes[i] = binaryStr.charCodeAt(i);
 				}
 
-				if (typeof window !== 'undefined' && 'DecompressionStream' in window) {
+				if (typeof DecompressionStream !== 'undefined') {
 					const ds = new DecompressionStream('deflate-raw');
 					const writer = ds.writable.getWriter();
 					writer.write(bytes);
@@ -322,10 +377,10 @@ export class SchemeSerializer {
 
 					const decompressedBuffer = await new Response(ds.readable).arrayBuffer();
 					const jsonStr = new TextDecoder().decode(decompressedBuffer);
-					return this.deserialize(JSON.parse(jsonStr));
+					return this.parse(JSON.parse(jsonStr));
 				}
 			} catch (e) {
-				console.error('[SchemeSerializer] 解壓 PZB1: 方案字串失敗:', e);
+				console.error('[SchemeSerializer] 解壓 PZB 方案字串失敗:', e);
 				throw new Error('壓縮方案字串損毀或解碼失敗');
 			}
 		}
@@ -333,7 +388,7 @@ export class SchemeSerializer {
 		// 2. 向下相容路徑：舊版無壓縮 JSON 明文或美化 JSON
 		try {
 			const obj = JSON.parse(str);
-			return this.deserialize(obj);
+			return this.parse(obj);
 		} catch (e) {
 			throw new Error('無法解析的方案內容格式');
 		}
@@ -341,7 +396,7 @@ export class SchemeSerializer {
 
 	/**
 	 * 權威統一門面解析器 (Facade Parser)：
-	 * 接受 PZB1 壓縮 Base64 字串、明文 JSON 字串、平鋪 JSON 物件或 Scheme 物件
+	 * 接受 PZB 壓縮 Base64 字串、明文 JSON 字串、平鋪 JSON 物件或 Scheme 物件
 	 * 統一完成還原、4 方向牆面正規化與預設色票補齊
 	 * @param {string|Object} rawInput
 	 * @returns {Object} 100% 合法且標準化的 Scheme 領域模型
@@ -353,20 +408,10 @@ export class SchemeSerializer {
 		try {
 			if (typeof rawInput === 'string') {
 				const str = rawInput.trim();
-				if (str.startsWith('PZB1:')) {
-					// PZB1 壓縮字串，若直接傳入嘗試解析或解碼
-					try {
-						const base64 = str.substring(5);
-						const binaryStr = atob(base64);
-						const bytes = new Uint8Array(binaryStr.length);
-						for (let i = 0; i < binaryStr.length; i++) {
-							bytes[i] = binaryStr.charCodeAt(i);
-						}
-						// 同步層降級安全解析
-						scheme = this.deserialize(str);
-					} catch (e) {
-						scheme = this.deserialize(str);
-					}
+				const pzbMatch = str.match(/^PZB\d+:(.+)$/s);
+				if (pzbMatch) {
+					// PZB 前綴字串需要非同步 decompressFromString，同步門面回傳最安全的預設解析
+					scheme = this.deserialize(str);
 				} else {
 					scheme = this.deserialize(JSON.parse(str));
 				}

@@ -178,9 +178,9 @@ export class SchemeModal {
 				if (!file) return;
 
 				const reader = new FileReader();
-				reader.onload = (event) => {
+				reader.onload = async (event) => {
 					try {
-						this.importScheme(event.target.result);
+						await this.importScheme(event.target.result);
 						ToastNotification.show(i18n.t('toast_scheme_imported') || '方案匯入成功！', 'success');
 					} catch (err) {
 						ToastNotification.show(i18n.t('toast_import_json_error'), 'error');
@@ -215,10 +215,10 @@ export class SchemeModal {
 				// Ignore clipboard read error
 			}
 
-			// 優先嘗試直接解析剪貼簿中合法的 PZB1: 或 JSON 內容
+			// 優先嘗試直接解析剪貼簿中合法的 PZB1:~PZB5: 或 JSON 內容
 			if (clipboardText && clipboardText.trim()) {
 				try {
-					this.importScheme(clipboardText.trim());
+					await this.importScheme(clipboardText.trim());
 					ToastNotification.show(i18n.t('toast_text_imported') || '已自動從剪貼簿成功匯入方案！', 'success');
 					return;
 				} catch (e) {
@@ -237,12 +237,12 @@ export class SchemeModal {
 			this.hideTextImportBox();
 		});
 
-		this.btnSubmitTextImport?.addEventListener('click', () => {
+		this.btnSubmitTextImport?.addEventListener('click', async () => {
 			const val = this.inputTextSchemeData?.value || '';
 			if (!val.trim()) return;
 
 			try {
-				this.importScheme(val.trim());
+				await this.importScheme(val.trim());
 				this.hideTextImportBox();
 				this.modal?.close();
 				ToastNotification.show(i18n.t('toast_text_imported') || '方案文字匯入成功！', 'success');
@@ -272,12 +272,12 @@ export class SchemeModal {
 	}
 
 	/**
-	 * 權威方案匯入入口：接收 PZB1 壓縮字串、明文 JSON 字串、JSON 物件或標準 Scheme 物件
-	 * 統一透過 SchemeSerializer.parse() 門面完成解碼、色票補齊與權威切換
+	 * 權威方案匯入入口：接收 PZB 壓縮字串 (PZB1:~PZB5:)、明文 JSON 字串、JSON 物件或標準 Scheme 物件
+	 * 統一透過 SchemeSerializer.decompressFromString() 門面完成非同步解碼、色票補齊與權威切換
 	 * @param {string|Object} rawInput
 	 */
-	importScheme(rawInput) {
-		const scheme = SchemeSerializer.parse(rawInput);
+	async importScheme(rawInput) {
+		const scheme = await SchemeSerializer.decompressFromString(rawInput);
 		if (!scheme) throw new Error('無法解析的方案格式');
 
 		scheme.id = 'scheme_' + Date.now();
