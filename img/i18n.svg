@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+	<defs>
+		<!-- 主卡片藍靛漸層 (Indigo-to-Deep Slate) -->
+		<linearGradient id="cardLeftGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#6366f1" />
+			<stop offset="100%" stop-color="#3730a3" />
+		</linearGradient>
+
+		<!-- 次卡片深色玻璃擬態漸層 (Dark Glassmorphism) -->
+		<linearGradient id="cardRightGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#1e293b" stop-opacity="0.95" />
+			<stop offset="100%" stop-color="#0f172a" stop-opacity="0.98" />
+		</linearGradient>
+
+		<!-- 文字高光漸層 -->
+		<linearGradient id="textLightGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+			<stop offset="0%" stop-color="#ffffff" />
+			<stop offset="100%" stop-color="#cbd5e1" />
+		</linearGradient>
+
+		<!-- 雙子流光弧線漸層 -->
+		<linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#38bdf8" />
+			<stop offset="100%" stop-color="#818cf8" />
+		</linearGradient>
+
+		<!-- 陰影濾鏡 -->
+		<filter id="cardShadow" x="-10%" y="-10%" width="130%" height="130%">
+			<feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.4" />
+		</filter>
+	</defs>
+
+	<!-- 右下卡片：「文」字卡 (底層玻璃擬態) -->
+	<g id="card-zh" filter="url(#cardShadow)">
+		<rect x="22" y="22" width="34" height="34" rx="8" fill="url(#cardRightGrad)" stroke="rgba(99, 102, 241, 0.45)" stroke-width="1.5" />
+		<text x="39" y="45.5" font-size="17" font-weight="700" text-anchor="middle" fill="#818cf8" font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">文</text>
+	</g>
+
+	<!-- 左上卡片：「A」字主卡 (上層藍靛實體) -->
+	<g id="card-en" filter="url(#cardShadow)">
+		<rect x="8" y="8" width="34" height="34" rx="8" fill="url(#cardLeftGrad)" stroke="rgba(255, 255, 255, 0.25)" stroke-width="1.5" />
+		<text x="25" y="32.5" font-size="19" font-weight="800" text-anchor="middle" fill="url(#textLightGrad)" font-family="'Ubuntu Mono', Consolas, sans-serif">A</text>
+	</g>
+
+	<!-- 雙向切換流光弧線與星光裝飾 (Language Swap Loop) -->
+	<path d="M 12 47 Q 16 54 23 54" fill="none" stroke="url(#arcGrad)" stroke-width="2" stroke-linecap="round" />
+	<polygon points="25,54 21,51.5 21,56.5" fill="#818cf8" />
+
+	<!-- 右上雙子流光小星光 ✨ -->
+	<path d="M 48 10 Q 50 14 54 16 Q 50 18 48 22 Q 46 18 42 16 Q 46 14 48 10 Z" fill="#38bdf8" opacity="0.9" />
+</svg>

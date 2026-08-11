@@ -104,6 +104,7 @@ meter.meter.is-danger::-moz-meter-bar { background:var(--danger) }
 .logo-area { flex-shrink:0; gap:calc(8px*var(--s)) }
 .header-actions { flex-shrink:0; gap:calc(8px*var(--s)) }
 .logo-icon { width:calc(32px*var(--s)); height:calc(32px*var(--s)); flex-shrink:0; object-fit:contain }
+.i18n-icon { width:calc(26px*var(--s)); height:calc(26px*var(--s)); flex-shrink:0; object-fit:contain; opacity:0.95; transition:transform 0.2s }
 .header-center { flex:1; min-width:0; justify-content:center; gap:calc(8px*var(--s)) }
 .logo-title { font-family:'Orbitron',sans-serif; font-weight:700; font-size:calc(1.25rem*var(--s)); background:linear-gradient(135deg,#a5b4fc,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent }
 .badge { font-size:calc(.7rem*var(--s)); background:rgba(99,102,241,.15); color:#a5b4fc; padding:.25em .65em; border-radius:1em; border:1px solid rgba(99,102,241,.3); display:inline-flex; align-items:center; white-space:nowrap; width:auto }
