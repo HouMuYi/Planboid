@@ -83,15 +83,25 @@ document.addEventListener('DOMContentLoaded', () => {
 	});
 
 	const infoCoords = document.getElementById('info-coords');
+	const infoDrag = document.getElementById('info-drag');
 	const infoGameCoords = document.getElementById('info-game-coords');
 	const infoZoom = document.getElementById('info-zoom');
 
 	window.addEventListener('gridhover', (e) => {
-		const { x, y, gameX, gameY } = e.detail;
+		const { x, y, gameX, gameY, dragDim } = e.detail;
 		const z = stateManager.currentZLevel;
 		const displayZ = StateManager.toDisplayZ(z);
 		if (infoCoords) {
 			infoCoords.textContent = i18n.t('viewport_info_coords', { x, y, z: displayZ });
+		}
+		if (infoDrag) {
+			if (dragDim) {
+				infoDrag.textContent = i18n.t('viewport_info_drag_dim', { x: dragDim.x, y: dragDim.y });
+				infoDrag.style.display = '';
+			} else {
+				infoDrag.textContent = '';
+				infoDrag.style.display = 'none';
+			}
 		}
 		if (infoGameCoords) {
 			infoGameCoords.textContent = i18n.t('viewport_info_game_coords', { gameX, gameY });

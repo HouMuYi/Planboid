@@ -114,6 +114,7 @@ export class InputDispatcher {
 		if (canceledAny) {
 			this.renderer.requestRenderAll();
 			this.state.notifyStateChange();
+			this.notifyHoverState();
 		}
 
 		return canceledAny;
@@ -216,6 +217,7 @@ export class InputDispatcher {
 					if (!this.renderer.wallStartPoint) {
 						this.renderer.wallStartPoint = { x: ix, y: iy };
 						this.renderer.requestRenderOverlay();
+						this.notifyHoverState();
 					}
 					return;
 				}
@@ -224,6 +226,7 @@ export class InputDispatcher {
 				this.renderer.rectStartCell = { x: cellX, y: cellY };
 				this.renderer.isPainting = true;
 				this.renderer.requestRenderOverlay();
+				this.notifyHoverState();
 			}
 		});
 
@@ -255,6 +258,8 @@ export class InputDispatcher {
 			if (this.renderer.wallStartPoint) {
 				this.finalizeWallOperationIfMoved();
 			}
+
+			this.notifyHoverState();
 		};
 
 		window.addEventListener('mouseup', handleMouseUp);
@@ -284,6 +289,7 @@ export class InputDispatcher {
 				this.renderer.rectStartCell = null;
 				this.renderer.wallStartPoint = null;
 				this.renderer.requestRenderOverlay();
+				this.notifyHoverState();
 
 				const t1 = e.touches[0];
 				const t2 = e.touches[1];
@@ -409,6 +415,48 @@ export class InputDispatcher {
 		}, { passive: false });
 	}
 
+	/**
+	 * 計算當前拖曳繪製量（地塊矩形或邊線直線），統一以 { x, y } 結構回傳
+	 * @returns {{ x: number, y: number } | null}
+	 */
+	getDragDimension() {
+		if (this.renderer.rectStartCell && this.renderer.hoveredCell.x >= 0 && this.renderer.hoveredCell.y >= 0) {
+			const dx = Math.abs(this.renderer.hoveredCell.x - this.renderer.rectStartCell.x) + 1;
+			const dy = Math.abs(this.renderer.hoveredCell.y - this.renderer.rectStartCell.y) + 1;
+			return { x: dx, y: dy };
+		}
+		if (this.renderer.wallStartPoint && this.renderer.hoveredIntersection.x >= 0 && this.renderer.hoveredIntersection.y >= 0) {
+			const end = GeometryPipeline.constrainAxisPoint(this.renderer.wallStartPoint, this.renderer.hoveredIntersection);
+			const dx = Math.abs(end.x - this.renderer.wallStartPoint.x);
+			const dy = Math.abs(end.y - this.renderer.wallStartPoint.y);
+			return { x: dx, y: dy };
+		}
+		return null;
+	}
+
+	/**
+	 * 派發全域網格懸停與拖曳狀態更新事件
+	 */
+	notifyHoverState() {
+		const cellX = this.renderer.hoveredCell.x;
+		const cellY = this.renderer.hoveredCell.y;
+		const displayX = cellX + 1;
+		const displayY = cellY + 1;
+		const gameX = (this.state?.scheme?.worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X) + (cellX >= 0 ? cellX : 0);
+		const gameY = (this.state?.scheme?.worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y) + (cellY >= 0 ? cellY : 0);
+
+		const event = new CustomEvent('gridhover', {
+			detail: {
+				x: displayX,
+				y: displayY,
+				gameX,
+				gameY,
+				dragDim: this.getDragDimension(),
+			},
+		});
+		window.dispatchEvent(event);
+	}
+
 	updateHoverState(cellX, cellY, edge, ix = -1, iy = -1) {
 		const changed = cellX !== this.renderer.hoveredCell.x
 			|| cellY !== this.renderer.hoveredCell.y
@@ -420,21 +468,7 @@ export class InputDispatcher {
 			this.renderer.hoveredCell = { x: cellX, y: cellY, edge };
 			this.renderer.hoveredIntersection = { x: ix, y: iy };
 			this.renderer.requestRenderOverlay();
-
-			const displayX = cellX + 1;
-			const displayY = cellY + 1;
-			const gameX = (this.state?.scheme?.worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X) + cellX;
-			const gameY = (this.state?.scheme?.worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y) + cellY;
-
-			const event = new CustomEvent('gridhover', {
-				detail: {
-					x: displayX,
-					y: displayY,
-					gameX,
-					gameY,
-				},
-			});
-			window.dispatchEvent(event);
+			this.notifyHoverState();
 		}
 	}
 

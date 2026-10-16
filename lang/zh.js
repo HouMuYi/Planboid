@@ -54,6 +54,7 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'viewport_btn_reset_view_title': '重設視角與縮放',
 	'viewport_btn_fit_view_title': '顯示全部畫布與地塊',
 	'viewport_info_coords': '網格：({x}, {y}), Z：{z}',
+	'viewport_info_drag_dim': '繪製：({x}, {y})',
 	'viewport_info_game_coords': 'PZ 座標：({gameX}, {gameY})',
 	'viewport_info_zoom': 'Zoom: {zoom}%',
 

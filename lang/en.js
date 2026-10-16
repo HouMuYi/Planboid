@@ -53,6 +53,7 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'viewport_btn_reset_view_title': 'Reset View & Zoom',
 	'viewport_btn_fit_view_title': 'Fit All Tiles to Screen',
 	'viewport_info_coords': 'Grid: ({x}, {y}), Z: {z}',
+	'viewport_info_drag_dim': 'Draw: ({x}, {y})',
 	'viewport_info_game_coords': 'PZ Coords: ({gameX}, {gameY})',
 	'viewport_info_zoom': 'Zoom: {zoom}%',
 
