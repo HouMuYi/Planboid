@@ -1,6 +1,6 @@
 export class RenderCacheManager {
 	constructor() {
-		// key: z 樓層, value: { base: <canvas>, label: <canvas>, dirty: boolean }
+		// key: z 樓層, value: { base: <canvas>, dirty: boolean }
 		this.caches = new Map();
 		this.isEnabled = true;
 	}
@@ -31,20 +31,17 @@ export class RenderCacheManager {
 	/**
 	 * 取得指定樓層的快取，若不存在或已失效則會建立
 	 * @param {number} z 樓層高度
-	 * @param {boolean} isCurrent 是否為當前樓層 (決定文字是否渲染)
 	 * @param {number} width 畫布寬度
 	 * @param {number} height 畫布高度
-	 * @param {Function} renderCallback 提供繪製邏輯的回呼函數 renderCallback(baseCtx, labelCtx)
-	 * @returns {{ base: HTMLCanvasElement, label: HTMLCanvasElement }}
+	 * @param {Function} renderCallback 提供繪製邏輯的回呼函數 renderCallback(baseCtx)
+	 * @returns {{ base: HTMLCanvasElement, dirty: boolean }}
 	 */
-	getOrCreateCache(z, isCurrent, width, height, renderCallback) {
+	getOrCreateCache(z, width, height, renderCallback) {
 		let cache = this.caches.get(z);
-		
-		// 若快取不存在，或尺寸已改變，重建
+
 		if (!cache || cache.base.width !== width || cache.base.height !== height) {
 			cache = {
 				base: this._createOffscreenCanvas(width, height),
-				label: this._createOffscreenCanvas(width, height),
 				dirty: true,
 			};
 			this.caches.set(z, cache);
@@ -52,19 +49,9 @@ export class RenderCacheManager {
 
 		if (cache.dirty) {
 			const baseCtx = cache.base.getContext('2d');
-			const labelCtx = cache.label.getContext('2d');
-
-			// 重置變換矩陣，防止每次重繪時 translate 累加造成畫面位移
 			baseCtx.setTransform(1, 0, 0, 1, 0, 0);
-			labelCtx.setTransform(1, 0, 0, 1, 0, 0);
-
-			// 清除舊畫面 (透明背景)
 			baseCtx.clearRect(0, 0, width, height);
-			labelCtx.clearRect(0, 0, width, height);
-
-			// 執行外部傳入的實際渲染邏輯 ( GeometryPipeline.traverseLayerPasses )
-			renderCallback(baseCtx, labelCtx);
-
+			renderCallback(baseCtx);
 			cache.dirty = false;
 		}
 

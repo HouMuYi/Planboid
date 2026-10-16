@@ -11,13 +11,13 @@ import { IsoMath } from './IsoMath.js';
 
 export class SvgExporter {
 	/**
-	 * 導出並下載 SVG (供 Toolbar 呼叫之權威入口)
+	 * 導出並下載 SVG
 	 * @param {import("../core/StateManager.js").StateManager} stateManager
 	 */
 	static exportToSvg(stateManager) {
 		if (!stateManager || !stateManager.scheme) return;
 		const scheme = stateManager.scheme;
-		const isoMath = new IsoMath(32);
+		const isoMath = new IsoMath(CONFIG.TILE_SIZE);
 		this.downloadSvg(scheme, isoMath, stateManager.currentZLevel, stateManager.otherFloorsMode);
 	}
 
@@ -48,7 +48,7 @@ export class SvgExporter {
 		svgContent += `    <stop offset="100%" stop-color="#000000" stop-opacity="0.32" />\n`;
 		svgContent += `  </linearGradient>\n`;
 		svgContent += `</defs>\n`;
-		svgContent += `<rect x="${viewBoxX}" y="${viewBoxY}" width="${viewBoxW}" height="${viewBoxH}" fill="#0b0f19" />\n`;
+		svgContent += `<rect x="${viewBoxX}" y="${viewBoxY}" width="${viewBoxW}" height="${viewBoxH}" fill="${CONFIG.COLOR_BG}" />\n`;
 
 		svgContent += `<g id="planboid-map-layer">\n`;
 
@@ -80,14 +80,9 @@ export class SvgExporter {
 				onWallObjects: (x, y, edge, objArray) => {
 					svgContent += GeometryPipeline.getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette);
 				},
-				onLabel: (x, y, label) => {
-					const center = isoMath.gridToScreen(x + 0.5, y + 0.5, 1.0);
-					const safeLabel = ExportCanvasPipeline.escapeXml(label);
-					const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
-					svgContent +=
-						`<text data-x="${x}" data-y="${y}" data-z="${z}" data-type="label" x="${center.x}" y="${center.y}" fill="#ffffff" font-size="13" font-family="${safeFont}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${safeLabel}</text>\n`;
-				},
 			});
+
+			svgContent += GeometryPipeline.getZoneSvgElements(isoMath, layer, palette);
 
 			svgContent += `</g>\n`;
 		});

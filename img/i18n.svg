@@ -33,13 +33,13 @@
 	<!-- 右下卡片：「文」字卡 (底層玻璃擬態) -->
 	<g id="card-zh" filter="url(#cardShadow)">
 		<rect x="22" y="22" width="34" height="34" rx="8" fill="url(#cardRightGrad)" stroke="rgba(99, 102, 241, 0.45)" stroke-width="1.5" />
-		<text x="39" y="45.5" font-size="17" font-weight="700" text-anchor="middle" fill="#818cf8" font-family="'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">文</text>
+		<text x="39" y="45.5" font-size="17" font-weight="700" text-anchor="middle" fill="#818cf8" font-family="'Noto Sans TC', -apple-system, system-ui, sans-serif">文</text>
 	</g>
 
 	<!-- 左上卡片：「A」字主卡 (上層藍靛實體) -->
 	<g id="card-en" filter="url(#cardShadow)">
 		<rect x="8" y="8" width="34" height="34" rx="8" fill="url(#cardLeftGrad)" stroke="rgba(255, 255, 255, 0.25)" stroke-width="1.5" />
-		<text x="25" y="32.5" font-size="19" font-weight="800" text-anchor="middle" fill="url(#textLightGrad)" font-family="'Ubuntu Mono', Consolas, sans-serif">A</text>
+		<text x="25" y="32.5" font-size="19" font-weight="800" text-anchor="middle" fill="url(#textLightGrad)" font-family="'Ubuntu Mono', Consolas, Menlo, Monaco, 'Noto Sans TC', monospace">A</text>
 	</g>
 
 	<!-- 雙向切換流光弧線與星光裝飾 (Language Swap Loop) -->

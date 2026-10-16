@@ -2,13 +2,14 @@
  * GeometryPipeline.js - 統一幾何投影管線與樓層視覺偏移 (LevelVisualOffset)
  * 合流 CanvasRenderer 與 SvgExporter 的幾何頂點與多邊形運算邏輯
  *
- * 架構原則 (重構後)：
+ * 幾何架構原則：
  * - getTilePolyPoints / getWallQuad96Points 只接受純邏輯 (x, y) 座標，不再套用 Z 軸視覺偏移。
  * - Z 軸視覺偏移 (螢幕像素量) 由 calcZTranslate 計算，交給繪製端 (ctx.translate / SVG <g transform>) 統一套用。
  * - LevelVisualOffset 僅保留給 InputDispatcher 逆算滑鼠座標時使用。
  */
 
 import { CONFIG } from '../core/Config.js';
+import { Utils } from '../core/Utils.js';
 import { BorderEdgeNormalizer } from './BorderEdgeNormalizer.js';
 
 /**
@@ -55,13 +56,19 @@ export class GeometryPipeline {
 	}
 
 	static getSortedLayersToRender(tiles, currentZ, otherFloorsMode = 'ghost') {
-		let mode = otherFloorsMode;
-		if (typeof mode === 'boolean') mode = mode ? 'ghost' : 'hidden';
+		const mode = typeof otherFloorsMode === 'boolean' ? (otherFloorsMode ? 'ghost' : 'hidden') : otherFloorsMode;
+		const zBuckets = new Map([[currentZ, []]]);
 
-		const zSet = new Set([currentZ]);
-		Object.keys(tiles || {}).forEach(k => zSet.add(parseInt(k.split(',')[2], 10)));
+		if (tiles) {
+			Object.entries(tiles).forEach(([key, tile]) => {
+				const [xStr, yStr, zStr] = key.split(',');
+				const z = parseInt(zStr, 10);
+				if (!zBuckets.has(z)) zBuckets.set(z, []);
+				zBuckets.get(z).push({ x: parseInt(xStr, 10), y: parseInt(yStr, 10), tile });
+			});
+		}
 
-		const sortedZLevels = Array.from(zSet).sort((a, b) => a - b);
+		const sortedZLevels = Array.from(zBuckets.keys()).sort((a, b) => a - b);
 		const layers = [];
 
 		sortedZLevels.forEach(z => {
@@ -72,26 +79,13 @@ export class GeometryPipeline {
 			let alpha = 1.0;
 			let desatFactor = 0.0;
 
-			if (!isCurrent) {
-				if (mode === 'ghost') {
-					alpha = Math.max(0.05, CONFIG.GHOST_BASE_ALPHA * Math.pow(CONFIG.GHOST_ALPHA_DECAY, dist - 1));
-					const saturation = Math.pow(CONFIG.GHOST_SATURATION_DECAY, dist);
-					desatFactor = Math.min(0.95, 1.0 - saturation);
-				} else if (mode === 'solid') {
-					alpha = 1.0;
-					desatFactor = 0.0;
-				}
+			if (!isCurrent && mode === 'ghost') {
+				alpha = Math.max(0.05, CONFIG.GHOST_BASE_ALPHA * Math.pow(CONFIG.GHOST_ALPHA_DECAY, dist - 1));
+				desatFactor = Math.min(0.95, 1.0 - Math.pow(CONFIG.GHOST_SATURATION_DECAY, dist));
 			}
 
-			const items = [];
-			Object.entries(tiles || {}).forEach(([key, tile]) => {
-				const [xStr, yStr, zStr] = key.split(',');
-				if (parseInt(zStr, 10) === z) {
-					items.push({ x: parseInt(xStr, 10), y: parseInt(yStr, 10), tile });
-				}
-			});
-
-			if (items.length > 0) {
+			const items = zBuckets.get(z);
+			if (items.length > 1) {
 				items.sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.x - b.x);
 			}
 
@@ -107,14 +101,15 @@ export class GeometryPipeline {
 	 * 統一層級 Pass 遍歷器：供 CanvasRenderer、PngExporter 與 SvgExporter 共享 Pass 1~3 的遍歷順序
 	 */
 	static traverseLayerPasses(layer, palette, callbacks = {}) {
-		const { isCurrent, items } = layer;
-		const { onFloor, onFloorObjects, onWall, onWallObjects, onLabel } = callbacks;
+		const { items } = layer;
+		const { onFloor, onFloorObjects, onWall, onWallObjects } = callbacks;
 
 		// Pass 1: 地塊多邊形
 		if (onFloor) {
 			items.forEach(({ x, y, tile }) => {
-				if (tile.floorColorId && palette[tile.floorColorId]) {
-					onFloor(x, y, tile.floorColorId, tile);
+				const id = tile.floorColorId || (typeof tile.floor === 'string' ? tile.floor : null);
+				if (id && palette[id] && !palette[id].isZone && !palette[id].isObject) {
+					onFloor(x, y, id, tile);
 				}
 			});
 		}
@@ -132,9 +127,9 @@ export class GeometryPipeline {
 		if (onWall) {
 			items.forEach(({ x, y, tile }) => {
 				if (tile.walls) {
-					Object.entries(tile.walls).forEach(([edge, colorId]) => {
-						if (colorId && palette[colorId]) {
-							onWall(x, y, edge, colorId, tile);
+					Object.entries(tile.walls).forEach(([edge, id]) => {
+						if (typeof id === 'string' && palette[id] && !palette[id].isZone && !palette[id].isObject) {
+							onWall(x, y, edge, id, tile);
 						}
 					});
 				}
@@ -150,15 +145,6 @@ export class GeometryPipeline {
 							onWallObjects(x, y, edge, objArray, tile);
 						}
 					});
-				}
-			});
-		}
-
-		// Pass 3: 文字標籤 (僅當前樓層)
-		if (onLabel && isCurrent) {
-			items.forEach(({ x, y, tile }) => {
-				if (tile.label) {
-					onLabel(x, y, tile.label, tile);
 				}
 			});
 		}
@@ -181,219 +167,495 @@ export class GeometryPipeline {
 		const w = Math.max(1, scheme.width || 0);
 		const h = Math.max(1, scheme.height || 0);
 
-		// 目前 Z 樓層中心為權威畫布對齊中心點
+		// 目前 Z 樓層中心為畫布對齊中心點
 		const centerPos = isoMath.gridToScreen(w / 2, h / 2, currentProgress);
 		const { dx: currentDx, dy: currentDy } = calcZTranslate(currentZ, currentProgress);
 		const targetX = centerPos.x + currentDx;
 		const targetY = centerPos.y + currentDy;
 
-		const zSet = new Set([0, currentZ]);
-		if (scheme && scheme.tiles) {
+		let minZ = Math.min(0, currentZ);
+		let maxZ = Math.max(0, currentZ);
+		if (scheme.tiles) {
 			Object.keys(scheme.tiles).forEach(k => {
 				const zVal = parseInt(k.split(',')[2], 10);
-				if (!isNaN(zVal)) zSet.add(zVal);
+				if (!isNaN(zVal)) {
+					if (zVal < minZ) minZ = zVal;
+					if (zVal > maxZ) maxZ = zVal;
+				}
 			});
 		}
-		const sortedZ = Array.from(zSet);
-		const maxZ = Math.max(...sortedZ);
-		const minZ = Math.min(...sortedZ);
 
 		const p = Math.max(0, padding);
-		const samplePoints = [];
-		[minZ, maxZ].forEach(z => {
-			const { dx, dy } = calcZTranslate(z, currentProgress);
-			// 帶入 FIT_VIEW_PADDING 留白格數的外擴四角落頂點 + Z 軸高程偏移
-			[[-p, -p], [w + p, -p], [w + p, h + p], [-p, h + p]].forEach(([gx, gy]) => {
-				const pt = isoMath.gridToScreen(gx, gy, currentProgress);
-				samplePoints.push({ x: pt.x + dx, y: pt.y + dy });
-				// 牆面頂端 96px 高度
-				samplePoints.push({ x: pt.x + dx, y: pt.y + dy - (CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET) * currentProgress });
-			});
-		});
+		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * currentProgress;
+		const corners = [[-p, -p], [w + p, -p], [w + p, h + p], [-p, h + p]];
 
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-		samplePoints.forEach(pt => {
-			if (pt.x < minX) minX = pt.x;
-			if (pt.x > maxX) maxX = pt.x;
-			if (pt.y < minY) minY = pt.y;
-			if (pt.y > maxY) maxY = pt.y;
+
+		[minZ, maxZ].forEach(z => {
+			const { dx, dy } = calcZTranslate(z, currentProgress);
+			corners.forEach(([gx, gy]) => {
+				const pt = isoMath.gridToScreen(gx, gy, currentProgress);
+				const px = pt.x + dx;
+				const py = pt.y + dy;
+				if (px < minX) minX = px;
+				if (px > maxX) maxX = px;
+				if (py < minY) minY = py;
+				if (py > maxY) maxY = py;
+
+				const wallTopY = py - wallHeight;
+				if (wallTopY < minY) minY = wallTopY;
+			});
 		});
 
 		const boundsW = Math.max(10, maxX - minX);
 		const boundsH = Math.max(10, maxY - minY);
-
-		const safeVpW = Math.max(10, viewportWidth || 0);
+		const effectiveWidth = Math.max(10, Math.max(10, viewportWidth || 0) - Math.max(0, sidebarWidth || 0));
 		const safeVpH = Math.max(10, viewportHeight || 0);
-		const safeSbW = Math.max(0, sidebarWidth || 0);
-		const effectiveWidth = Math.max(10, safeVpW - safeSbW);
 
-		const zoomX = effectiveWidth / boundsW;
-		const zoomY = safeVpH / boundsH;
-		const fitZoom = Math.max(0.15, Math.min(4.0, Math.min(zoomX, zoomY)));
-
+		const fitZoom = Math.max(0.15, Math.min(4.0, Math.min(effectiveWidth / boundsW, safeVpH / boundsH)));
 		const cameraX = (effectiveWidth / 2) - targetX * fitZoom;
 		const cameraY = (safeVpH / 2) - targetY * fitZoom;
 
 		return { zoom: fitZoom, cameraX, cameraY, minX, minY, maxX, maxY };
 	}
 
+	// ==========================================
+	// 純幾何計算管道 (Pure Geometry Extractors)
+	// ==========================================
+
 	/**
-	 * 權威 2D 正交牆線渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
+	 * 計算地塊物件的階梯堆疊幾何 (支援微縮小與階梯偏移)
+	 * @returns {Array<{ points: Array<{x:number, y:number}>, cx: number, cy: number, size: number }>}
 	 */
-	static drawWallLine2D(ctx, isoMath, x, y, edge, colorHex, zoom, currentProgress = 0) {
-		const normalized = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-		const nxGrid = normalized.x;
-		const nyGrid = normalized.y;
-		const e = normalized.edge;
+	static getFloorObjectGeometries(isoMath, x, y, count, progress = 1.0) {
+		if (!count) return [];
+		const pts = this.getTilePolyPoints(isoMath, x, y, progress);
+		const cx = (pts[0].x + pts[2].x) / 2;
+		const cy = (pts[0].y + pts[2].y) / 2;
+		const halfW = Math.abs(pts[1].x - pts[3].x) / 2;
+		const halfH = Math.abs(pts[2].y - pts[0].y) / 2;
+		const scale = Math.max(0.5, 0.95 - Math.max(0, count - 1) * 0.06);
+		const stepX = halfW * 0.08;
+		const stepY = halfH * 0.08;
 
-		const p0 = isoMath.gridToScreen(nxGrid, nyGrid, currentProgress);
-		const p1 = e === 'N' ? isoMath.gridToScreen(nxGrid + 1, nyGrid, currentProgress) : (e === 'W' ? isoMath.gridToScreen(nxGrid, nyGrid + 1, currentProgress) : null);
+		const items = [];
+		for (let idx = 0; idx < count; idx++) {
+			const shift = idx - (count - 1) / 2;
+			const px = cx + shift * stepX;
+			const py = cy + shift * stepY;
+			const p0 = { x: px + (pts[0].x - cx) * scale, y: py + (pts[0].y - cy) * scale };
+			const p1 = { x: px + (pts[1].x - cx) * scale, y: py + (pts[1].y - cy) * scale };
+			const p2 = { x: px + (pts[2].x - cx) * scale, y: py + (pts[2].y - cy) * scale };
+			const p3 = { x: px + (pts[3].x - cx) * scale, y: py + (pts[3].y - cy) * scale };
+			items.push({
+				points: [p0, p1, p2, p3],
+				cx: px,
+				cy: py,
+				size: Math.hypot(p1.x - p0.x, p1.y - p0.y),
+			});
+		}
+		return items;
+	}
 
-		if (!p0 || !p1) return;
+	/**
+	 * 計算牆面物件的堆疊幾何 (2D 正方形圓角 / 3D 菱形立體面片)
+	 * @returns {Array<{ is2D: boolean, points?: Array<{x:number, y:number}>, cx: number, cy: number, size: number }>}
+	 */
+	static getWallObjectGeometries(isoMath, x, y, edge, count, progress = 1.0) {
+		if (!count) return [];
+		if (progress === 0) {
+			const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+			const p0 = isoMath.gridToScreen(norm.x, norm.y, 0);
+			const p1 = norm.edge === 'N' ? isoMath.gridToScreen(norm.x + 1, norm.y, 0) : isoMath.gridToScreen(norm.x, norm.y + 1, 0);
+			if (!p0 || !p1) return [];
+			const cx = (p0.x + p1.x) / 2;
+			const cy = (p0.y + p1.y) / 2;
+			const scale = Math.max(0.6, 1.0 - Math.max(0, count - 1) * 0.1);
+			const boxSize = Math.max(16, CONFIG.TILE_SIZE * 0.75) * scale;
+			const items = [];
+			for (let idx = 0; idx < count; idx++) {
+				const shift = idx - (count - 1) / 2;
+				items.push({
+					is2D: true,
+					cx: cx + shift * 5 * scale,
+					cy: cy + shift * 4 * scale,
+					size: boxSize,
+				});
+			}
+			return items;
+		}
 
-		const dx = p1.x - p0.x;
-		const dy = p1.y - p0.y;
+		const quad = this.getWallQuad96Points(isoMath, x, y, edge, progress);
+		if (!quad) return [];
+		const [b0, b1, t1, t0] = quad;
+		const cx = (b0.x + b1.x + t1.x + t0.x) / 4;
+		const cy = (b0.y + b1.y + t1.y + t0.y) / 4 - (CONFIG.TILE_SIZE * 0.15 * progress);
+		const dirX = (b1.x - b0.x) / 2;
+		const dirY = (b1.y - b0.y) / 2;
+		const halfUp = Math.hypot(dirX, dirY);
+		const scale = Math.max(0.4, 0.75 - Math.max(0, count - 1) * 0.06);
+		const stepX = dirX * 0.15;
+		const stepY = Math.abs(dirY) * 0.15;
+		const dx = dirX * scale;
+		const dy = dirY * scale;
+		const dh = halfUp * scale;
+
+		const items = [];
+		for (let idx = 0; idx < count; idx++) {
+			const shift = idx - (count - 1) / 2;
+			const px = cx + shift * stepX;
+			const py = cy + shift * stepY;
+			items.push({
+				is2D: false,
+				points: [
+					{ x: px - dx, y: py - dy + dh },
+					{ x: px + dx, y: py + dy + dh },
+					{ x: px + dx, y: py + dy - dh },
+					{ x: px - dx, y: py - dy - dh },
+				],
+				cx: px,
+				cy: py,
+				size: dh * 2,
+			});
+		}
+		return items;
+	}
+
+	/**
+	/**
+	 * 計算單一邊線標籤在空間中的透視懸空帶狀多邊形幾何
+	 */
+	static calcWallBandGeometry(isoMath, x, y, edge, progress) {
+		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+		const b0 = isoMath.gridToScreen(norm.x, norm.y, progress);
+		const b1 = norm.edge === 'N'
+			? isoMath.gridToScreen(norm.x + 1, norm.y, progress)
+			: isoMath.gridToScreen(norm.x, norm.y + 1, progress);
+		if (!b0 || !b1) return null;
+
+		const dx = b1.x - b0.x;
+		const dy = b1.y - b0.y;
 		const len = Math.hypot(dx, dy);
+		const nx = len === 0 ? 0 : -dy / len;
+		const ny = len === 0 ? 0 : dx / len;
 
-		if (len > 0) {
-			ctx.save();
-			const nx = -dy / len;
-			const ny = dx / len;
-			const offset = 2.2 / zoom;
+		// 2D 橫向半寬 (在 2D 下維持 6px 帶狀面，3D 動畫過渡時平滑收合)
+		const latOffset = 6 * (1 - progress);
+		// 3D 懸空垂直高度 (在牆高中段 25%~75% 處懸空，厚度 48px，離地 24px)
+		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * progress;
+		const dyBottom = -wallHeight * 0.25;
+		const dyTop = -wallHeight * 0.75;
 
-			// 1. 長邊兩側 4px 深色襯底線 (短邊平口不封線)
-			ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-			ctx.lineWidth = 4 / zoom;
-			ctx.lineCap = 'butt';
+		const pb0 = { x: b0.x + nx * latOffset, y: b0.y + ny * latOffset + dyBottom };
+		const pb1 = { x: b1.x + nx * latOffset, y: b1.y + ny * latOffset + dyBottom };
+		const pt1 = { x: b1.x - nx * latOffset, y: b1.y - ny * latOffset + dyTop };
+		const pt0 = { x: b0.x - nx * latOffset, y: b0.y - ny * latOffset + dyTop };
 
-			ctx.beginPath();
-			ctx.moveTo(p0.x + nx * offset, p0.y + ny * offset);
-			ctx.lineTo(p1.x + nx * offset, p1.y + ny * offset);
-			ctx.moveTo(p0.x - nx * offset, p0.y - ny * offset);
-			ctx.lineTo(p1.x - nx * offset, p1.y - ny * offset);
-			ctx.stroke();
-
-			// 2. 中央牆線主體
-			ctx.strokeStyle = colorHex;
-			ctx.lineWidth = 5 / zoom;
-			ctx.lineCap = 'butt';
-			ctx.beginPath();
-			ctx.moveTo(p0.x, p0.y);
-			ctx.lineTo(p1.x, p1.y);
-			ctx.stroke();
-
-			ctx.restore();
-		}
+		return {
+			norm,
+			polygon: [pb0, pb1, pt1, pt0],
+			bottomEdge: { p0: pb0, p1: pb1 },
+			topEdge: { p0: pt0, p1: pt1 },
+			v0Edge: { p0: pb0, p1: pt0 },
+			v1Edge: { p0: pb1, p1: pt1 },
+			center: { x: (pb0.x + pb1.x + pt1.x + pt0.x) / 4, y: (pb0.y + pb1.y + pt1.y + pt0.y) / 4 },
+			v0Key: `${norm.x},${norm.y}`,
+			v1Key: norm.edge === 'N' ? `${norm.x + 1},${norm.y}` : `${norm.x},${norm.y + 1}`,
+		};
 	}
 
 	/**
-	 * 權威 3D 菱形立體牆面渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
+	 * 萃取區域標籤的幾何資料 (Canvas 渲染與 SVG 匯出共用)
+	 * 支援地面多邊形與外框虛線，以及邊線區域之 3D 透視懸空帶狀多邊形與相鄰連通外框
 	 */
-	static drawWallQuad96px(ctx, isoMath, x, y, edge, colorHex, zoom, currentProgress = 1.0, fillAlpha = CONFIG.WALL_FILL_ALPHA) {
-		const quad = this.getWallQuad96Points(isoMath, x, y, edge, currentProgress);
-		if (!quad) return;
+	static getZoneGeometries(isoMath, layer, palette, progress = 1.0) {
+		const data = this._collectZones(layer, palette);
+		if (!data) return [];
+		const { tileMap, zones } = data;
 
-		const [b0, b1, t1, t0] = quad;
-		const savedAlpha = ctx.globalAlpha;
+		const result = [];
+		zones.forEach(({ id, item, cells, islands, edgeIslands }) => {
+			const polygons = cells.map(({ x, y }) => this.getTilePolyPoints(isoMath, x, y, progress));
+			const borderEdges = [];
+			this._forEachZoneBorderEdge(cells, id, tileMap, (x0, y0, x1, y1) => {
+				borderEdges.push({
+					p0: isoMath.gridToScreen(x0, y0, progress),
+					p1: isoMath.gridToScreen(x1, y1, progress),
+				});
+			});
+			const labels = islands.map(({ centerCell }) => {
+				const pos = isoMath.gridToScreen(centerCell.x + 0.5, centerCell.y + 0.5, progress);
+				return { text: item.name, x: pos.x, y: pos.y };
+			});
 
-		const topMidX = (t0.x + t1.x) / 2;
-		const topMidY = (t0.y + t1.y) / 2;
-		const botMidX = (b0.x + b1.x) / 2;
-		const botMidY = (b0.y + b1.y) / 2;
+			const wallPolygons = [];
+			const wallBorderEdges = [];
+			const wallLabels = [];
 
-		ctx.save();
+			(edgeIslands || []).forEach(island => {
+				const bands = island.map(e => this.calcWallBandGeometry(isoMath, e.x, e.y, e.edge, progress)).filter(Boolean);
+				if (bands.length === 0) return;
 
-		// 1. 原色層
-		ctx.globalAlpha = savedAlpha * fillAlpha;
-		ctx.fillStyle = colorHex;
-		ctx.beginPath();
-		ctx.moveTo(b0.x, b0.y);
-		ctx.lineTo(b1.x, b1.y);
-		ctx.lineTo(t1.x, t1.y);
-		ctx.lineTo(t0.x, t0.y);
-		ctx.closePath();
-		ctx.fill();
+				// 收集立面多邊形
+				bands.forEach(b => wallPolygons.push(b.polygon));
 
-		// 動畫過渡期間 (currentProgress < 1.0)：跳過昂貴的 5 重漸層與多重高光描邊，僅做一次基礎外框描邊
-		if (currentProgress < 1.0) {
-			ctx.strokeStyle = colorHex;
-			ctx.lineWidth = 1.5 / zoom;
-			ctx.stroke();
-			ctx.restore();
-			return;
+				// 統計頂點度數以過濾內部接縫線段
+				const vertexCounts = new Map();
+				bands.forEach(b => {
+					vertexCounts.set(b.v0Key, (vertexCounts.get(b.v0Key) || 0) + 1);
+					vertexCounts.set(b.v1Key, (vertexCounts.get(b.v1Key) || 0) + 1);
+				});
+
+				// 外周邊界線段 (頂邊、底邊，以及無相鄰邊線的開放末端)
+				bands.forEach(b => {
+					wallBorderEdges.push(b.topEdge);
+					wallBorderEdges.push(b.bottomEdge);
+					if (vertexCounts.get(b.v0Key) === 1) wallBorderEdges.push(b.v0Edge);
+					if (vertexCounts.get(b.v1Key) === 1) wallBorderEdges.push(b.v1Edge);
+				});
+
+				// 連通島嶼質心文字位置
+				const avg = bands.reduce((acc, b) => ({ x: acc.x + b.center.x, y: acc.y + b.center.y }), { x: 0, y: 0 });
+				const cx = avg.x / bands.length;
+				const cy = avg.y / bands.length;
+				let bestCenter = bands[0].center;
+				let minDist = Infinity;
+				for (const b of bands) {
+					const dist = (b.center.x - cx) ** 2 + (b.center.y - cy) ** 2;
+					if (dist < minDist) {
+						minDist = dist;
+						bestCenter = b.center;
+					}
+				}
+				wallLabels.push({ text: item.name, x: bestCenter.x, y: bestCenter.y });
+			});
+
+			result.push({ id, item, cells, polygons, borderEdges, labels, wallPolygons, wallBorderEdges, wallLabels });
+		});
+		return result;
+	}
+
+	static _collectZones(layer, palette) {
+		const { items } = layer;
+		if (!items || items.length === 0) return null;
+		const tileMap = new Map();
+		const zones = new Map();
+
+		const getOrCreateZone = (zoneId) => {
+			if (!zones.has(zoneId)) {
+				zones.set(zoneId, { id: zoneId, item: palette[zoneId], cells: [], wallEdges: [] });
+			}
+			return zones.get(zoneId);
+		};
+
+		items.forEach(({ x, y, tile }) => {
+			// 地面標籤
+			const floorZoneId = tile.zoneId || (typeof tile.floor === 'string' && palette[tile.floor]?.isZone ? tile.floor : null);
+			if (floorZoneId && palette[floorZoneId]) {
+				tileMap.set(`${x},${y}`, floorZoneId);
+				getOrCreateZone(floorZoneId).cells.push({ x, y });
+			}
+
+			// 邊線標籤
+			if (tile.wallZones) {
+				Object.entries(tile.wallZones).forEach(([edge, colorId]) => {
+					if (colorId && palette[colorId]?.isZone) {
+						getOrCreateZone(colorId).wallEdges.push({ x, y, edge });
+					}
+				});
+			} else if (tile.walls) {
+				Object.entries(tile.walls).forEach(([edge, val]) => {
+					if (typeof val === 'string' && palette[val]?.isZone) {
+						getOrCreateZone(val).wallEdges.push({ x, y, edge });
+					}
+				});
+			}
+		});
+
+		if (zones.size === 0) return null;
+		zones.forEach(zone => {
+			if (zone.cells.length > 0) {
+				zone.islands = this._partitionIslands(zone.cells);
+			} else {
+				zone.islands = [];
+			}
+
+			if (zone.wallEdges.length > 0) {
+				const edgeKeySet = new Set();
+				const uniqueEdges = [];
+				zone.wallEdges.forEach(e => {
+					const norm = BorderEdgeNormalizer.normalizeEdge(e.x, e.y, e.edge);
+					const key = `${norm.edge},${norm.x},${norm.y}`;
+					if (!edgeKeySet.has(key)) {
+						edgeKeySet.add(key);
+						uniqueEdges.push(norm);
+					}
+				});
+				zone.wallEdges = uniqueEdges;
+				zone.edgeIslands = this._partitionEdgeIslands(uniqueEdges);
+			} else {
+				zone.edgeIslands = [];
+			}
+		});
+		return { tileMap, zones };
+	}
+
+	static _partitionIslands(cells) {
+		const unvisited = new Map(cells.map(c => [`${c.x},${c.y}`, c]));
+		const islands = [];
+
+		while (unvisited.size > 0) {
+			const [firstKey, seed] = unvisited.entries().next().value;
+			unvisited.delete(firstKey);
+			const islandCells = [];
+			const queue = [seed];
+
+			while (queue.length > 0) {
+				const curr = queue.pop();
+				islandCells.push(curr);
+				const neighbors = [
+					`${curr.x + 1},${curr.y}`,
+					`${curr.x - 1},${curr.y}`,
+					`${curr.x},${curr.y + 1}`,
+					`${curr.x},${curr.y - 1}`,
+				];
+				neighbors.forEach(nKey => {
+					if (unvisited.has(nKey)) {
+						queue.push(unvisited.get(nKey));
+						unvisited.delete(nKey);
+					}
+				});
+			}
+
+			const sum = islandCells.reduce((acc, c) => ({ x: acc.x + c.x, y: acc.y + c.y }), { x: 0, y: 0 });
+			const cx = sum.x / islandCells.length;
+			const cy = sum.y / islandCells.length;
+			let bestCell = islandCells[0];
+			let minDist = Infinity;
+			for (const c of islandCells) {
+				const d = (c.x - cx) ** 2 + (c.y - cy) ** 2;
+				if (d < minDist) {
+					minDist = d;
+					bestCell = c;
+				}
+			}
+			islands.push({ cells: islandCells, centerCell: bestCell });
+		}
+		return islands;
+	}
+
+	static _partitionEdgeIslands(edges) {
+		if (!edges || edges.length === 0) return [];
+
+		const vertexToEdges = new Map();
+		const getEndpoints = (e) => (
+			e.edge === 'N'
+				? [`${e.x},${e.y}`, `${e.x + 1},${e.y}`]
+				: [`${e.x},${e.y}`, `${e.x},${e.y + 1}`]
+		);
+
+		edges.forEach((e, idx) => {
+			const [v0, v1] = getEndpoints(e);
+			if (!vertexToEdges.has(v0)) vertexToEdges.set(v0, []);
+			if (!vertexToEdges.has(v1)) vertexToEdges.set(v1, []);
+			vertexToEdges.get(v0).push(idx);
+			vertexToEdges.get(v1).push(idx);
+		});
+
+		const visited = new Set();
+		const islands = [];
+
+		for (let i = 0; i < edges.length; i++) {
+			if (visited.has(i)) continue;
+
+			const island = [];
+			const queue = [i];
+			visited.add(i);
+
+			while (queue.length > 0) {
+				const currIdx = queue.pop();
+				const currEdge = edges[currIdx];
+				island.push(currEdge);
+
+				const [v0, v1] = getEndpoints(currEdge);
+				[v0, v1].forEach(v => {
+					const neighbors = vertexToEdges.get(v) || [];
+					neighbors.forEach(nIdx => {
+						if (!visited.has(nIdx)) {
+							visited.add(nIdx);
+							queue.push(nIdx);
+						}
+					});
+				});
+			}
+
+			islands.push(island);
 		}
 
-		// 2. 平行向量 Shading 光影遮罩 (靜止與快照時開啟)
-		const shadingGrad = ctx.createLinearGradient(topMidX, topMidY, botMidX, botMidY);
-		shadingGrad.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
-		shadingGrad.addColorStop(1, 'rgba(0, 0, 0, 0.32)');
-
-		ctx.globalAlpha = savedAlpha * fillAlpha;
-		ctx.fillStyle = shadingGrad;
-		ctx.beginPath();
-		ctx.moveTo(b0.x, b0.y);
-		ctx.lineTo(b1.x, b1.y);
-		ctx.lineTo(t1.x, t1.y);
-		ctx.lineTo(t0.x, t0.y);
-		ctx.closePath();
-		ctx.fill();
-
-		// 3. 主輪廓線
-		ctx.globalAlpha = savedAlpha * fillAlpha * 1.5;
-		ctx.strokeStyle = colorHex;
-		ctx.lineWidth = 1.5 / zoom;
-		ctx.stroke();
-
-		// 4. 牆頂 1px 高光
-		ctx.globalAlpha = savedAlpha * 0.75;
-		ctx.strokeStyle = '#ffffff';
-		ctx.lineWidth = 1.5 / zoom;
-		ctx.beginPath();
-		ctx.moveTo(t0.x, t0.y);
-		ctx.lineTo(t1.x, t1.y);
-		ctx.stroke();
-
-		// 5. 牆底 1px 壓角暗邊
-		ctx.globalAlpha = savedAlpha * 0.6;
-		ctx.strokeStyle = '#000000';
-		ctx.lineWidth = 1.5 / zoom;
-		ctx.beginPath();
-		ctx.moveTo(b0.x, b0.y);
-		ctx.lineTo(b1.x, b1.y);
-		ctx.stroke();
-
-		ctx.restore();
+		return islands;
 	}
 
+	static _forEachZoneBorderEdge(cells, id, tileMap, onEdge) {
+		cells.forEach(({ x, y }) => {
+			if (tileMap.get(`${x},${y - 1}`) !== id) onEdge(x, y, x + 1, y);
+			if (tileMap.get(`${x - 1},${y}`) !== id) onEdge(x, y, x, y + 1);
+			if (tileMap.get(`${x},${y + 1}`) !== id) onEdge(x, y + 1, x + 1, y + 1);
+			if (tileMap.get(`${x + 1},${y}`) !== id) onEdge(x + 1, y, x + 1, y + 1);
+		});
+	}
+
+	// ==========================================
+	// 基礎幾何繪製工具
+	// ==========================================
+
 	/**
-	 * 權威 3D/2D 牆體 SVG 向量標籤生成管道 (SVG 匯出專用)
+	 * 在 Canvas 上繪製 2:1 ISO 菱形/多邊形的切弧圓角 (仿射切線圓角算術)
 	 */
-	static getWallSvgElements(isoMath, x, y, z, edge, colorId, color) {
-		const quad = this.getWallQuad96Points(isoMath, x, y, edge, 1.0);
-		if (!quad) return '';
-
-		const [b0, b1, t1, t0] = quad;
-		let str = '';
-		// 1. 原色面片
-		str +=
-			`<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall" data-edge="${edge}" data-color-id="${colorId}" points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="${color}" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" stroke="${color}" stroke-opacity="0.675" stroke-width="1.5" />\n`;
-		// 2. 向量 Shading 遮罩
-		str +=
-			`<polygon points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="url(#svg-wall-shading)" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" />\n`;
-		// 3. 牆頂 1px 高光
-		str += `<line x1="${t0.x}" y1="${t0.y}" x2="${t1.x}" y2="${t1.y}" stroke="#ffffff" stroke-opacity="0.75" stroke-width="1.5" />\n`;
-		// 4. 牆底 1px 壓角暗線
-		str += `<line x1="${b0.x}" y1="${b0.y}" x2="${b1.x}" y2="${b1.y}" stroke="#000000" stroke-opacity="0.6" stroke-width="1.5" />\n`;
-
-		return str;
+	static drawIsoRoundedPolygon(ctx, points, cornerRatio = 0.15) {
+		if (!Array.isArray(points) || points.length < 3) return;
+		const len = points.length;
+		ctx.beginPath();
+		for (let i = 0; i < len; i++) {
+			const prev = points[(i - 1 + len) % len];
+			const curr = points[i];
+			const next = points[(i + 1) % len];
+			const inX = curr.x + (prev.x - curr.x) * cornerRatio;
+			const inY = curr.y + (prev.y - curr.y) * cornerRatio;
+			const outX = curr.x + (next.x - curr.x) * cornerRatio;
+			const outY = curr.y + (next.y - curr.y) * cornerRatio;
+			if (i === 0) ctx.moveTo(inX, inY);
+			else ctx.lineTo(inX, inY);
+			ctx.quadraticCurveTo(curr.x, curr.y, outX, outY);
+		}
+		ctx.closePath();
 	}
 
 	/**
-	 * 權威地塊多邊形渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
+	 * 繪製置中徽章文字 (黑邊白字，全模式共用 CONFIG.OBJECT_* 常數配置)
+	 */
+	static drawObjectTextLabel(ctx, text, px, py, boxSize) {
+		const rawName = String(text || '').substring(0, 2);
+		if (!rawName) return;
+		const fontSize = Math.max(CONFIG.OBJECT_FONT_MIN, boxSize * CONFIG.OBJECT_FONT_RATIO);
+		ctx.font = `bold ${fontSize}px ${CONFIG.FONT_SANS}`;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.strokeStyle = CONFIG.OBJECT_STROKE_COLOR;
+		ctx.lineWidth = CONFIG.OBJECT_STROKE_WIDTH;
+		ctx.strokeText(rawName, px, py);
+		ctx.fillStyle = CONFIG.OBJECT_TEXT_COLOR;
+		ctx.fillText(rawName, px, py);
+	}
+
+	// ==========================================
+	// Canvas 繪圖管道
+	// ==========================================
+
+	/**
+	 * 地塊多邊形渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
 	 */
 	static drawTilePoly(ctx, isoMath, x, y, colorHex, currentProgress = 1.0) {
 		const [p0, p1, p2, p3] = this.getTilePolyPoints(isoMath, x, y, currentProgress);
-
 		ctx.fillStyle = colorHex;
 		ctx.beginPath();
 		ctx.moveTo(p0.x, p0.y);
@@ -405,369 +667,540 @@ export class GeometryPipeline {
 	}
 
 	/**
-	 * 權威地塊文字標籤渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
+	 * 2D 正交牆線渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
 	 */
-	static drawTileText(ctx, isoMath, x, y, text, zoom, currentProgress = 1.0) {
-		const center = isoMath.gridToScreen(x + 0.5, y + 0.5, currentProgress);
+	static drawWallLine2D(ctx, isoMath, x, y, edge, colorHex, zoom, currentProgress = 0) {
+		const normalized = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+		const p0 = isoMath.gridToScreen(normalized.x, normalized.y, currentProgress);
+		const p1 = normalized.edge === 'N'
+			? isoMath.gridToScreen(normalized.x + 1, normalized.y, currentProgress)
+			: (normalized.edge === 'W' ? isoMath.gridToScreen(normalized.x, normalized.y + 1, currentProgress) : null);
+		if (!p0 || !p1) return;
+
+		const dx = p1.x - p0.x;
+		const dy = p1.y - p0.y;
+		const len = Math.hypot(dx, dy);
+		if (len === 0) return;
 
 		ctx.save();
-		ctx.fillStyle = '#ffffff';
-		ctx.font = `bold ${Math.max(10, 12 / zoom)}px ${CONFIG.FONT_SANS}`;
-		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-		ctx.shadowColor = 'rgba(0,0,0,0.9)';
-		ctx.shadowBlur = 4;
-		ctx.fillText(text, center.x, center.y);
+		const nx = -dy / len;
+		const ny = dx / len;
+		const offset = 2.2 / zoom;
+
+		// 1. 長邊兩側深色襯底線 (短邊平口不封線)
+		ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+		ctx.lineWidth = 4 / zoom;
+		ctx.lineCap = 'butt';
+		ctx.beginPath();
+		ctx.moveTo(p0.x + nx * offset, p0.y + ny * offset);
+		ctx.lineTo(p1.x + nx * offset, p1.y + ny * offset);
+		ctx.moveTo(p0.x - nx * offset, p0.y - ny * offset);
+		ctx.lineTo(p1.x - nx * offset, p1.y - ny * offset);
+		ctx.stroke();
+
+		// 2. 中央牆線主體
+		ctx.strokeStyle = colorHex;
+		ctx.lineWidth = 5 / zoom;
+		ctx.beginPath();
+		ctx.moveTo(p0.x, p0.y);
+		ctx.lineTo(p1.x, p1.y);
+		ctx.stroke();
 		ctx.restore();
 	}
 
 	/**
-	 * 權威樓層鬼影去飽和度色號運算 (Canvas 2D 畫布與 PNG 匯出共用)
+	 * 3D 菱形立體牆面渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
 	 */
-	static desaturateHex(hex, factor = 0.5) {
-		if (!hex || hex.length < 7) return '#64748b';
-		let r = parseInt(hex.substring(1, 3), 16);
-		let g = parseInt(hex.substring(3, 5), 16);
-		let b = parseInt(hex.substring(5, 7), 16);
+	static drawWallQuad96px(ctx, isoMath, x, y, edge, colorHex, zoom, currentProgress = 1.0, fillAlpha = CONFIG.WALL_FILL_ALPHA) {
+		const quad = this.getWallQuad96Points(isoMath, x, y, edge, currentProgress);
+		if (!quad) return;
+		const [b0, b1, t1, t0] = quad;
+		const savedAlpha = ctx.globalAlpha;
 
-		const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-		r = Math.round(r + (gray - r) * factor);
-		g = Math.round(g + (gray - g) * factor);
-		b = Math.round(b + (gray - b) * factor);
-
-		return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-	}
-
-	/**
-	 * 在 Canvas 上繪製 2:1 ISO 菱形/多邊形的切弧圓角 (仿射切線圓角算術)
-	 * 完美還原 1:1 正方形圓角在 2:1 ISO 投影下的自然橢圓切弧
-	 */
-	static drawIsoRoundedPolygon(ctx, points, cornerRatio = 0.15) {
-		if (!Array.isArray(points) || points.length < 3) return;
-
-		const len = points.length;
+		ctx.save();
+		ctx.globalAlpha = savedAlpha * fillAlpha;
+		ctx.fillStyle = colorHex;
 		ctx.beginPath();
+		ctx.moveTo(b0.x, b0.y);
+		ctx.lineTo(b1.x, b1.y);
+		ctx.lineTo(t1.x, t1.y);
+		ctx.lineTo(t0.x, t0.y);
+		ctx.closePath();
+		ctx.fill();
 
-		for (let i = 0; i < len; i++) {
-			const prev = points[(i - 1 + len) % len];
-			const curr = points[i];
-			const next = points[(i + 1) % len];
-
-			const inX = curr.x + (prev.x - curr.x) * cornerRatio;
-			const inY = curr.y + (prev.y - curr.y) * cornerRatio;
-
-			const outX = curr.x + (next.x - curr.x) * cornerRatio;
-			const outY = curr.y + (next.y - curr.y) * cornerRatio;
-
-			if (i === 0) {
-				ctx.moveTo(inX, inY);
-			} else {
-				ctx.lineTo(inX, inY);
-			}
-
-			ctx.quadraticCurveTo(curr.x, curr.y, outX, outY);
+		// 動畫過渡期間：僅做基礎外框描邊
+		if (currentProgress < 1.0) {
+			ctx.strokeStyle = colorHex;
+			ctx.lineWidth = 1.5 / zoom;
+			ctx.stroke();
+			ctx.restore();
+			return;
 		}
 
-		ctx.closePath();
+		// 平行向量 Shading 光影遮罩
+		const grad = ctx.createLinearGradient((t0.x + t1.x) / 2, (t0.y + t1.y) / 2, (b0.x + b1.x) / 2, (b0.y + b1.y) / 2);
+		grad.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
+		grad.addColorStop(1, 'rgba(0, 0, 0, 0.32)');
+		ctx.fillStyle = grad;
+		ctx.fill();
+
+		// 主輪廓線
+		ctx.globalAlpha = savedAlpha * fillAlpha * 1.5;
+		ctx.strokeStyle = colorHex;
+		ctx.lineWidth = 1.5 / zoom;
+		ctx.stroke();
+
+		// 牆頂高光與牆底暗邊
+		ctx.globalAlpha = savedAlpha * 0.75;
+		ctx.strokeStyle = '#ffffff';
+		ctx.beginPath();
+		ctx.moveTo(t0.x, t0.y);
+		ctx.lineTo(t1.x, t1.y);
+		ctx.stroke();
+
+		ctx.globalAlpha = savedAlpha * 0.6;
+		ctx.strokeStyle = '#000000';
+		ctx.beginPath();
+		ctx.moveTo(b0.x, b0.y);
+		ctx.lineTo(b1.x, b1.y);
+		ctx.stroke();
+		ctx.restore();
 	}
 
 	/**
-	 * 統一物件面板文字與描邊繪製管道 (全模式共用 CONFIG.OBJECT_* 常數配置)
-	 */
-	static drawObjectTextLabel(ctx, text, px, py, boxSize) {
-		if (!text) return;
-		const rawName = String(text).substring(0, 2);
-		if (!rawName) return;
-
-		const fontSize = Math.max(CONFIG.OBJECT_FONT_MIN, boxSize * CONFIG.OBJECT_FONT_RATIO);
-		ctx.font = `bold ${fontSize}px ${CONFIG.FONT_SANS}`;
-		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-
-		ctx.strokeStyle = CONFIG.OBJECT_STROKE_COLOR;
-		ctx.lineWidth = CONFIG.OBJECT_STROKE_WIDTH;
-		ctx.strokeText(rawName, px, py);
-
-		ctx.fillStyle = CONFIG.OBJECT_TEXT_COLOR;
-		ctx.fillText(rawName, px, py);
-	}
-
-	/**
-	 * 權威地塊物件繪製 (支援多重疊加、微縮小與階梯偏移，黑字白邊，精確 ISO 圓角菱形)
+	 * 地塊物件繪製 (支援多重疊加、微縮小與階梯偏移，黑字白邊，精確 ISO 圓角菱形)
 	 */
 	static drawFloorObjects(ctx, isoMath, x, y, objArray, palette, zoom, currentProgress = 1.0) {
-		if (!Array.isArray(objArray) || objArray.length === 0) return;
+		const geometries = this.getFloorObjectGeometries(isoMath, x, y, objArray?.length || 0, currentProgress);
+		if (geometries.length === 0) return;
 
-		const points = this.getTilePolyPoints(isoMath, x, y, currentProgress);
-		const cx = (points[0].x + points[2].x) / 2;
-		const cy = (points[0].y + points[2].y) / 2;
-		const total = objArray.length;
-
-		// 菱形半寬與半高（用於計算相對於地塊尺寸的步進）
-		const halfW = Math.abs(points[1].x - points[3].x) / 2;
-		const halfH = Math.abs(points[2].y - points[0].y) / 2;
-
-		// 基礎尺寸：TILE_SIZE * 0.95，隨疊加數量等比縮小
-		const baseScale = 0.95 - Math.max(0, total - 1) * 0.06;
-		const scale = Math.max(0.5, baseScale);
-
-		// 書頁偏移：左上(舊)→右下(新)，步進為菱形尺寸的 8%
-		const stepRatio = 0.08;
-		const stepX = halfW * stepRatio;
-		const stepY = halfH * stepRatio;
-
-		objArray.forEach((objId, idx) => {
-			const item = palette[objId];
+		ctx.save();
+		geometries.forEach(({ points, cx, cy, size }, idx) => {
+			const item = palette[objArray[idx]];
 			if (!item || !item.color) return;
 
-			const shiftX = (idx - (total - 1) / 2) * stepX;
-			const shiftY = (idx - (total - 1) / 2) * stepY;
-			const px = cx + shiftX;
-			const py = cy + shiftY;
-
-			const p0 = { x: px + (points[0].x - cx) * scale, y: py + (points[0].y - cy) * scale };
-			const p1 = { x: px + (points[1].x - cx) * scale, y: py + (points[1].y - cy) * scale };
-			const p2 = { x: px + (points[2].x - cx) * scale, y: py + (points[2].y - cy) * scale };
-			const p3 = { x: px + (points[3].x - cx) * scale, y: py + (points[3].y - cy) * scale };
-
-			ctx.save();
 			ctx.strokeStyle = item.color;
 			ctx.lineWidth = 2.5 / zoom;
 			ctx.fillStyle = CONFIG.OBJECT_PANEL_BG;
-
-			// 使用 2:1 ISO 仿射圓角多邊形算術
-			this.drawIsoRoundedPolygon(ctx, [p0, p1, p2, p3], 0.15);
+			this.drawIsoRoundedPolygon(ctx, points, 0.15);
 			ctx.fill();
 			ctx.stroke();
-
-			const sideLength = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-			this.drawObjectTextLabel(ctx, item.name, px, py, sideLength);
-
-			ctx.restore();
+			this.drawObjectTextLabel(ctx, item.name, cx, cy, size);
 		});
+		ctx.restore();
 	}
 
 	/**
-	 * 權威 2D 牆面物件繪製 (斷線嵌入式，正方形圓角，去除死白背景)
+	 * 2D 牆面物件繪製 (斷線嵌入式，正方形圓角，去除死白背景)
 	 */
 	static drawWallObjects2D(ctx, isoMath, x, y, edge, objArray, palette, zoom, currentProgress = 0) {
-		if (!Array.isArray(objArray) || objArray.length === 0) return;
+		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, 0);
+		if (geometries.length === 0) return;
 
-		const normalized = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-		const nxGrid = normalized.x;
-		const nyGrid = normalized.y;
-		const e = normalized.edge;
-
-		const p0 = isoMath.gridToScreen(nxGrid, nyGrid, currentProgress);
-		const p1 = e === 'N' ? isoMath.gridToScreen(nxGrid + 1, nyGrid, currentProgress) : (e === 'W' ? isoMath.gridToScreen(nxGrid, nyGrid + 1, currentProgress) : null);
-		if (!p0 || !p1) return;
-
-		const cx = (p0.x + p1.x) / 2;
-		const cy = (p0.y + p1.y) / 2;
-		const total = objArray.length;
-
-		// 基礎尺寸與偏移設定
-		const baseScale = Math.max(0.6, 1.0 - Math.max(0, total - 1) * 0.1);
-		const stepX = 5 * baseScale;
-		const stepY = 4 * baseScale;
-
-		objArray.forEach((objId, idx) => {
-			const item = palette[objId];
+		ctx.save();
+		geometries.forEach(({ cx, cy, size }, idx) => {
+			const item = palette[objArray[idx]];
 			if (!item || !item.color) return;
 
-			// 書頁偏移：左上(舊)→右下(新)，整體置中
-			const shiftX = (idx - (total - 1) / 2) * stepX;
-			const shiftY = (idx - (total - 1) / 2) * stepY;
-			const px = cx + shiftX;
-			const py = cy + shiftY;
-
-			const boxSize = Math.max(16, (CONFIG.TILE_SIZE * 0.75)) * baseScale;
-
-			ctx.save();
 			ctx.fillStyle = CONFIG.OBJECT_PANEL_BG;
 			ctx.strokeStyle = item.color;
 			ctx.lineWidth = 2 / zoom;
-
 			ctx.beginPath();
-			ctx.roundRect(px - boxSize / 2, py - boxSize / 2, boxSize, boxSize, 4);
+			ctx.roundRect(cx - size / 2, cy - size / 2, size, size, 4);
 			ctx.fill();
 			ctx.stroke();
-
-			this.drawObjectTextLabel(ctx, item.name, px, py, boxSize);
-
-			ctx.restore();
+			this.drawObjectTextLabel(ctx, item.name, cx, cy, size);
 		});
+		ctx.restore();
 	}
 
 	/**
-	 * 權威 3D 牆面物件繪製 (立於牆面的正方形圓角面板，四邊長度完全相等呈正菱形)
+	 * 3D 牆面物件繪製 (立於牆面的正方形圓角面板，四邊長度完全相等呈正菱形)
 	 */
 	static drawWallObjects3D(ctx, isoMath, x, y, edge, objArray, palette, zoom, currentProgress = 1.0) {
-		if (!Array.isArray(objArray) || objArray.length === 0) return;
+		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, currentProgress);
+		if (geometries.length === 0) return;
 
-		const quad = this.getWallQuad96Points(isoMath, x, y, edge, currentProgress);
-		if (!quad) return;
-
-		const [b0, b1, t1, t0] = quad;
-		// 牆面中央偏上 (偏高 20%)
-		const cx = (b0.x + b1.x + t1.x + t0.x) / 4;
-		const cy = (b0.y + b1.y + t1.y + t0.y) / 4 - (CONFIG.TILE_SIZE * 0.15 * currentProgress);
-		const total = objArray.length;
-
-		// 底邊方向半向量 (平行於牆面)
-		const dirX = (b1.x - b0.x) / 2;
-		const dirY = (b1.y - b0.y) / 2;
-		// 正方形面板高度 (與底邊半向量長度完全一致，保證四邊長度完全相等呈正菱形)
-		const halfUp = Math.hypot(dirX, dirY);
-
-		// 依疊加總數決定基礎縮放（疊加越多，全體縮越小）
-		const baseScale = Math.max(0.4, 0.75 - Math.max(0, total - 1) * 0.06);
-		const stepX = dirX * 0.15;
-		const stepY = Math.abs(dirY) * 0.15;
-
-		objArray.forEach((objId, idx) => {
-			const item = palette[objId];
+		ctx.save();
+		geometries.forEach(({ points, cx, cy, size }, idx) => {
+			const item = palette[objArray[idx]];
 			if (!item || !item.color) return;
 
-			// 從左上 (舊) 向右下 (新) 階梯位移，整體幾何中心精確對齊
-			const shiftX = (idx - (total - 1) / 2) * stepX;
-			const shiftY = (idx - (total - 1) / 2) * stepY;
-			const px = cx + shiftX;
-			const py = cy + shiftY;
-
-			const dx = dirX * baseScale;
-			const dy = dirY * baseScale;
-			const dh = halfUp * baseScale;
-
-			// 立於牆面的 4 個頂點 (順時針: 左下 -> 右下 -> 右上 -> 左上)
-			const p0 = { x: px - dx, y: py - dy + dh };
-			const p1 = { x: px + dx, y: py + dy + dh };
-			const p2 = { x: px + dx, y: py + dy - dh };
-			const p3 = { x: px - dx, y: py - dy - dh };
-
-			ctx.save();
 			ctx.fillStyle = CONFIG.OBJECT_PANEL_BG;
 			ctx.strokeStyle = item.color;
 			ctx.lineWidth = 2.5 / zoom;
-
-			// 繪製立於牆面的 3D 圓角面板
-			this.drawIsoRoundedPolygon(ctx, [p0, p1, p2, p3], 0.15);
+			this.drawIsoRoundedPolygon(ctx, points, 0.15);
 			ctx.fill();
 			ctx.stroke();
-
-			const boxSize = dh * 2;
-			this.drawObjectTextLabel(ctx, item.name, px, py, boxSize);
-
-			ctx.restore();
+			this.drawObjectTextLabel(ctx, item.name, cx, cy, size);
 		});
+		ctx.restore();
 	}
 
 	/**
-	 * 權威地塊物件 SVG 向量標籤生成管道 (SVG 匯出專用)
+	 * 區域標籤渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
+	 * 包含邊界內向光暈 (Inset Glow)、外周虛線邊界與質心最近實體格投影法文字
 	 */
-	static getFloorObjectsSvgElements(isoMath, x, y, z, objArray, palette) {
-		if (!Array.isArray(objArray) || objArray.length === 0) return '';
+	static drawZones(ctx, isoMath, layer, palette, zoom, currentProgress = 1.0) {
+		const zoneGeometries = this.getZoneGeometries(isoMath, layer, palette, currentProgress);
+		if (zoneGeometries.length === 0) return;
 
-		const points = this.getTilePolyPoints(isoMath, x, y, 1.0);
-		const cx = (points[0].x + points[2].x) / 2;
-		const cy = (points[0].y + points[2].y) / 2;
-		const total = objArray.length;
+		zoneGeometries.forEach(({ item, polygons, borderEdges, labels, wallPolygons, wallBorderEdges, wallLabels }) => {
+			// 1. 地面標籤光暈與外框
+			if (polygons.length > 0) {
+				ctx.save();
+				ctx.beginPath();
+				polygons.forEach(pts => {
+					ctx.moveTo(pts[0].x, pts[0].y);
+					ctx.lineTo(pts[1].x, pts[1].y);
+					ctx.lineTo(pts[2].x, pts[2].y);
+					ctx.lineTo(pts[3].x, pts[3].y);
+					ctx.closePath();
+				});
 
-		const halfW = Math.abs(points[1].x - points[3].x) / 2;
-		const halfH = Math.abs(points[2].y - points[0].y) / 2;
+				if (CONFIG.ZONE_CENTER_ALPHA > 0) {
+					ctx.globalAlpha = CONFIG.ZONE_CENTER_ALPHA;
+					ctx.fillStyle = item.color;
+					ctx.fill();
+				}
+				ctx.clip();
 
-		const baseScale = Math.max(0.5, 0.95 - Math.max(0, total - 1) * 0.06);
-		const stepRatio = 0.08;
-		const stepX = halfW * stepRatio;
-		const stepY = halfH * stepRatio;
+				if (CONFIG.ZONE_GLOW_WIDTH > 0 && CONFIG.ZONE_GLOW_ALPHA > 0) {
+					const glowW = CONFIG.ZONE_GLOW_WIDTH / zoom;
+					const steps = [
+						{ wRatio: 2.0, aRatio: 0.25 },
+						{ wRatio: 1.2, aRatio: 0.35 },
+						{ wRatio: 0.5, aRatio: 0.40 },
+					];
+					ctx.strokeStyle = item.color;
+					ctx.lineCap = 'round';
+					ctx.lineJoin = 'round';
+					steps.forEach(({ wRatio, aRatio }) => {
+						ctx.lineWidth = glowW * wRatio;
+						ctx.globalAlpha = CONFIG.ZONE_GLOW_ALPHA * aRatio;
+						ctx.beginPath();
+						borderEdges.forEach(({ p0, p1 }) => {
+							ctx.moveTo(p0.x, p0.y);
+							ctx.lineTo(p1.x, p1.y);
+						});
+						ctx.stroke();
+					});
+				}
+				ctx.restore();
 
-		let str = '';
-		objArray.forEach((objId, idx) => {
-			const item = palette[objId];
-			if (!item || !item.color) return;
+				ctx.save();
+				ctx.lineWidth = Math.max(1, CONFIG.ZONE_BORDER_WIDTH / zoom);
+				ctx.setLineDash(CONFIG.ZONE_BORDER_DASH.map(d => Math.max(1, d / zoom)));
+				ctx.strokeStyle = item.color;
+				ctx.beginPath();
+				borderEdges.forEach(({ p0, p1 }) => {
+					ctx.moveTo(p0.x, p0.y);
+					ctx.lineTo(p1.x, p1.y);
+				});
+				ctx.stroke();
+				ctx.restore();
+			}
 
-			const shiftX = (idx - (total - 1) / 2) * stepX;
-			const shiftY = (idx - (total - 1) / 2) * stepY;
-			const px = cx + shiftX;
-			const py = cy + shiftY;
+			// 2. 邊線標籤 (3D 透視懸空立面：中心填色、內向光暈與外周虛線外框)
+			if (wallPolygons && wallPolygons.length > 0) {
+				ctx.save();
+				ctx.beginPath();
+				wallPolygons.forEach(pts => {
+					ctx.moveTo(pts[0].x, pts[0].y);
+					ctx.lineTo(pts[1].x, pts[1].y);
+					ctx.lineTo(pts[2].x, pts[2].y);
+					ctx.lineTo(pts[3].x, pts[3].y);
+					ctx.closePath();
+				});
 
-			const p0 = { x: px + (points[0].x - cx) * baseScale, y: py + (points[0].y - cy) * baseScale };
-			const p1 = { x: px + (points[1].x - cx) * baseScale, y: py + (points[1].y - cy) * baseScale };
-			const p2 = { x: px + (points[2].x - cx) * baseScale, y: py + (points[2].y - cy) * baseScale };
-			const p3 = { x: px + (points[3].x - cx) * baseScale, y: py + (points[3].y - cy) * baseScale };
+				if (CONFIG.ZONE_CENTER_ALPHA > 0) {
+					ctx.globalAlpha = CONFIG.ZONE_CENTER_ALPHA;
+					ctx.fillStyle = item.color;
+					ctx.fill();
+				}
+				ctx.clip();
 
-			const safeColorId = this._escapeXml(String(objId));
-			const safeName = this._escapeXml((item.name || '').substring(0, 2));
+				if (CONFIG.ZONE_GLOW_WIDTH > 0 && CONFIG.ZONE_GLOW_ALPHA > 0) {
+					const glowW = CONFIG.ZONE_GLOW_WIDTH / zoom;
+					const steps = [
+						{ wRatio: 2.0, aRatio: 0.25 },
+						{ wRatio: 1.2, aRatio: 0.35 },
+						{ wRatio: 0.5, aRatio: 0.40 },
+					];
+					ctx.strokeStyle = item.color;
+					ctx.lineCap = 'round';
+					ctx.lineJoin = 'round';
+					steps.forEach(({ wRatio, aRatio }) => {
+						ctx.lineWidth = glowW * wRatio;
+						ctx.globalAlpha = CONFIG.ZONE_GLOW_ALPHA * aRatio;
+						ctx.beginPath();
+						wallBorderEdges.forEach(({ p0, p1 }) => {
+							ctx.moveTo(p0.x, p0.y);
+							ctx.lineTo(p1.x, p1.y);
+						});
+						ctx.stroke();
+					});
+				}
+				ctx.restore();
 
-			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="floor-object" data-color-id="${safeColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
-			if (safeName) {
-				const sideLength = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-				const fontSize = Math.max(CONFIG.OBJECT_FONT_MIN, sideLength * CONFIG.OBJECT_FONT_RATIO);
-				const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
-				str += `<text x="${px}" y="${py}" fill="${CONFIG.OBJECT_TEXT_COLOR}" stroke="${CONFIG.OBJECT_STROKE_COLOR}" stroke-width="${CONFIG.OBJECT_STROKE_WIDTH}" font-size="${fontSize}" font-family="${safeFont}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${safeName}</text>\n`;
+				ctx.save();
+				ctx.lineWidth = Math.max(1, CONFIG.ZONE_BORDER_WIDTH / zoom);
+				ctx.setLineDash(CONFIG.ZONE_BORDER_DASH.map(d => Math.max(1, d / zoom)));
+				ctx.strokeStyle = item.color;
+				ctx.lineCap = 'round';
+				ctx.beginPath();
+				wallBorderEdges.forEach(({ p0, p1 }) => {
+					ctx.moveTo(p0.x, p0.y);
+					ctx.lineTo(p1.x, p1.y);
+				});
+				ctx.stroke();
+				ctx.restore();
+			}
+
+			// 3. 文字置中 (地面島嶼 + 邊線連通島嶼)
+			if (layer.isCurrent) {
+				const allLabels = [...(labels || []), ...(wallLabels || [])];
+				if (allLabels.length > 0) {
+					const fontSize = Math.max(CONFIG.ZONE_FONT_MIN, 13 / zoom);
+					ctx.save();
+					ctx.font = `bold ${fontSize}px ${CONFIG.FONT_SANS}`;
+					ctx.textAlign = 'center';
+					ctx.textBaseline = 'middle';
+					ctx.fillStyle = '#ffffff';
+					ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+					ctx.shadowBlur = 4;
+					allLabels.forEach(({ text, x, y }) => ctx.fillText(text, x, y));
+					ctx.restore();
+				}
 			}
 		});
-
-		return str;
 	}
 
-	/**
-	 * 權威牆面物件 SVG 向量標籤生成管道 (SVG 匯出專用)
-	 */
-	static getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette) {
-		if (!Array.isArray(objArray) || objArray.length === 0) return '';
+	// ==========================================
+	// SVG 向量標籤生成管道 (SVG 匯出專用)
+	// ==========================================
 
+	/**
+	 * 3D 牆體 SVG 向量標籤生成管道
+	 */
+	static getWallSvgElements(isoMath, x, y, z, edge, colorId, color) {
 		const quad = this.getWallQuad96Points(isoMath, x, y, edge, 1.0);
 		if (!quad) return '';
-
 		const [b0, b1, t1, t0] = quad;
-		const cx = (b0.x + b1.x + t1.x + t0.x) / 4;
-		const cy = (b0.y + b1.y + t1.y + t0.y) / 4 - (CONFIG.TILE_SIZE * 0.15);
-		const total = objArray.length;
+		return `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall" data-edge="${edge}" data-color-id="${colorId}" points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="${color}" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" stroke="${color}" stroke-opacity="0.675" stroke-width="1.5" />\n` +
+			`<polygon points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="url(#svg-wall-shading)" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" />\n` +
+			`<line x1="${t0.x}" y1="${t0.y}" x2="${t1.x}" y2="${t1.y}" stroke="#ffffff" stroke-opacity="0.75" stroke-width="1.5" />\n` +
+			`<line x1="${b0.x}" y1="${b0.y}" x2="${b1.x}" y2="${b1.y}" stroke="#000000" stroke-opacity="0.6" stroke-width="1.5" />\n`;
+	}
 
-		const dirX = (b1.x - b0.x) / 2;
-		const dirY = (b1.y - b0.y) / 2;
-		const halfUp = Math.hypot(dirX, dirY);
-
-		const baseScale = Math.max(0.4, 0.75 - Math.max(0, total - 1) * 0.06);
-		const stepX = dirX * 0.15;
-		const stepY = Math.abs(dirY) * 0.15;
-
+	/**
+	 * 地塊物件 SVG 向量標籤生成管道
+	 */
+	static getFloorObjectsSvgElements(isoMath, x, y, z, objArray, palette) {
+		const geometries = this.getFloorObjectGeometries(isoMath, x, y, objArray?.length || 0, 1.0);
+		if (geometries.length === 0) return '';
 		let str = '';
-		objArray.forEach((objId, idx) => {
+		geometries.forEach(({ points, cx, cy, size }, idx) => {
+			const objId = objArray[idx];
 			const item = palette[objId];
 			if (!item || !item.color) return;
+			const pts = points.map(p => `${p.x},${p.y}`).join(' ');
+			const safeColorId = Utils.escapeXml(String(objId));
+			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="floor-object" data-color-id="${safeColorId}" points="${pts}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
+			str += this._formatObjectSvgText(cx, cy, item.name, size);
+		});
+		return str;
+	}
 
-			const shiftX = (idx - (total - 1) / 2) * stepX;
-			const shiftY = (idx - (total - 1) / 2) * stepY;
-			const px = cx + shiftX;
-			const py = cy + shiftY;
+	/**
+	 * 牆面物件 SVG 向量標籤生成管道
+	 */
+	static getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette) {
+		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, 1.0);
+		if (geometries.length === 0) return '';
+		let str = '';
+		geometries.forEach(({ points, cx, cy, size }, idx) => {
+			const objId = objArray[idx];
+			const item = palette[objId];
+			if (!item || !item.color) return;
+			const pts = points.map(p => `${p.x},${p.y}`).join(' ');
+			const safeColorId = Utils.escapeXml(String(objId));
+			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall-object" data-edge="${edge}" data-color-id="${safeColorId}" points="${pts}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
+			str += this._formatObjectSvgText(cx, cy, item.name, size);
+		});
+		return str;
+	}
 
-			const dx = dirX * baseScale;
-			const dy = dirY * baseScale;
-			const dh = halfUp * baseScale;
+	/**
+	 * 區域與標籤 SVG 向量標籤生成管道
+	 */
+	static getZoneSvgElements(isoMath, layer, palette) {
+		const zoneGeometries = this.getZoneGeometries(isoMath, layer, palette, 1.0);
+		if (zoneGeometries.length === 0) return '';
+		const { isCurrent, z } = layer;
+		const dashArray = CONFIG.ZONE_BORDER_DASH.join(',');
+		let str = '';
 
-			const p0 = { x: px - dx, y: py - dy + dh };
-			const p1 = { x: px + dx, y: py + dy + dh };
-			const p2 = { x: px + dx, y: py + dy - dh };
-			const p3 = { x: px - dx, y: py - dy - dh };
+		zoneGeometries.forEach(({ id, item, cells, polygons, borderEdges, labels, wallPolygons, wallBorderEdges, wallLabels }) => {
+			if (polygons.length > 0) {
+				const clipId = `zone-clip-${id}-${z}`;
+				str += `<clipPath id="${clipId}">\n`;
+				polygons.forEach(pts => {
+					str += `<polygon points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+				});
+				str += `</clipPath>\n<g clip-path="url(#${clipId})">\n`;
 
-			const safeColorId = this._escapeXml(String(objId));
-			const safeName = this._escapeXml((item.name || '').substring(0, 2));
+				if (CONFIG.ZONE_CENTER_ALPHA > 0) {
+					cells.forEach(({ x, y }, i) => {
+						const pts = polygons[i].map(p => `${p.x},${p.y}`).join(' ');
+						str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="zone-fill" points="${pts}" fill="${item.color}" fill-opacity="${CONFIG.ZONE_CENTER_ALPHA}" stroke="none" />\n`;
+					});
+				}
 
-			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall-object" data-edge="${edge}" data-color-id="${safeColorId}" points="${p0.x},${p0.y} ${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
-			if (safeName) {
-				const boxSize = dh * 2;
-				const fontSize = Math.max(CONFIG.OBJECT_FONT_MIN, boxSize * CONFIG.OBJECT_FONT_RATIO);
+				if (CONFIG.ZONE_GLOW_WIDTH > 0 && CONFIG.ZONE_GLOW_ALPHA > 0) {
+					const steps = [
+						{ wRatio: 2.0, aRatio: 0.25 },
+						{ wRatio: 1.2, aRatio: 0.35 },
+						{ wRatio: 0.5, aRatio: 0.40 },
+					];
+					steps.forEach(({ wRatio, aRatio }) => {
+						const strokeW = CONFIG.ZONE_GLOW_WIDTH * wRatio;
+						const op = (CONFIG.ZONE_GLOW_ALPHA * aRatio).toFixed(3);
+						borderEdges.forEach(({ p0, p1 }) => {
+							str += `<line x1="${p0.x}" y1="${p0.y}" x2="${p1.x}" y2="${p1.y}" stroke="${item.color}" stroke-width="${strokeW}" stroke-opacity="${op}" stroke-linecap="round" stroke-linejoin="round" />\n`;
+						});
+					});
+				}
+				str += `</g>\n`;
+
+				borderEdges.forEach(({ p0, p1 }) => {
+					str += `<line x1="${p0.x}" y1="${p0.y}" x2="${p1.x}" y2="${p1.y}" stroke="${item.color}" stroke-width="${CONFIG.ZONE_BORDER_WIDTH}" stroke-dasharray="${dashArray}" />\n`;
+				});
+			}
+
+			if (wallPolygons && wallPolygons.length > 0) {
+				const wallClipId = `zone-wall-clip-${id}-${z}`;
+				str += `<clipPath id="${wallClipId}">\n`;
+				wallPolygons.forEach(pts => {
+					str += `<polygon points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+				});
+				str += `</clipPath>\n<g clip-path="url(#${wallClipId})">\n`;
+
+				if (CONFIG.ZONE_CENTER_ALPHA > 0) {
+					wallPolygons.forEach(pts => {
+						str += `<polygon data-type="zone-wall-fill" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" fill="${item.color}" fill-opacity="${CONFIG.ZONE_CENTER_ALPHA}" stroke="none" />\n`;
+					});
+				}
+
+				if (CONFIG.ZONE_GLOW_WIDTH > 0 && CONFIG.ZONE_GLOW_ALPHA > 0) {
+					const steps = [
+						{ wRatio: 2.0, aRatio: 0.25 },
+						{ wRatio: 1.2, aRatio: 0.35 },
+						{ wRatio: 0.5, aRatio: 0.40 },
+					];
+					steps.forEach(({ wRatio, aRatio }) => {
+						const strokeW = CONFIG.ZONE_GLOW_WIDTH * wRatio;
+						const op = (CONFIG.ZONE_GLOW_ALPHA * aRatio).toFixed(3);
+						wallBorderEdges.forEach(({ p0, p1 }) => {
+							str += `<line x1="${p0.x}" y1="${p0.y}" x2="${p1.x}" y2="${p1.y}" stroke="${item.color}" stroke-width="${strokeW}" stroke-opacity="${op}" stroke-linecap="round" stroke-linejoin="round" />\n`;
+						});
+					});
+				}
+				str += `</g>\n`;
+
+				wallBorderEdges.forEach(({ p0, p1 }) => {
+					str += `<line x1="${p0.x}" y1="${p0.y}" x2="${p1.x}" y2="${p1.y}" stroke="${item.color}" stroke-width="${CONFIG.ZONE_BORDER_WIDTH}" stroke-dasharray="${dashArray}" stroke-linecap="round" />\n`;
+				});
+			}
+
+			if (isCurrent) {
+				const safeName = Utils.escapeXml(String(item.name || ''));
 				const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
-				str += `<text x="${px}" y="${py}" fill="${CONFIG.OBJECT_TEXT_COLOR}" stroke="${CONFIG.OBJECT_STROKE_COLOR}" stroke-width="${CONFIG.OBJECT_STROKE_WIDTH}" font-size="${fontSize}" font-family="${safeFont}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${safeName}</text>\n`;
+				const allLabels = [...(labels || []), ...(wallLabels || [])];
+				allLabels.forEach(({ x, y }) => {
+					str += `<text data-type="zone-label" x="${x}" y="${y}" fill="#ffffff" stroke="#000000" stroke-width="2" paint-order="stroke" font-size="13" font-family="${safeFont}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${safeName}</text>\n`;
+				});
 			}
 		});
 
 		return str;
+	}
+
+	/**
+	 * 樓層鬼影去飽和度色號運算 (Canvas 2D 畫布與 PNG 匯出共用)
+	 */
+	static desaturateHex(hex, factor = 0.5) {
+		if (!hex || hex.length < 7) return '#64748b';
+		const r = parseInt(hex.substring(1, 3), 16);
+		const g = parseInt(hex.substring(3, 5), 16);
+		const b = parseInt(hex.substring(5, 7), 16);
+		const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+		const toHex = v => Math.round(v + (gray - v) * factor).toString(16).padStart(2, '0');
+		return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+	}
+
+	/**
+	 * 統一繪製地塊網格輔助線與外框
+	 * @param {CanvasRenderingContext2D} ctx
+	 * @param {import("./IsoMath.js").IsoMath} isoMath
+	 * @param {number} width 網格寬度 (格數)
+	 * @param {number} height 網格高度 (格數)
+	 * @param {number} currentProgress 視角過渡進度
+	 * @param {number} zoom 視角縮放倍率
+	 * @param {number} [zLevel=0] Z 軸層級
+	 */
+	static drawGrid(ctx, isoMath, width, height, currentProgress, zoom = 1.0, zLevel = 0) {
+		const { dx, dy } = calcZTranslate(zLevel, currentProgress);
+
+		ctx.save();
+		ctx.translate(dx, dy);
+		ctx.lineWidth = 1 / zoom;
+		ctx.strokeStyle = CONFIG.COLOR_GRID_NORMAL;
+
+		for (let x = 0; x <= width; x++) {
+			const start = isoMath.gridToScreen(x, 0, currentProgress);
+			const end = isoMath.gridToScreen(x, height, currentProgress);
+			ctx.beginPath();
+			ctx.moveTo(start.x, start.y);
+			ctx.lineTo(end.x, end.y);
+			ctx.stroke();
+		}
+
+		for (let y = 0; y <= height; y++) {
+			const start = isoMath.gridToScreen(0, y, currentProgress);
+			const end = isoMath.gridToScreen(width, y, currentProgress);
+			ctx.beginPath();
+			ctx.moveTo(start.x, start.y);
+			ctx.lineTo(end.x, end.y);
+			ctx.stroke();
+		}
+
+		ctx.strokeStyle = CONFIG.COLOR_GRID_BOUNDS;
+		ctx.lineWidth = 2 / zoom;
+		const p00 = isoMath.gridToScreen(0, 0, currentProgress);
+		const p10 = isoMath.gridToScreen(width, 0, currentProgress);
+		const p11 = isoMath.gridToScreen(width, height, currentProgress);
+		const p01 = isoMath.gridToScreen(0, height, currentProgress);
+
+		ctx.beginPath();
+		ctx.moveTo(p00.x, p00.y);
+		ctx.lineTo(p10.x, p10.y);
+		ctx.lineTo(p11.x, p11.y);
+		ctx.lineTo(p01.x, p01.y);
+		ctx.closePath();
+		ctx.stroke();
+		ctx.restore();
+	}
+
+	static _formatObjectSvgText(px, py, name, boxSize) {
+		const rawName = Utils.escapeXml(String(name || '').substring(0, 2));
+		if (!rawName) return '';
+		const fontSize = Math.max(CONFIG.OBJECT_FONT_MIN, boxSize * CONFIG.OBJECT_FONT_RATIO);
+		const safeFont = CONFIG.FONT_SANS.replace(/"/g, '&quot;');
+		return `<text x="${px}" y="${py}" fill="${CONFIG.OBJECT_TEXT_COLOR}" stroke="${CONFIG.OBJECT_STROKE_COLOR}" stroke-width="${CONFIG.OBJECT_STROKE_WIDTH}" font-size="${fontSize}" font-family="${safeFont}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">${rawName}</text>\n`;
 	}
 
 	static _escapeXml(unsafe) {
-		return unsafe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+		return Utils.escapeXml(unsafe);
 	}
 }

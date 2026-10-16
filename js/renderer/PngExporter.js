@@ -1,5 +1,5 @@
 /**
- * PngExporter.js - 帶全包覆視角與質感圖例的 PNG 圖片快照匯出器 (100% 離線純靜態相容)
+ * PngExporter.js - 離屏 Canvas PNG 圖檔快照匯出管道
  * 架構原則：按樓層分組 ctx.translate 統一套用位移，子元素使用純邏輯座標繪製。
  */
 
@@ -24,7 +24,7 @@ export class PngExporter {
 		const scheme = stateManager.scheme;
 		const currentZ = stateManager.currentZLevel;
 		const palette = scheme.palette || {};
-		const isoMath = new IsoMath(32);
+		const isoMath = new IsoMath(CONFIG.TILE_SIZE);
 
 		// 離屏 Canvas 尺寸同目前主畫布
 		const offCanvas = document.createElement('canvas');
@@ -50,7 +50,7 @@ export class PngExporter {
 		ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
 
 		// 1. 純黑背景
-		ctx.fillStyle = '#0b0f19';
+		ctx.fillStyle = CONFIG.COLOR_BG;
 		ctx.fillRect(0, 0, viewportW, viewportH);
 
 		// 套用全包覆相機矩陣
@@ -58,44 +58,16 @@ export class PngExporter {
 		ctx.translate(fit.cameraX, fit.cameraY);
 		ctx.scale(fit.zoom, fit.zoom);
 
-		// 2. 繪製底層網格 (Grid) (在當前 Z 層的座標系下)
-		const { dx: gridDx, dy: gridDy } = calcZTranslate(currentZ, currentProgress);
-		ctx.save();
-		ctx.translate(gridDx, gridDy);
-		ctx.lineWidth = 1 / fit.zoom;
-		ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-		for (let x = 0; x <= scheme.width; x++) {
-			const start = isoMath.gridToScreen(x, 0, currentProgress);
-			const end = isoMath.gridToScreen(x, scheme.height, currentProgress);
-			ctx.beginPath();
-			ctx.moveTo(start.x, start.y);
-			ctx.lineTo(end.x, end.y);
-			ctx.stroke();
-		}
-		for (let y = 0; y <= scheme.height; y++) {
-			const start = isoMath.gridToScreen(0, y, currentProgress);
-			const end = isoMath.gridToScreen(scheme.width, y, currentProgress);
-			ctx.beginPath();
-			ctx.moveTo(start.x, start.y);
-			ctx.lineTo(end.x, end.y);
-			ctx.stroke();
-		}
-
-		// 外邊界紫線
-		ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
-		ctx.lineWidth = 2 / fit.zoom;
-		const p00 = isoMath.gridToScreen(0, 0, currentProgress);
-		const p10 = isoMath.gridToScreen(scheme.width, 0, currentProgress);
-		const p11 = isoMath.gridToScreen(scheme.width, scheme.height, currentProgress);
-		const p01 = isoMath.gridToScreen(0, scheme.height, currentProgress);
-		ctx.beginPath();
-		ctx.moveTo(p00.x, p00.y);
-		ctx.lineTo(p10.x, p10.y);
-		ctx.lineTo(p11.x, p11.y);
-		ctx.lineTo(p01.x, p01.y);
-		ctx.closePath();
-		ctx.stroke();
-		ctx.restore();
+		// 2. 繪製底層網格 (Grid)
+		GeometryPipeline.drawGrid(
+			ctx,
+			isoMath,
+			scheme.width,
+			scheme.height,
+			currentProgress,
+			fit.zoom,
+			currentZ,
+		);
 
 		// 3. 渲染所有樓層 (按層分組 ctx.translate 統一偏置)
 		const layers = GeometryPipeline.getSortedLayersToRender(scheme.tiles, currentZ, stateManager.otherFloorsMode);
@@ -137,10 +109,9 @@ export class PngExporter {
 						GeometryPipeline.drawWallObjects2D(ctx, isoMath, x, y, edge, objArray, palette, fit.zoom, currentProgress);
 					}
 				},
-				onLabel: (x, y, label) => {
-					GeometryPipeline.drawTileText(ctx, isoMath, x, y, label, fit.zoom, currentProgress);
-				},
 			});
+
+			GeometryPipeline.drawZones(ctx, isoMath, layer, palette, fit.zoom, currentProgress);
 
 			ctx.restore();
 		});

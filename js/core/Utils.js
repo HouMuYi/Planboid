@@ -35,6 +35,36 @@ export class Utils {
 	}
 
 	/**
+	 * XML / SVG 特殊字元跳脫
+	 * @param {any} str
+	 * @returns {string}
+	 */
+	static escapeXml(str) {
+		if (str === null || str === undefined) return '';
+		return String(str)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&apos;');
+	}
+
+	/**
+	 * XML / SVG 特殊字元反跳脫
+	 * @param {any} str
+	 * @returns {string}
+	 */
+	static unescapeXml(str) {
+		if (str === null || str === undefined) return '';
+		return String(str)
+			.replace(/&amp;/g, '&')
+			.replace(/&lt;/g, '<')
+			.replace(/&gt;/g, '>')
+			.replace(/&quot;/g, '"')
+			.replace(/&(?:apos|#39|#039);/g, "'");
+	}
+
+	/**
 	 * 產出帶有時間戳 (YYYYMMDD_HHmmss) 的通用匯出檔名
 	 * @param {string} rawName 方案名稱
 	 * @param {string} suffix 檔名後綴 (如 'blueprint', 'full_canvas', 'scheme')

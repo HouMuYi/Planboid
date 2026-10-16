@@ -18,13 +18,23 @@ export class BrushActionApplicator {
 		if (!this.state || !this.state.scheme) return;
 		const brushType = this.state.brushType;
 		const tool = this.state.activeTool;
+		const activeItem = this.state.scheme.palette?.[this.state.activeColorId];
+		const isZone = !!activeItem?.isZone;
 
 		if (brushType === 'wall' || tool === 'erase-wall') {
 			if (edge) {
-				this.state.removeWall(x, y, edge);
+				if (isZone) {
+					this.state.removeWallZone(x, y, edge);
+				} else {
+					this.state.removeWall(x, y, edge);
+				}
 			}
 		} else {
-			this.state.removeFloor(x, y);
+			if (isZone) {
+				this.state.removeZone(x, y);
+			} else {
+				this.state.removeFloor(x, y);
+			}
 		}
 		this.state.notifyStateChange();
 	}
@@ -45,11 +55,21 @@ export class BrushActionApplicator {
 		const endY = Math.min(height - 1, maxY);
 		if (startX > endX || startY > endY) return;
 
+		const activeItem = this.state.scheme.palette?.[colorId];
+		const isZone = !!activeItem?.isZone;
+
 		this.state.batchOperation(() => {
 			for (let x = startX; x <= endX; x++) {
 				for (let y = startY; y <= endY; y++) {
-					if (tool === 'pencil') this.state.setTileFloor(x, y, colorId);
-					else if (tool === 'erase-floor') this.state.removeFloor(x, y);
+					if (tool === 'pencil') {
+						this.state.setTileFloor(x, y, colorId);
+					} else if (tool === 'erase-floor') {
+						if (isZone) {
+							this.state.removeZone(x, y);
+						} else {
+							this.state.removeFloor(x, y);
+						}
+					}
 				}
 			}
 		});
@@ -68,6 +88,8 @@ export class BrushActionApplicator {
 		const colorId = this.state.activeColorId;
 		const width = this.state.scheme.width;
 		const height = this.state.scheme.height;
+		const activeItem = this.state.scheme.palette?.[colorId];
+		const isZone = !!activeItem?.isZone;
 
 		this.state.batchOperation(() => {
 			if (start.y === end.y) {
@@ -75,16 +97,22 @@ export class BrushActionApplicator {
 				const minX = Math.max(0, Math.min(start.x, end.x));
 				const maxX = Math.min(width, Math.max(start.x, end.x));
 				for (let x = minX; x < maxX; x++) {
-					if (tool === 'pencil') this.state.setTileWall(x, y, 'north', colorId);
-					else if (tool === 'erase-wall') this.state.removeWall(x, y, 'north');
+					if (tool === 'pencil') this.state.setTileWall(x, y, 'N', colorId);
+					else if (tool === 'erase-wall') {
+						if (isZone) this.state.removeWallZone(x, y, 'N');
+						else this.state.removeWall(x, y, 'N');
+					}
 				}
 			} else {
 				const x = start.x;
 				const minY = Math.max(0, Math.min(start.y, end.y));
 				const maxY = Math.min(height, Math.max(start.y, end.y));
 				for (let y = minY; y < maxY; y++) {
-					if (tool === 'pencil') this.state.setTileWall(x, y, 'west', colorId);
-					else if (tool === 'erase-wall') this.state.removeWall(x, y, 'west');
+					if (tool === 'pencil') this.state.setTileWall(x, y, 'W', colorId);
+					else if (tool === 'erase-wall') {
+						if (isZone) this.state.removeWallZone(x, y, 'W');
+						else this.state.removeWall(x, y, 'W');
+					}
 				}
 			}
 		});

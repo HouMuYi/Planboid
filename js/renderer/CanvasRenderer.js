@@ -1,10 +1,11 @@
 /**
  * CanvasRenderer.js - 精確 PZ 幾何重構繪繪引擎 (深模組：雙畫布分層 Offscreen Architecture)
  * - 底層 Canvas (this.canvas): 負責純黑背景、網格與全樓層地塊牆面多邊形 (僅地塊變更與視角過渡時重繪)
- * - 頂層 Canvas (this.overlayCanvas): 負責 Hover 高亮、選區、筆刷與貼上預覽 (極輕量，<0.1ms 重繪，徹底拯救 CPU)
+ * - 頂層 Canvas (this.overlayCanvas): 負責 Hover 高亮、選區、筆刷與貼上預覽 (分層動態繪製)
  */
 
 import { CONFIG } from '../core/Config.js';
+import { eventBus, EVENTS } from '../core/EventBus.js';
 import { BrushActionApplicator } from './BrushActionApplicator.js';
 import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
 import { InputDispatcher } from './InputDispatcher.js';
@@ -91,7 +92,7 @@ export class CanvasRenderer {
 		window.addEventListener('resize', () => this.resize());
 		this.centerCamera();
 
-		window.addEventListener('statechange', () => {
+		eventBus.on(EVENTS.STATE_CHANGED, () => {
 			this.cacheManager.invalidateAll();
 			this.requestRenderAll();
 		});
@@ -167,8 +168,7 @@ export class CanvasRenderer {
 		this.cameraY = fit.cameraY;
 		this.requestRenderAll();
 
-		const event = new CustomEvent('zoomchange', { detail: { zoom: this.zoom } });
-		window.dispatchEvent(event);
+		eventBus.emit(EVENTS.ZOOM_CHANGED, { zoom: this.zoom });
 	}
 
 	/**
@@ -226,8 +226,8 @@ export class CanvasRenderer {
 	}
 
 	/**
-	 * 全站中央單一影格調度器 (Central Unified Frame Scheduler Loop)
-	 * 統籌雙畫布分層重繪、相機 Lerp 縮放與 2D/3D 視角過渡動畫，消滅同影格重複繪製
+	 * 影格調度器
+	 * 統籌雙畫布分層重繪、相機縮放與視角過渡動畫
 	 */
 	scheduleTick() {
 		if (this.isTickScheduled) return;
@@ -275,8 +275,7 @@ export class CanvasRenderer {
 			}
 			needsBaseRedraw = true;
 
-			const event = new CustomEvent('zoomchange', { detail: { zoom: this.zoom } });
-			window.dispatchEvent(event);
+			eventBus.emit(EVENTS.ZOOM_CHANGED, { zoom: this.zoom });
 		}
 
 		// 2. 處理 2D/3D 視角切換過渡動畫 (時間驅動型 Ease-InOut 2 秒曲線)
@@ -312,7 +311,7 @@ export class CanvasRenderer {
 			needsBaseRedraw = true;
 		}
 
-		// 3. 權威結算：單一 rAF 影格內絕對不重複執行 renderBase / renderOverlay
+		// 3. 結算繪製
 		if (needsBaseRedraw) {
 			this.renderAll();
 		} else if (needsOverlayRedraw) {
@@ -420,47 +419,15 @@ export class CanvasRenderer {
 		if (this.isAnimating) return;
 
 		const scheme = this.state.scheme;
-		const z = this.state.currentZLevel;
-		const { dx, dy } = calcZTranslate(z, this.currentProgress);
-
-		ctx.save();
-		ctx.translate(dx, dy);
-		ctx.lineWidth = 1 / this.zoom;
-		ctx.strokeStyle = CONFIG.COLOR_GRID_NORMAL;
-
-		for (let x = 0; x <= scheme.width; x++) {
-			const start = this.isoMath.gridToScreen(x, 0, this.currentProgress);
-			const end = this.isoMath.gridToScreen(x, scheme.height, this.currentProgress);
-			ctx.beginPath();
-			ctx.moveTo(start.x, start.y);
-			ctx.lineTo(end.x, end.y);
-			ctx.stroke();
-		}
-
-		for (let y = 0; y <= scheme.height; y++) {
-			const start = this.isoMath.gridToScreen(0, y, this.currentProgress);
-			const end = this.isoMath.gridToScreen(scheme.width, y, this.currentProgress);
-			ctx.beginPath();
-			ctx.moveTo(start.x, start.y);
-			ctx.lineTo(end.x, end.y);
-			ctx.stroke();
-		}
-
-		ctx.strokeStyle = CONFIG.COLOR_GRID_BOUNDS;
-		ctx.lineWidth = 2 / this.zoom;
-		const p00 = this.isoMath.gridToScreen(0, 0, this.currentProgress);
-		const p10 = this.isoMath.gridToScreen(scheme.width, 0, this.currentProgress);
-		const p11 = this.isoMath.gridToScreen(scheme.width, scheme.height, this.currentProgress);
-		const p01 = this.isoMath.gridToScreen(0, scheme.height, this.currentProgress);
-
-		ctx.beginPath();
-		ctx.moveTo(p00.x, p00.y);
-		ctx.lineTo(p10.x, p10.y);
-		ctx.lineTo(p11.x, p11.y);
-		ctx.lineTo(p01.x, p01.y);
-		ctx.closePath();
-		ctx.stroke();
-		ctx.restore();
+		GeometryPipeline.drawGrid(
+			ctx,
+			this.isoMath,
+			scheme.width,
+			scheme.height,
+			this.currentProgress,
+			this.zoom,
+			this.state.currentZLevel,
+		);
 	}
 
 	drawAllFloors(ctx) {
@@ -513,24 +480,22 @@ export class CanvasRenderer {
 					ctx.drawImage(floorCache2D.canvas, snapMinX2D, snapMinY2D);
 					ctx.restore();
 
-					// 牆面層：動畫過渡期間即時繪製
+					// 牆面層與區域層：動畫過渡期間即時繪製
 					this._renderPasses(ctx, layer, palette, desatFactor, isCurrent, this.zoom, this.currentProgress, { wall: true });
+					GeometryPipeline.drawZones(ctx, this.isoMath, layer, palette, this.zoom, this.currentProgress);
 				}
 			} else if (isPanZooming) {
-				const cache = this.cacheManager.getOrCreateCache(z, isCurrent, snapWidth, snapHeight, (baseCtx, labelCtx) => {
+				const cache = this.cacheManager.getOrCreateCache(z, snapWidth, snapHeight, (baseCtx) => {
 					baseCtx.translate(-snapMinX, -snapMinY);
-					labelCtx.translate(-snapMinX, -snapMinY);
 					this._renderPasses(baseCtx, layer, palette, desatFactor, isCurrent, 1.0, this.currentProgress, { floor: true, wall: true });
-					if (isCurrent) {
-						this._renderPasses(labelCtx, layer, palette, desatFactor, isCurrent, 1.0, this.currentProgress, { label: true });
-					}
+					GeometryPipeline.drawZones(baseCtx, this.isoMath, layer, palette, 1.0, this.currentProgress);
 				});
 
 				ctx.drawImage(cache.base, snapMinX, snapMinY);
-				if (isCurrent) ctx.drawImage(cache.label, snapMinX, snapMinY);
 			} else {
 				// 靜止狀態：完整原生繪製
-				this._renderPasses(ctx, layer, palette, desatFactor, isCurrent, this.zoom, this.currentProgress, { floor: true, wall: true, label: isCurrent });
+				this._renderPasses(ctx, layer, palette, desatFactor, isCurrent, this.zoom, this.currentProgress, { floor: true, wall: true });
+				GeometryPipeline.drawZones(ctx, this.isoMath, layer, palette, this.zoom, this.currentProgress);
 			}
 
 			ctx.restore();
@@ -561,9 +526,6 @@ export class CanvasRenderer {
 					GeometryPipeline.drawWallObjects2D(targetCtx, this.isoMath, x, y, edge, objArray, palette, zoom, progress);
 				}
 			} : null,
-			onLabel: passes.label ? (x, y, label) => {
-				GeometryPipeline.drawTileText(targetCtx, this.isoMath, x, y, label, zoom, progress);
-			} : null,
 		});
 	}
 
@@ -577,10 +539,6 @@ export class CanvasRenderer {
 
 	drawWallQuad96px(ctx, x, y, edge, colorHex, fillAlpha = CONFIG.WALL_FILL_ALPHA) {
 		GeometryPipeline.drawWallQuad96px(ctx, this.isoMath, x, y, edge, colorHex, this.zoom, this.currentProgress, fillAlpha);
-	}
-
-	drawTileText(ctx, x, y, text) {
-		GeometryPipeline.drawTileText(ctx, this.isoMath, x, y, text, this.zoom, this.currentProgress);
 	}
 
 	// 以下方法在頂層 Overlay 上繪製

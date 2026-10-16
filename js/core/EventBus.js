@@ -93,4 +93,11 @@ class EventBus {
 	}
 }
 
+export const EVENTS = Object.freeze({
+	STATE_CHANGED: 'state:changed',
+	LANG_CHANGED: 'lang:changed',
+	GRID_HOVER: 'grid:hover',
+	ZOOM_CHANGED: 'zoom:changed',
+});
+
 export const eventBus = new EventBus();

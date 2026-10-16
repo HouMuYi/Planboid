@@ -2,6 +2,8 @@
  * I18nManager.js - 多語言國際化管理器 (平鋪字典、無限退回鏈與 DOM 批次更新)
  */
 
+import { eventBus, EVENTS } from './EventBus.js';
+
 export class I18nManager {
 	constructor() {
 		this.availableLangs = ['zh', 'en'];
@@ -35,7 +37,7 @@ export class I18nManager {
 		localStorage.setItem('planboid_lang', langKey);
 		this.updateDomTranslations();
 
-		window.dispatchEvent(new CustomEvent('langchange', { detail: { lang: langKey } }));
+		eventBus.emit(EVENTS.LANG_CHANGED, { lang: langKey });
 	}
 
 	/**

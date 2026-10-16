@@ -22,9 +22,9 @@
 	--shadow: 0 10px 30px -10px rgba(0,0,0,.5);
 	--blur: blur(14px);
 	--s: 1;
-	--font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Microsoft YaHei", "微软雅黑", sans-serif;
-	--font-serif: "Noto Serif TC", "Songti TC", "PMingLiU", "新細明體", "Songti SC", "SimSun", "宋体", serif;
-	--font-mono: "Ubuntu Mono", Consolas, Menlo, Monaco, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Microsoft YaHei", "微软雅黑", monospace;
+	--font-sans: "Noto Sans TC", -apple-system, system-ui, sans-serif;
+	--font-serif: "Noto Serif TC", -apple-system, serif;
+	--font-mono: "Ubuntu Mono", Consolas, Menlo, Monaco, "Noto Sans TC", -apple-system, system-ui, monospace;
 }
 @media (min-width:1920px) { :root { --s:1.15 } }
 @media (min-width:2560px) { :root { --s:1.28 } }
@@ -95,7 +95,7 @@ meter.meter.is-danger::-moz-meter-bar { background:var(--danger) }
 .input-code { font-family:var(--font-mono); resize:vertical; font-weight:600 }
 .input-color { width:48px; height:38px; border:none; cursor:pointer; border-radius:6px; padding:0; background:transparent }
 #preset-color-swatches { display:grid; grid-template-columns:repeat(8, calc(24px*var(--s))); gap:calc(6px*var(--s)); justify-content:start; margin-top:calc(4px*var(--s)) }
-.preset-swatch-item { width:calc(24px*var(--s)); height:calc(24px*var(--s)); border-radius:4px; border:1px solid var(--bd); cursor:pointer; transition:transform .15s, filter .15s }
+.preset-swatch-item { width:calc(24px*var(--s)); height:calc(24px*var(--s)); border-radius:4px; border:1px solid var(--bd); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .15s, filter .15s }
 
 /* ── 7. Component Structure & Boundaries ── */
 #app-container { height:100vh; height:100dvh; width:100vw }
@@ -226,4 +226,3 @@ meter.meter.is-danger::-moz-meter-bar { background:var(--danger) }
 .toast-item.toast-error { border-left:4px solid var(--danger) }
 .toast-item.show { opacity:1; transform:translateY(0) }
 
-.preset-swatch-item { width:calc(24px*var(--s)); height:calc(24px*var(--s)); border-radius:4px; border:1px solid var(--bd); cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.3) }

@@ -8,7 +8,7 @@
 		<!-- Google Fonts -->
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@100..900&family=Noto+Serif+TC:wght@200..900&family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@100..900&family=Noto+Serif+TC:wght@200..900&family=Orbitron:wght@400..900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap" rel="stylesheet">
 
 		<!-- CSS Style -->
 		<link rel="stylesheet" href="css/style.css">
@@ -19,7 +19,7 @@
 			href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA6MObAP+EAAChe1IA////AH1KFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADVVVVVVVVUAEiIiIiIiJQASREJEREIlABIiIkIiQiUAEkRCQiJCJQASQkJEREIlABJCIiIiIiUAEiQiJEQiJQASRCQiIiQlABJCIkIiQiUAEiQiJCQiJQASIiIiQiIlABIiIiIiIiUAEREREREREwAAAAAAAAAAD//wAAgAEAAIABAACAAQAAgAEAAIABAACAAQAAgAEAAIABAACAAQAAgAEAAIABAACAAQAAgAEAAIABAAD//wAA"
 		>
 
-		<!-- 靜態語言字典檔 (100% 離線 file:// 相容) -->
+		<!-- 靜態語言字典檔 -->
 		<script src="lang/zh.js"></script>
 		<script src="lang/en.js"></script>
 	</head>
@@ -41,7 +41,7 @@
 				</div>
 
 				<div class="header-center">
-					<span class="scheme-title" id="active-scheme-name" data-i18n-title="header_scheme_name_tooltip" title="點擊重新命名與調整尺寸"
+					<span class="scheme-title" id="active-scheme-name" data-i18n-title="header_scheme_name_tooltip"
 					>預設規劃方案</span>
 					<span class="scheme-dim desktop-only" id="active-scheme-dim">(32 x 32 @ 10500,9200)</span>
 
@@ -51,7 +51,7 @@
 				</div>
 
 				<div class="header-actions">
-					<button class="btn" id="btn-about" data-i18n-title="header_btn_about_title" title="關於專案與團隊致謝">
+					<button class="btn" id="btn-about" data-i18n-title="header_btn_about_title">
 						ℹ️ <span class="btn-text" data-i18n="header_btn_about">關於</span>
 					</button>
 					<a
@@ -61,27 +61,25 @@
 						target="_blank"
 						rel="noopener"
 						data-i18n-title="header_btn_github_title"
-						title="造訪 GitHub 原始碼倉庫"
 					>⭐</a>
-					<button class="btn" id="btn-export-svg" data-i18n-title="header_btn_svg_title" title="匯出高畫質向量 SVG 圖檔 (含圖例)">
+					<button class="btn" id="btn-export-svg" data-i18n-title="header_btn_svg_title">
 						📐 <span class="btn-text" data-i18n="header_btn_svg">SVG</span>
 					</button>
-					<button class="btn" id="btn-export-png" data-i18n-title="header_btn_png_title" title="匯出全幅 PNG 圖片快照">
+					<button class="btn" id="btn-export-png" data-i18n-title="header_btn_png_title">
 						📷 <span class="btn-text" data-i18n="header_btn_png">PNG</span>
 					</button>
-					<button class="btn" id="btn-export-json" data-i18n-title="header_btn_export_json_title" title="將方案匯出為 JSON 檔案">💾</button>
-					<button class="btn" id="btn-import-json" data-i18n-title="header_btn_import_json_title" title="從本機讀取 JSON 檔案匯入">
+					<button class="btn" id="btn-export-json" data-i18n-title="header_btn_export_json_title">💾</button>
+					<button class="btn" id="btn-import-json" data-i18n-title="header_btn_import_json_title">
 						📂
 					</button>
 					<button
 						class="btn"
 						id="btn-export-clipboard"
 						data-i18n-title="header_btn_export_clipboard_title"
-						title="將方案極簡文字複製至剪貼簿"
 					>
 						📄
 					</button>
-					<button class="btn" id="btn-import-text" data-i18n-title="header_btn_import_text_title" title="貼上或輸入方案極簡文字匯入">
+					<button class="btn" id="btn-import-text" data-i18n-title="header_btn_import_text_title">
 						📋
 					</button>
 				</div>
@@ -98,7 +96,6 @@
 							id="tool-floor"
 							data-tool="floor"
 							data-i18n-title="toolbar_tool_floor_title"
-							title="繪製地塊（1）&#10;點擊單一地塊立即上色；按住拖曳後放開，可依起訖對角批次為矩形範圍地塊上色。"
 						>
 							<span class="icon unicode-icon">◆</span>
 						</button>
@@ -107,7 +104,6 @@
 							id="tool-wall"
 							data-tool="wall"
 							data-i18n-title="toolbar_tool_wall_title"
-							title="繪製邊線（2）&#10;遊標會自動吸附至地塊網格交叉點；點擊一交叉點作為起點後，按住拖曳到另一交叉點放開，或放開後移動再次點擊，皆可沿水平或垂直單一直線批次繪製整排邊線；按 Esc 可中斷。"
 						>
 							<span class="icon unicode-icon">◇</span>
 						</button>
@@ -116,7 +112,6 @@
 							id="tool-erase-floor"
 							data-tool="erase-floor"
 							data-i18n-title="toolbar_tool_erase_floor_title"
-							title="清除地塊（3）&#10;操作邏輯與繪製地塊相同：點擊單一地塊立即清除；按住拖曳後放開，可清除起訖對角所框出之矩形範圍內全部地塊。"
 						>
 							<span class="icon combo-icon">
 								<span class="base-icon">◆</span>
@@ -128,7 +123,6 @@
 							id="tool-erase-wall"
 							data-tool="erase-wall"
 							data-i18n-title="toolbar_tool_erase_wall_title"
-							title="清除邊線（4）&#10;操作邏輯與繪製邊線相同：吸附交叉點設定起點後，拖曳或再次點擊終點，即可沿同一水平或垂直直線批次清除整排邊線。"
 						>
 							<span class="icon combo-icon">
 								<span class="base-icon">◇</span>
@@ -140,7 +134,6 @@
 							id="tool-select"
 							data-tool="select"
 							data-i18n-title="toolbar_tool_select_title"
-							title="選取工具（5）&#10;點擊單一地塊即可選取並編輯標籤；按住拖曳後放開，可框選矩形範圍地塊，供複製（Ctrl+C）、貼上（Ctrl+V）或刪除（Delete）使用。"
 						>
 							<span class="icon">👆</span>
 						</button>
@@ -150,8 +143,8 @@
 
 					<div class="tool-group desktop-only">
 						<span class="group-label" data-i18n="toolbar_group_history">歷史</span>
-						<button class="btn btn-icon" id="btn-undo" data-i18n-title="toolbar_btn_undo_title" title="復原 (Ctrl+Z)">↩️</button>
-						<button class="btn btn-icon" id="btn-redo" data-i18n-title="toolbar_btn_redo_title" title="重做 (Ctrl+Y)">↪️</button>
+						<button class="btn btn-icon" id="btn-undo" data-i18n-title="toolbar_btn_undo_title">↩️</button>
+						<button class="btn btn-icon" id="btn-redo" data-i18n-title="toolbar_btn_redo_title">↪️</button>
 					</div>
 				</aside>
 
@@ -161,18 +154,18 @@
 
 					<div class="view-overlay-controls">
 						<div class="view-switch-group">
-							<button class="btn active" id="view-iso" data-i18n-title="viewport_view_iso_title" title="2:1 等軸測視角">
+							<button class="btn active" id="view-iso" data-i18n-title="viewport_view_iso_title">
 								<span data-i18n="viewport_view_iso">等軸測（2:1）</span>
 							</button>
-							<button class="btn" id="view-ortho" data-i18n-title="viewport_view_ortho_title" title="1:1 正交視角">
+							<button class="btn" id="view-ortho" data-i18n-title="viewport_view_ortho_title">
 								<span data-i18n="viewport_view_ortho">正交（1:1）</span>
 							</button>
 						</div>
 
-						<button class="btn btn-circle" id="btn-fit-view" data-i18n-title="viewport_btn_fit_view_title" title="顯示全部畫布與地塊">
+						<button class="btn btn-circle" id="btn-fit-view" data-i18n-title="viewport_btn_fit_view_title">
 							🔍
 						</button>
-						<button class="btn btn-circle" id="btn-reset-view" data-i18n-title="viewport_btn_reset_view_title" title="重設視角與縮放">
+						<button class="btn btn-circle" id="btn-reset-view" data-i18n-title="viewport_btn_reset_view_title">
 							🎯
 						</button>
 					</div>
@@ -191,7 +184,7 @@
 
 				<!-- 右側側邊欄 -->
 				<aside class="sidebar-right panel" id="main-sidebar">
-					<button class="btn btn-toggle-sidebar" id="btn-toggle-sidebar" data-i18n-title="sidebar_btn_toggle_title" title="摺疊/展開側邊欄">
+					<button class="btn btn-toggle-sidebar" id="btn-toggle-sidebar" data-i18n-title="sidebar_btn_toggle_title">
 						<span class="toggle-icon">⇄</span>
 						<span class="toggle-text" data-i18n="sidebar_btn_toggle">側邊欄</span>
 					</button>
@@ -205,7 +198,6 @@
 									id="floor-up"
 									data-i18n="sidebar_floor_up"
 									data-i18n-title="sidebar_floor_up_title"
-									title="▲ 上層"
 								>
 									▲ 上層
 								</button>
@@ -217,7 +209,6 @@
 									id="floor-down"
 									data-i18n="sidebar_floor_down"
 									data-i18n-title="sidebar_floor_down_title"
-									title="▼ 下層"
 								>
 									▼ 下層
 								</button>
@@ -230,7 +221,6 @@
 										data-mode="hidden"
 										data-i18n="sidebar_other_floors_hidden"
 										data-i18n-title="sidebar_other_floors_hidden_title"
-										title="隱藏其他所有樓層"
 									>
 										隱藏
 									</button>
@@ -239,7 +229,6 @@
 										data-mode="ghost"
 										data-i18n="sidebar_other_floors_ghost"
 										data-i18n-title="sidebar_other_floors_ghost_title"
-										title="以半透明鬼影呈現其他樓層"
 									>
 										虛影
 									</button>
@@ -248,7 +237,6 @@
 										data-mode="solid"
 										data-i18n="sidebar_other_floors_solid"
 										data-i18n-title="sidebar_other_floors_solid_title"
-										title="完整顯示其他樓層"
 									>
 										完整
 									</button>
@@ -257,7 +245,6 @@
 							<label
 								class="toggle-pill"
 								data-i18n-title="viewport_toggle_3d_walls_title"
-								title="立體牆面"
 							>
 								<input type="checkbox" id="chk-3d-walls" checked>
 								<span data-i18n="viewport_toggle_3d_walls">立體牆面</span>
@@ -288,31 +275,13 @@
 
 						<hr class="divider">
 
-						<!-- 區域與標籤區塊 -->
-						<div class="panel-section label-section">
+						<!-- 標籤調色盤區塊 -->
+						<div class="panel-section zone-palette-section">
 							<div class="section-header">
-								<h3 class="section-title" data-i18n="sidebar_label_title">區域與標籤</h3>
-								<button
-									class="btn"
-									id="btn-enable-select"
-									data-i18n="sidebar_btn_enable_select"
-									data-i18n-title="sidebar_btn_enable_select_title"
-									title="快捷進入選取模式"
-								>
-									👆 點擊選取
-								</button>
+								<h3 class="section-title" data-i18n="sidebar_zone_palette_title">標籤調色盤</h3>
+								<button class="btn" id="btn-add-zone-palette" data-i18n="sidebar_btn_add_zone_palette">+ 新增標籤</button>
 							</div>
-							<div class="selected-tile-info text-muted" id="selected-tile-info" data-i18n="sidebar_no_selected_tile">
-								未選擇地塊 (點擊上方按鈕進入選取)
-							</div>
-							<input
-								type="text"
-								id="input-tile-label"
-								class="input-text"
-								data-i18n-placeholder="sidebar_label_input_placeholder"
-								placeholder="例如：廚房、主臥室、儲藏室"
-								disabled
-							>
+							<div class="palette-list" id="zone-palette-container"></div>
 						</div>
 					</div>
 					</div>

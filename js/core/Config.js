@@ -52,8 +52,47 @@ export const CONFIG = Object.freeze({
 	OBJECT_FONT_RATIO: 0.4, // 物件文字大小相對於面板尺寸之比例
 	OBJECT_FONT_MIN: 8, // 物件文字小尺寸保底下限 (px)
 
-	// 全站標準字型配置
-	FONT_SANS: '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Microsoft YaHei", "微軟雅黑", sans-serif',
-	FONT_SERIF: '"Noto Serif TC", "Songti TC", "PMingLiU", "新細明體", "Songti SC", "SimSun", "宋體", serif',
-	FONT_MONO: '"Ubuntu Mono", Consolas, Menlo, Monaco, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Microsoft YaHei", "微軟雅黑", monospace',
+	// 全站標準字型
+	FONT_SANS: '"Noto Sans TC", -apple-system, system-ui, sans-serif',
+	FONT_SERIF: '"Noto Serif TC", -apple-system, serif',
+	FONT_MONO: '"Ubuntu Mono", Consolas, Menlo, Monaco, "Noto Sans TC", -apple-system, system-ui, monospace',
+
+	// 預設調色盤項目清單（包含一般色塊、物件色票與區域標籤基礎定義）
+	DEFAULT_PALETTE_ITEMS: [
+		{ id: 'color_road', color: '#334155', nameKey: 'defaults_palette_road', defaultName: '道路' },
+		{ id: 'color_indoor', color: '#B38147', nameKey: 'defaults_palette_indoor', defaultName: '室內空間' },
+		{ id: 'obj_door', color: '#e11d48', name: '🚪', isObject: true },
+		{ id: 'obj_window', color: '#f59e0b', name: '🪟', isObject: true },
+		{ id: 'obj_sink', color: '#38bdf8', name: '🚰', isObject: true },
+		{ id: 'obj_bucket', color: '#1e40af', name: '🪣', isObject: true },
+		{ id: 'obj_ladder', color: '#991b1b', name: '🪜', isObject: true },
+		{ id: 'zone_bedroom', color: '#818cf8', nameKey: 'defaults_zone_bedroom', defaultName: '臥室', isZone: true },
+		{ id: 'zone_kitchen', color: '#fb923c', nameKey: 'defaults_zone_kitchen', defaultName: '廚房', isZone: true },
+		{ id: 'zone_living', color: '#38bdf8', nameKey: 'defaults_zone_living', defaultName: '客廳', isZone: true },
+	],
+
+	// 區域標籤統一視覺配置
+	ZONE_GLOW_WIDTH: 14, // 邊界內發光光暈寬度 (px)，向內漸變衰減
+	ZONE_GLOW_ALPHA: 0.35, // 邊界內發光光暈外緣不透明度 (0.0~1.0)
+	ZONE_CENTER_ALPHA: 0.01, // 區域正中心底色不透明度 (0.0 為全透)
+	ZONE_BORDER_DASH: [4, 4], // 幾何外周虛線邊框間距 (px)
+	ZONE_BORDER_WIDTH: 2, // 幾何外周虛線邊框粗細 (px)
+	ZONE_FONT_MIN: 11, // 標籤文字字級保底下限 (px)
+
+	// 調色盤編輯器預設色碼
+	DEFAULT_PALETTE_COLOR: '#6366F1',
+
+	// 調色盤編輯器預設快速選色盤
+	PRESET_SWATCHES: [
+		'#334155', '#64748b', '#94a3b8', '#f8fafc',
+		'#e11d48', '#ea580c', '#d97706', '#ca8a04',
+		'#65a30d', '#16a34a', '#0d9488', '#0284c7',
+		'#2563eb', '#4f46e5', '#7c3aed', '#c026d3',
+	],
+
+	// 本機儲存配額常數
+	STORAGE_QUOTA_BYTES: 5 * 1024 * 1024, // 5 MiB 瀏覽器 LocalStorage 標準配額上限
+	STORAGE_QUOTA_WARNING_PERCENT: 70, // 容量使用率警告門檻 (%)
+	STORAGE_QUOTA_DANGER_PERCENT: 85, // 容量使用率危險門檻 (%)
 });
+

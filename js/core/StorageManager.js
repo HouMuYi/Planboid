@@ -7,7 +7,7 @@ import { i18n } from './I18nManager.js';
 import { SchemeSerializer } from './SchemeSerializer.js';
 
 // 動態由 CONFIG.SCHEMA_VERSION 衍生主鍵與歷史向下相容鍵名列表
-const STORAGE_KEY = `planboid_data_v${CONFIG.SCHEMA_VERSION}`;
+export const STORAGE_KEY = `planboid_data_v${CONFIG.SCHEMA_VERSION}`;
 const LEGACY_STORAGE_KEYS = (() => {
 	const keys = [];
 	for (let i = CONFIG.SCHEMA_VERSION - 1; i >= 2; i--) {
@@ -18,10 +18,22 @@ const LEGACY_STORAGE_KEYS = (() => {
 })();
 
 export class StorageManager {
+	static STORAGE_KEY = STORAGE_KEY;
+
 	/**
 	 * 取得預設方案
 	 */
 	static getDefaultScheme() {
+		const palette = {};
+		CONFIG.DEFAULT_PALETTE_ITEMS.forEach(item => {
+			const name = item.nameKey ? (i18n.t(item.nameKey) || item.defaultName) : item.name;
+			palette[item.id] = {
+				color: item.color,
+				name,
+				...(item.isObject ? { isObject: true } : {})
+			};
+		});
+
 		return {
 			id: 'scheme_' + Date.now(),
 			name: i18n.t('defaults_scheme_name') || '預設地塊規劃',
@@ -31,15 +43,7 @@ export class StorageManager {
 			worldOriginX: CONFIG.DEFAULT_ORIGIN_X,
 			worldOriginY: CONFIG.DEFAULT_ORIGIN_Y,
 			tiles: {},
-			palette: {
-				'color_road': { color: '#334155', name: i18n.t('defaults_palette_road') || '道路' },
-				'color_indoor': { color: '#B38147', name: i18n.t('defaults_palette_indoor') || '室內空間' },
-				'obj_door': { color: '#e11d48', name: '🚪', isObject: true },
-				'obj_window': { color: '#f59e0b', name: '🪟', isObject: true },
-				'obj_sink': { color: '#38bdf8', name: '🚰', isObject: true },
-				'obj_bucket': { color: '#1e40af', name: '🪣', isObject: true },
-				'obj_ladder': { color: '#991b1b', name: '🪜', isObject: true },
-			},
+			palette,
 		};
 	}
 
@@ -73,7 +77,7 @@ export class StorageManager {
 
 			const data = JSON.parse(jsonStr);
 			if (data && Array.isArray(data.schemes) && data.schemes.length > 0) {
-				// 透過權威門面解析器 100% 同步穩健解析所有載體（PZB1~PZB5 / 明文 JSON / 舊版物件）
+				// 支援字串與舊版物件相容解析
 				const deserializedSchemes = data.schemes
 					.map(s => SchemeSerializer.parse(s))
 					.filter(Boolean);
@@ -184,7 +188,7 @@ export class StorageManager {
 			console.error('[StorageManager] 讀取容量失敗:', e);
 		}
 
-		const quotaBytes = 5 * 1024 * 1024; // 5 MiB 標準配額 (5,242,880 Bytes)
+		const quotaBytes = CONFIG.STORAGE_QUOTA_BYTES;
 		const percentNumber = Math.min(100, (totalBytes / quotaBytes) * 100);
 
 		return {
@@ -196,8 +200,8 @@ export class StorageManager {
 			otherKiB: (otherBytes / 1024).toFixed(1),
 			percent: percentNumber.toFixed(1),
 			percentNumber,
-			isWarning: percentNumber >= 70 && percentNumber < 85,
-			isDanger: percentNumber >= 85,
+			isWarning: percentNumber >= CONFIG.STORAGE_QUOTA_WARNING_PERCENT && percentNumber < CONFIG.STORAGE_QUOTA_DANGER_PERCENT,
+			isDanger: percentNumber >= CONFIG.STORAGE_QUOTA_DANGER_PERCENT,
 		};
 	}
 }

@@ -2,6 +2,7 @@
  * main.js - ES Modules 主入口點 (平鋪鍵多語言與選單)
  */
 
+import { eventBus, EVENTS } from './core/EventBus.js';
 import { i18n } from './core/I18nManager.js';
 import { StateManager } from './core/StateManager.js';
 import { TabSyncManager } from './core/TabSyncManager.js';
@@ -35,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	i18n.updateDomTranslations();
 
-	window.addEventListener('langchange', () => {
+	eventBus.on(EVENTS.LANG_CHANGED, () => {
 		stateManager.notifyStateChange();
 		schemeModal.updateHeaderInfo();
 	});
@@ -78,8 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		renderer.zoom = 1.0;
 		renderer.centerCamera();
 		renderer.requestRenderAll();
-		const event = new CustomEvent('zoomchange', { detail: { zoom: renderer.zoom } });
-		window.dispatchEvent(event);
+		eventBus.emit(EVENTS.ZOOM_CHANGED, { zoom: renderer.zoom });
 	});
 
 	const infoCoords = document.getElementById('info-coords');
@@ -87,8 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	const infoGameCoords = document.getElementById('info-game-coords');
 	const infoZoom = document.getElementById('info-zoom');
 
-	window.addEventListener('gridhover', (e) => {
-		const { x, y, gameX, gameY, dragDim } = e.detail;
+	const handleGridHover = (detail) => {
+		const { x, y, gameX, gameY, dragDim } = detail;
 		const z = stateManager.currentZLevel;
 		const displayZ = StateManager.toDisplayZ(z);
 		if (infoCoords) {
@@ -106,11 +106,13 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (infoGameCoords) {
 			infoGameCoords.textContent = i18n.t('viewport_info_game_coords', { gameX, gameY });
 		}
-	});
+	};
 
-	window.addEventListener('zoomchange', (e) => {
+	eventBus.on(EVENTS.GRID_HOVER, handleGridHover);
+
+	eventBus.on(EVENTS.ZOOM_CHANGED, (detail) => {
 		if (infoZoom) {
-			infoZoom.textContent = i18n.t('viewport_info_zoom', { zoom: Math.round(e.detail.zoom * 100) });
+			infoZoom.textContent = i18n.t('viewport_info_zoom', { zoom: Math.round(detail.zoom * 100) });
 		}
 	});
 

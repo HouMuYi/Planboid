@@ -13,6 +13,7 @@
  */
 
 import { CONFIG } from '../core/Config.js';
+import { eventBus, EVENTS } from '../core/EventBus.js';
 import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
 
 export class InputDispatcher {
@@ -60,13 +61,13 @@ export class InputDispatcher {
 		const snapMax = CONFIG.EDGE_SNAP_MAX;
 
 		if (localY < snapMin && localX >= snapMin && localX <= snapMax) {
-			edge = 'north';
+			edge = 'N';
 		} else if (localY > snapMax && localX >= snapMin && localX <= snapMax) {
-			edge = 'south';
+			edge = 'S';
 		} else if (localX < snapMin && localY >= snapMin && localY <= snapMax) {
-			edge = 'west';
+			edge = 'W';
 		} else if (localX > snapMax && localY >= snapMin && localY <= snapMax) {
-			edge = 'east';
+			edge = 'E';
 		}
 
 		// 邊線筆刷交叉點吸附：直接四捨五入至最近的網格交叉點 (地塊網格的頂點)
@@ -445,16 +446,14 @@ export class InputDispatcher {
 		const gameX = (this.state?.scheme?.worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X) + (cellX >= 0 ? cellX : 0);
 		const gameY = (this.state?.scheme?.worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y) + (cellY >= 0 ? cellY : 0);
 
-		const event = new CustomEvent('gridhover', {
-			detail: {
-				x: displayX,
-				y: displayY,
-				gameX,
-				gameY,
-				dragDim: this.getDragDimension(),
-			},
-		});
-		window.dispatchEvent(event);
+		const detail = {
+			x: displayX,
+			y: displayY,
+			gameX,
+			gameY,
+			dragDim: this.getDragDimension(),
+		};
+		eventBus.emit(EVENTS.GRID_HOVER, detail);
 	}
 
 	updateHoverState(cellX, cellY, edge, ix = -1, iy = -1) {

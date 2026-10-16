@@ -1,5 +1,5 @@
 /**
- * SchemeModal.js - 方案管理視窗 (極簡 Dense Flat Tuple 格式、零原生彈窗、剪貼簿與內建盒體導入導出)
+ * SchemeModal.js - 方案管理對話框
  */
 
 import { CONFIG } from '../core/Config.js';
@@ -31,7 +31,7 @@ export class SchemeModal {
 		this.btnSaveEditor = document.getElementById('btn-save-scheme-editor');
 		this.btnSaveAsNew = document.getElementById('btn-save-as-new-scheme');
 
-		// 內建文字貼上盒體 (零原生彈窗)
+		// 文字貼上盒體
 		this.boxTextImport = document.getElementById('box-text-import');
 		this.inputTextSchemeData = document.getElementById('input-text-scheme-data');
 		this.btnCancelTextImport = document.getElementById('btn-cancel-text-import');
@@ -97,24 +97,13 @@ export class SchemeModal {
 				}
 				ToastNotification.show(i18n.t('toast_scheme_updated') || '方案更新成功！', 'success');
 			} else {
-				const newScheme = {
-					id: 'scheme_' + Date.now(),
+				const newScheme = this.state.createScheme({
 					name,
-					width: Math.max(10, Math.min(300, width)),
-					height: Math.max(10, Math.min(300, height)),
-					currentLevel: 0,
+					width,
+					height,
 					worldOriginX: worldX,
 					worldOriginY: worldY,
-					palette: StorageManager.getDefaultScheme().palette,
-					tiles: {},
-				};
-				this.state.schemes.push(newScheme);
-				this.state.activeSchemeId = newScheme.id;
-				this.state.scheme = newScheme;
-				this.state.currentZLevel = 0;
-				this.state.pushHistory();
-				this.state.persist();
-				this.state.notifyStateChange();
+				});
 				ToastNotification.show(i18n.t('toast_scheme_created') || '新方案建立成功！', 'success');
 				this.setEditorToEditMode(newScheme.id);
 			}
@@ -131,26 +120,13 @@ export class SchemeModal {
 			const worldX = parseInt(this.inputWorldX?.value, 10) || CONFIG.DEFAULT_ORIGIN_X;
 			const worldY = parseInt(this.inputWorldY?.value, 10) || CONFIG.DEFAULT_ORIGIN_Y;
 
-			const sourceScheme = this.state.schemes.find(s => s.id === this.editingSchemeId) || this.state.scheme;
-			const newScheme = {
-				id: 'scheme_' + Date.now(),
+			const newScheme = this.state.cloneScheme(this.editingSchemeId, {
 				name,
-				width: Math.max(10, Math.min(300, width)),
-				height: Math.max(10, Math.min(300, height)),
-				currentLevel: sourceScheme ? sourceScheme.currentLevel || 0 : 0,
+				width,
+				height,
 				worldOriginX: worldX,
 				worldOriginY: worldY,
-				palette: JSON.parse(JSON.stringify(sourceScheme ? sourceScheme.palette : StorageManager.getDefaultScheme().palette)),
-				tiles: JSON.parse(JSON.stringify(sourceScheme ? sourceScheme.tiles : {})),
-			};
-
-			this.state.schemes.push(newScheme);
-			this.state.activeSchemeId = newScheme.id;
-			this.state.scheme = newScheme;
-			this.state.currentZLevel = newScheme.currentLevel || 0;
-			this.state.pushHistory();
-			this.state.persist();
-			this.state.notifyStateChange();
+			});
 
 			ToastNotification.show(i18n.t('toast_scheme_saved_as_new') || '已另存為新方案！', 'success');
 			this.setEditorToEditMode(newScheme.id);
@@ -272,8 +248,8 @@ export class SchemeModal {
 	}
 
 	/**
-	 * 權威方案匯入入口：接收 PZB 壓縮字串 (PZB1:~PZB5:)、明文 JSON 字串、JSON 物件或標準 Scheme 物件
-	 * 統一透過 SchemeSerializer.decompressFromString() 門面完成非同步解碼、色票補齊與權威切換
+	 * 方案匯入：接收 PZB 壓縮字串、明文 JSON 字串或物件
+	 * 透過 SchemeSerializer.decompressFromString() 完成解碼與載入
 	 * @param {string|Object} rawInput
 	 */
 	async importScheme(rawInput) {
@@ -406,12 +382,7 @@ export class SchemeModal {
 				btnSwitch.className = 'btn';
 				btnSwitch.textContent = i18n.t('modal_schemes_btn_switch');
 				btnSwitch.addEventListener('click', () => {
-					this.state.activeSchemeId = scheme.id;
-					this.state.scheme = scheme;
-					this.state.currentZLevel = scheme.currentLevel || 0;
-					this.state.pushHistory();
-					this.state.persist();
-					this.state.notifyStateChange();
+					this.state.switchScheme(scheme.id);
 					this.setEditorToEditMode(scheme.id);
 					this.renderSchemeList();
 					this.updateHeaderInfo();

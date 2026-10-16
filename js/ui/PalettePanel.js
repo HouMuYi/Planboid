@@ -1,7 +1,9 @@
 /**
- * PalettePanel.js - 通用調色盤 (支援拖曳排序、16進位 Hex 色碼輸入與零原生彈窗)
+ * PalettePanel.js - 通用調色盤 (支援拖曳排序與 16 進位色碼輸入)
  */
 
+import { CONFIG } from '../core/Config.js';
+import { eventBus, EVENTS } from '../core/EventBus.js';
 import { i18n } from '../core/I18nManager.js';
 import { StateManager } from '../core/StateManager.js';
 import { ConfirmModal } from './ConfirmModal.js';
@@ -14,9 +16,7 @@ export class PalettePanel {
 		this.state = stateManager;
 		this.container = document.getElementById('palette-container');
 		this.objectContainer = document.getElementById('object-palette-container');
-		this.labelInput = document.getElementById('input-tile-label');
-		this.tileInfoDisplay = document.getElementById('selected-tile-info');
-		this.btnEnableSelect = document.getElementById('btn-enable-select');
+		this.zoneContainer = document.getElementById('zone-palette-container');
 
 		this.editModal = document.getElementById('modal-palette-edit');
 		this.modalTitle = document.getElementById('palette-modal-title');
@@ -27,7 +27,7 @@ export class PalettePanel {
 		this.btnDeletePalette = document.getElementById('btn-delete-palette');
 
 		this.draggedKey = null;
-		this.isCreatingObject = false;
+		this.creatingType = 'floor'; // 'floor' | 'object' | 'zone'
 
 		this.init();
 	}
@@ -36,25 +36,12 @@ export class PalettePanel {
 		this.renderPalette();
 		this.initPresetSwatches();
 
-		window.addEventListener('statechange', () => {
+		eventBus.on(EVENTS.STATE_CHANGED, () => {
 			this.renderPalette();
-			this.updateSelectedTileInfo();
 		});
 
-		window.addEventListener('langchange', () => {
+		eventBus.on(EVENTS.LANG_CHANGED, () => {
 			this.renderPalette();
-			this.updateSelectedTileInfo();
-		});
-
-		this.btnEnableSelect?.addEventListener('click', () => {
-			this.state.toolState.setActiveTool('select');
-			document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-			this.btnEnableSelect.classList.add('btn-primary');
-			this.btnEnableSelect.classList.remove('btn-secondary');
-
-			if (this.tileInfoDisplay) {
-				this.tileInfoDisplay.textContent = i18n.t('sidebar_no_selected_tile');
-			}
 		});
 
 		// 原生色彩選擇器與 16 進位文字輸入框雙向同步
@@ -79,19 +66,46 @@ export class PalettePanel {
 
 		const btnAdd = document.getElementById('btn-add-palette');
 		btnAdd?.addEventListener('click', () => {
-			this.openAddModal(false);
+			this.openAddModal('floor');
 		});
 
 		const btnAddObj = document.getElementById('btn-add-object-palette');
 		btnAddObj?.addEventListener('click', () => {
-			this.openAddModal(true);
+			this.openAddModal('object');
+		});
+
+		const btnAddZone = document.getElementById('btn-add-zone-palette');
+		btnAddZone?.addEventListener('click', () => {
+			this.openAddModal('zone');
 		});
 
 		const btnSavePalette = document.getElementById('btn-save-palette');
 		btnSavePalette?.addEventListener('click', () => {
 			const id = this.editIdInput?.value || '';
-			const name = this.editNameInput?.value?.trim() || i18n.t('modal_palette_name_placeholder');
-			let color = this.editColorInput ? this.editColorInput.value : '#6366F1';
+			let name = this.editNameInput?.value?.trim() || '';
+			if (!name) {
+				const palette = this.state.scheme?.palette || {};
+				let type = this.creatingType;
+				if (id) {
+					const item = palette[id];
+					if (item?.isZone) type = 'zone';
+					else if (item?.isObject) type = 'object';
+					else type = 'floor';
+				}
+				const sameTypeCount = Object.values(palette).filter(item => {
+					if (type === 'zone') return !!item.isZone;
+					if (type === 'object') return !!item.isObject && !item.isZone;
+					return !item.isObject && !item.isZone;
+				}).length;
+				const nextNum = id ? sameTypeCount : sameTypeCount + 1;
+				const keyMap = {
+					zone: 'palette_default_zone_name',
+					object: 'palette_default_object_name',
+					floor: 'palette_default_color_name',
+				};
+				name = i18n.t(keyMap[type], { num: Math.max(1, nextNum) });
+			}
+			let color = this.editColorInput ? this.editColorInput.value : CONFIG.DEFAULT_PALETTE_COLOR;
 
 			if (this.editHexInput && this.editHexInput.value) {
 				let hexVal = this.editHexInput.value.trim();
@@ -105,17 +119,12 @@ export class PalettePanel {
 			}
 
 			if (!id) {
-				const newId = (this.isCreatingObject ? 'obj_' : 'color_') + Date.now();
-				if (this.state.scheme?.palette) {
-					this.state.scheme.palette[newId] = {
-						color,
-						name,
-						...(this.isCreatingObject ? { isObject: true } : {}),
-					};
-				}
-				this.state.activeColorId = newId;
-				this.state.pushHistory();
-				this.state.notifyStateChange();
+				this.state.addPaletteItem({
+					name,
+					color,
+					isObject: this.creatingType === 'object',
+					isZone: this.creatingType === 'zone',
+				});
 			} else {
 				this.state.updatePaletteItem(id, { name, color });
 			}
@@ -123,7 +132,7 @@ export class PalettePanel {
 			this.editModal?.close();
 		});
 
-		// 二次確認零原生彈窗刪除色塊
+		// 彈窗確認刪除色塊
 		this.btnDeletePalette?.addEventListener('click', async () => {
 			const id = this.editIdInput?.value;
 			if (id) {
@@ -145,39 +154,14 @@ export class PalettePanel {
 				this.editModal.close();
 			}
 		});
-
-		this.labelInput?.addEventListener('input', (e) => {
-			if (this.state.selectedCell) {
-				const { x, y } = this.state.selectedCell;
-				this.state.setTileLabel(x, y, e.target.value);
-			}
-		});
 	}
 
 	initPresetSwatches() {
 		const presetContainer = document.getElementById('preset-color-swatches');
 		if (!presetContainer) return;
 
-		const presets = [
-			'#334155', // Slate 700
-			'#64748b', // Slate 500
-			'#94a3b8', // Slate 400
-			'#f8fafc', // White / Slate 50
-			'#e11d48', // Rose 600
-			'#ea580c', // Orange 600
-			'#d97706', // Amber 600
-			'#ca8a04', // Yellow 600
-			'#65a30d', // Lime 600
-			'#16a34a', // Green 600
-			'#0d9488', // Teal 600
-			'#0284c7', // Sky 600
-			'#2563eb', // Blue 600
-			'#4f46e5', // Indigo 600
-			'#7c3aed', // Violet 600
-			'#c026d3', // Fuchsia 600
-		];
 		presetContainer.innerHTML = '';
-		presets.forEach(color => {
+		CONFIG.PRESET_SWATCHES.forEach(color => {
 			const btn = document.createElement('div');
 			btn.className = 'preset-swatch-item';
 			btn.style.backgroundColor = color;
@@ -193,43 +177,19 @@ export class PalettePanel {
 		});
 	}
 
-	updateSelectedTileInfo() {
-		if (this.state.activeTool !== 'select' && this.btnEnableSelect) {
-			this.btnEnableSelect.classList.remove('btn-primary');
-			this.btnEnableSelect.classList.add('btn-secondary');
-		}
-
-		if (!this.state.selectedCell) {
-			if (this.tileInfoDisplay && this.state.activeTool !== 'select') {
-				this.tileInfoDisplay.textContent = i18n.t('sidebar_no_selected_tile');
-			}
-			if (this.labelInput) {
-				this.labelInput.value = '';
-				this.labelInput.disabled = true;
-			}
-			return;
-		}
-
-		const { x, y } = this.state.selectedCell;
-		const z = this.state.currentZLevel;
-		const key = `${x},${y},${z}`;
-		const tile = this.state.scheme.tiles[key];
-
-		if (this.tileInfoDisplay) {
-			const displayZ = StateManager.toDisplayZ(z);
-			this.tileInfoDisplay.textContent = i18n.t('sidebar_selected_tile_coords', { x: x + 1, y: y + 1, z: displayZ });
-		}
-
-		if (this.labelInput) {
-			this.labelInput.disabled = false;
-			this.labelInput.value = (tile && tile.label) ? tile.label : '';
-		}
+	/**
+	 * 統計當前方案各色票於地圖中的實體使用數量（包含地塊、邊線與各層物件）
+	 * @returns {Record<string, number>}
+	 */
+	getPaletteUsageCounts() {
+		return StateManager.getPaletteUsageCounts(this.state.scheme);
 	}
 
 	renderPalette() {
 		if (!this.container) return;
 		this.container.innerHTML = '';
 		if (this.objectContainer) this.objectContainer.innerHTML = '';
+		if (this.zoneContainer) this.zoneContainer.innerHTML = '';
 
 		const palette = this.state.scheme.palette;
 		const keys = Object.keys(palette);
@@ -238,8 +198,12 @@ export class PalettePanel {
 			this.state.activeColorId = keys[0];
 		}
 
-		const normalItems = Object.entries(palette).filter(([, item]) => !item.isObject);
-		const objectItems = Object.entries(palette).filter(([, item]) => !!item.isObject);
+		const counts = this.getPaletteUsageCounts();
+		const wrapper = i18n.t('parenthesis_wrapper') || ' ({val})';
+
+		const normalItems = Object.entries(palette).filter(([, item]) => !item.isObject && !item.isZone);
+		const objectItems = Object.entries(palette).filter(([, item]) => !!item.isObject && !item.isZone);
+		const zoneItems = Object.entries(palette).filter(([, item]) => !!item.isZone);
 
 		const renderGroup = (items, targetContainer) => {
 			if (!targetContainer) return;
@@ -256,7 +220,9 @@ export class PalettePanel {
 
 				const name = document.createElement('span');
 				name.className = 'palette-name';
-				name.textContent = item.name;
+				const count = counts[id] || 0;
+				const countSuffix = wrapper.replace('{val}', count);
+				name.textContent = `${item.name}${countSuffix}`;
 
 				const btnEdit = document.createElement('button');
 				btnEdit.className = 'btn-palette-edit';
@@ -307,9 +273,8 @@ export class PalettePanel {
 					this.state.activeColorId = id;
 					if (this.state.activeTool === 'select') {
 						this.state.toolState.setActiveTool('pencil');
-						this.state.toolState.setBrushType(item.isObject ? 'wall' : 'floor');
-						document.getElementById('tool-floor')?.classList.add('active');
 					}
+					this.state.notifyStateChange();
 					this.renderPalette();
 				});
 
@@ -319,37 +284,21 @@ export class PalettePanel {
 
 		renderGroup(normalItems, this.container);
 		renderGroup(objectItems, this.objectContainer || this.container);
+		renderGroup(zoneItems, this.zoneContainer || this.container);
 	}
 
 	reorderPalette(sourceId, targetId) {
-		const palette = this.state.scheme?.palette;
-		if (!palette) return;
-		const keys = Object.keys(palette);
-		const sourceIndex = keys.indexOf(sourceId);
-		const targetIndex = keys.indexOf(targetId);
-
-		if (sourceIndex === -1 || targetIndex === -1) return;
-
-		keys.splice(sourceIndex, 1);
-		keys.splice(targetIndex, 0, sourceId);
-
-		const newPalette = {};
-		keys.forEach(k => {
-			newPalette[k] = palette[k];
-		});
-
-		this.state.scheme.palette = newPalette;
-		this.state.pushHistory();
-		this.state.notifyStateChange();
+		this.state.reorderPalette(sourceId, targetId);
 	}
 
-	openAddModal(isObject = false) {
-		this.isCreatingObject = !!isObject;
+	openAddModal(type = 'floor') {
+		this.creatingType = type;
 		if (!this.editModal) return;
 		if (this.modalTitle) {
-			this.modalTitle.textContent = this.isCreatingObject
-				? i18n.t('sidebar_btn_add_object_palette')
-				: i18n.t('modal_palette_title_add');
+			const titleKey = type === 'zone'
+				? 'modal_palette_title_add_zone'
+				: (type === 'object' ? 'sidebar_btn_add_object_palette' : 'modal_palette_title_add');
+			this.modalTitle.textContent = i18n.t(titleKey);
 		}
 		if (this.editIdInput) this.editIdInput.value = '';
 		if (this.editNameInput) this.editNameInput.value = '';
@@ -369,32 +318,35 @@ export class PalettePanel {
 		if (this.modalTitle) this.modalTitle.textContent = i18n.t('modal_palette_title_edit');
 		if (this.editIdInput) this.editIdInput.value = id;
 		if (this.editNameInput) this.editNameInput.value = item.name;
-		const colorVal = item.color || '#6366F1';
+		const colorVal = item.color || CONFIG.DEFAULT_PALETTE_COLOR;
 		if (this.editColorInput) this.editColorInput.value = colorVal;
 		if (this.editHexInput) this.editHexInput.value = colorVal.toUpperCase();
 
 		const btnConvert = document.getElementById('btn-convert-palette-type');
 		if (btnConvert && btnConvert.parentNode) {
-			btnConvert.style.display = 'inline-flex';
-			const isObj = !!item.isObject;
-			btnConvert.textContent = isObj
-				? i18n.t('modal_palette_btn_convert_to_normal')
-				: i18n.t('modal_palette_btn_convert_to_object');
+			if (item.isZone) {
+				btnConvert.style.display = 'none';
+			} else {
+				btnConvert.style.display = 'inline-flex';
+				const isObj = !!item.isObject;
+				btnConvert.textContent = isObj
+					? i18n.t('modal_palette_btn_convert_to_normal')
+					: i18n.t('modal_palette_btn_convert_to_object');
 
-			// 替換綁定監聯
-			const newBtn = btnConvert.cloneNode(true);
-			btnConvert.parentNode.replaceChild(newBtn, btnConvert);
-			newBtn.addEventListener('click', async () => {
-				if (!isObj) {
-					this.state.convertPaletteItemType(id, true);
-				} else {
-					const confirmed = await ConfirmModal.show(i18n.t('modal_palette_confirm_convert'));
-					if (confirmed) {
-						this.state.convertPaletteItemType(id, false);
+				const newBtn = btnConvert.cloneNode(true);
+				btnConvert.parentNode.replaceChild(newBtn, btnConvert);
+				newBtn.addEventListener('click', async () => {
+					if (!isObj) {
+						this.state.convertPaletteItemType(id, true);
+					} else {
+						const confirmed = await ConfirmModal.show(i18n.t('modal_palette_confirm_convert'));
+						if (confirmed) {
+							this.state.convertPaletteItemType(id, false);
+						}
 					}
-				}
-				this.editModal?.close();
-			});
+					this.editModal?.close();
+				});
+			}
 		}
 
 		if (this.btnDeletePalette) this.btnDeletePalette.style.display = 'inline-flex';

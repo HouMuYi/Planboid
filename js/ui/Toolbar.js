@@ -1,7 +1,8 @@
 /**
- * Toolbar.js - 工具列、圖檔雙匯出與全套剪貼簿快捷鍵 (平鋪 i18n 整合)
+ * Toolbar.js - 工具列、圖檔匯出與快捷鍵控制
  */
 
+import { eventBus, EVENTS } from '../core/EventBus.js';
 import { i18n } from '../core/I18nManager.js';
 import { StateManager } from '../core/StateManager.js';
 import { PngExporter } from '../renderer/PngExporter.js';
@@ -21,11 +22,26 @@ export class Toolbar {
 
 	init() {
 		const toolButtons = document.querySelectorAll('.tool-btn');
+		const getCurrentToolId = () => {
+			const activeTool = this.state.activeTool;
+			if (activeTool === 'select') return 'select';
+			if (activeTool === 'erase-floor') return 'erase-floor';
+			if (activeTool === 'erase-wall') return 'erase-wall';
+			return this.state.brushType === 'wall' ? 'wall' : 'floor';
+		};
+
+		const syncToolButtonsUI = () => {
+			const currentId = getCurrentToolId();
+			toolButtons.forEach(btn => {
+				btn.classList.toggle('active', btn.dataset.tool === currentId);
+			});
+		};
+
+		eventBus.on(EVENTS.STATE_CHANGED, syncToolButtonsUI);
+		syncToolButtonsUI();
+
 		toolButtons.forEach(btn => {
 			btn.addEventListener('click', () => {
-				toolButtons.forEach(b => b.classList.remove('active'));
-				btn.classList.add('active');
-
 				const tool = btn.dataset.tool;
 
 				if (tool === 'floor') {
@@ -111,10 +127,10 @@ export class Toolbar {
 			});
 		});
 
-		window.addEventListener('statechange', syncOtherFloorsUI);
+		eventBus.on(EVENTS.STATE_CHANGED, syncOtherFloorsUI);
 		syncOtherFloorsUI();
 
-		window.addEventListener('langchange', updateFloorDisplay);
+		eventBus.on(EVENTS.LANG_CHANGED, updateFloorDisplay);
 
 		const cycleOtherFloors = (e) => {
 			const modes = ['hidden', 'ghost', 'solid'];
@@ -168,7 +184,7 @@ export class Toolbar {
 				.join('\n');
 		};
 
-		window.addEventListener('langchange', updateHotkeyLegend);
+		eventBus.on(EVENTS.LANG_CHANGED, updateHotkeyLegend);
 		updateHotkeyLegend();
 
 		const btnUndo = document.getElementById('btn-undo');

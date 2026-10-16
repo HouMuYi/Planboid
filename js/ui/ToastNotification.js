@@ -1,5 +1,5 @@
 /**
- * ToastNotification.js - 零原生彈窗之全站高質感 Toast 浮動提示元件
+ * ToastNotification.js - 全站懸浮提示訊息組件
  */
 
 import { CONFIG } from '../core/Config.js';

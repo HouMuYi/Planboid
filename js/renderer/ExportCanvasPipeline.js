@@ -1,6 +1,6 @@
 /**
  * ExportCanvasPipeline.js - PNG 與 SVG 通用匯出計算管道與圖例 (Legend) 排版引擎
- * 專責邊界 Box、1.2x 尺寸放大與全新 [大色塊]: [調色盤名稱] 圖例數據導出
+ * 負責邊界 Box、尺寸放大與圖例排版資料生成
  */
 
 import { i18n } from '../core/I18nManager.js';
@@ -17,18 +17,12 @@ export class ExportCanvasPipeline {
 	}
 
 	/**
-	 * 轉義 XML / SVG 特殊字元
+	 * 轉義 XML / SVG 特殊字元 (委派至 Utils)
 	 * @param {string} str
 	 * @returns {string}
 	 */
 	static escapeXml(str) {
-		if (!str) return '';
-		return String(str)
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&apos;');
+		return Utils.escapeXml(str);
 	}
 
 	/**

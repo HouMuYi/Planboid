@@ -1,9 +1,5 @@
 /**
- * SchemeSerializer.js - 方案極簡 JSON 權威序列化深模組 (Deep Module)
- * 1. 保留固定方案 ID (scheme.id)，確保瀏覽器重新整理後完美記憶當前所選方案
- * 2. Palette 調色盤採用元組陣列 `p: [[id, name, color], ...]`
- * 3. Tiles 地塊採用元組陣列 `d: [[x, y, z, ...], ...]` (v5 複合格式)
- * 4. 牆面 100% 無損正規化 (自動將 S/E 邊線轉化為對應格點之 N/W 邊線)
+ * SchemeSerializer.js - 方案 JSON 序列化與無損壓縮編解碼模組
  */
 
 import { CONFIG } from './Config.js';
@@ -18,26 +14,27 @@ export class SchemeSerializer {
 	static serialize(scheme) {
 		if (!scheme || typeof scheme !== 'object') return null;
 
-		// Palette 調色盤元組陣列: [[id, name, color, isObject], ...]
+		// Palette 調色盤元組陣列: [[id, name, color, typeFlag], ...] (typeFlag: 0=floor, 1=object, 2=zone)
 		const paletteTuples = Object.entries(scheme.palette || {}).map(([id, item]) => [
 			id,
 			item?.name || '',
 			item?.color || '#000000',
-			item?.isObject ? 1 : 0,
+			item?.isZone ? 2 : (item?.isObject ? 1 : 0),
 		]);
 
-		// 同格多層複合元組 Map: coordKey -> { floor, wallN, wallW, label, floorObjs, wallNObjs, wallWObjs }
+		// 同格多層複合元組 Map: coordKey -> { floor, wallN, wallW, zoneId, floorObjs, wallNObjs, wallWObjs, wallZoneN, wallZoneW }
 		const tileMap = new Map();
 		const getComposite = (x, y, z) => {
 			const key = `${x},${y},${z}`;
 			if (!tileMap.has(key)) {
-				tileMap.set(key, { x, y, z, f: 0, wN: 0, wW: 0, l: 0, fo: 0, woN: 0, woW: 0 });
+				tileMap.set(key, { x, y, z, f: 0, wN: 0, wW: 0, zId: 0, fo: 0, woN: 0, woW: 0, wzN: 0, wzW: 0 });
 			}
 			return tileMap.get(key);
 		};
 
 		if (scheme.tiles) {
-			Object.entries(scheme.tiles).forEach(([coordKey, tile]) => {
+			const normalizedTiles = BorderEdgeNormalizer.normalizeTilesMap(scheme.tiles);
+			Object.entries(normalizedTiles).forEach(([coordKey, tile]) => {
 				const [xStr, yStr, zStr] = coordKey.split(',');
 				const x = parseInt(xStr, 10);
 				const y = parseInt(yStr, 10);
@@ -45,42 +42,28 @@ export class SchemeSerializer {
 
 				if (isNaN(x) || isNaN(y) || isNaN(z) || !tile) return;
 				const comp = getComposite(x, y, z);
-
 				if (tile.floorColorId) comp.f = tile.floorColorId;
-				if (tile.label) comp.l = tile.label;
-				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
-					comp.fo = tile.floorObjects;
-				}
+				if (tile.zoneId) comp.zId = tile.zoneId;
+				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) comp.fo = [...tile.floorObjects];
 
-				if (tile.walls) {
-					Object.entries(tile.walls).forEach(([edge, colorId]) => {
-						if (colorId) {
-							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-							const normComp = getComposite(norm.x, norm.y, z);
-							if (norm.edge === 'N') normComp.wN = colorId;
-							else if (norm.edge === 'W') normComp.wW = colorId;
-						}
-					});
-				}
+				const parseEdge = (edge, targetObjProp, targetZoneProp, targetWallProp) => {
+					if (tile.walls?.[edge]) comp[targetWallProp] = tile.walls[edge];
+					if (tile.wallZones?.[edge]) comp[targetZoneProp] = tile.wallZones[edge];
+					if (Array.isArray(tile.wallObjects?.[edge]) && tile.wallObjects[edge].length > 0) {
+						comp[targetObjProp] = [...tile.wallObjects[edge]];
+					}
+				};
 
-				if (tile.wallObjects) {
-					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
-						if (Array.isArray(objArray) && objArray.length > 0) {
-							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-							const normComp = getComposite(norm.x, norm.y, z);
-							if (norm.edge === 'N') normComp.woN = objArray;
-							else if (norm.edge === 'W') normComp.woW = objArray;
-						}
-					});
-				}
+				parseEdge('N', 'woN', 'wzN', 'wN');
+				parseEdge('W', 'woW', 'wzW', 'wW');
 			});
 		}
 
 		// 轉換為複合元組陣列，並進行尾部 0 截斷優化
 		const denseTiles = [];
 		tileMap.forEach(comp => {
-			// 完整槽位: [x, y, z, floor, wallN, wallW, label, floorObjs, wallNObjs, wallWObjs]
-			const tuple = [comp.x, comp.y, comp.z, comp.f, comp.wN, comp.wW, comp.l, comp.fo, comp.woN, comp.woW];
+			// 完整槽位: [x, y, z, floor, wallN, wallW, zoneId, floorObjs, wallNObjs, wallWObjs, wallZoneN, wallZoneW]
+			const tuple = [comp.x, comp.y, comp.z, comp.f, comp.wN, comp.wW, comp.zId, comp.fo, comp.woN, comp.woW, comp.wzN, comp.wzW];
 
 			// 尾部 0 截斷
 			while (tuple.length > 3 && tuple[tuple.length - 1] === 0) {
@@ -123,23 +106,39 @@ export class SchemeSerializer {
 		if (Array.isArray(rawPalette)) {
 			rawPalette.forEach(item => {
 				if (Array.isArray(item)) {
-					const [id, name, color, isObjFlag] = item;
+					const [id, name, color, typeFlag] = item;
 					if (!id) return;
-					const isObj = isObjFlag === 1 || isObjFlag === true || String(id).startsWith('obj_');
-					paletteMap[id] = { name: name || '', color: color || '#000000', ...(isObj ? { isObject: true } : {}) };
+					const isZone = typeFlag === 2 || String(id).startsWith('zone_');
+					const isObj = !isZone && (typeFlag === 1 || typeFlag === true || String(id).startsWith('obj_'));
+					paletteMap[id] = {
+						name: name || '',
+						color: color || '#000000',
+						...(isObj ? { isObject: true } : {}),
+						...(isZone ? { isZone: true } : {}),
+					};
 				} else if (typeof item === 'object' && item !== null) {
 					const id = item.i || item.id;
 					if (!id) return;
-					const isObjFlag = item.isObject || item.o;
-					const isObj = !!isObjFlag || String(id).startsWith('obj_');
-					paletteMap[id] = { name: item.n || item.name || '', color: item.c || item.color || '#000000', ...(isObj ? { isObject: true } : {}) };
+					const isZone = !!item.isZone || String(id).startsWith('zone_');
+					const isObj = !isZone && (!!item.isObject || !!item.o || String(id).startsWith('obj_'));
+					paletteMap[id] = {
+						name: item.n || item.name || '',
+						color: item.c || item.color || '#000000',
+						...(isObj ? { isObject: true } : {}),
+						...(isZone ? { isZone: true } : {}),
+					};
 				}
 			});
 		} else if (typeof rawPalette === 'object' && rawPalette !== null) {
 			Object.entries(rawPalette).forEach(([id, item]) => {
 				if (!item || typeof item !== 'object') return;
-				const isObj = !!item.isObject || String(id).startsWith('obj_');
-				paletteMap[id] = { ...item, ...(isObj ? { isObject: true } : {}) };
+				const isZone = !!item.isZone || String(id).startsWith('zone_');
+				const isObj = !isZone && (!!item.isObject || String(id).startsWith('obj_'));
+				paletteMap[id] = {
+					...item,
+					...(isObj ? { isObject: true } : {}),
+					...(isZone ? { isZone: true } : {}),
+				};
 			});
 		}
 
@@ -168,7 +167,7 @@ export class SchemeSerializer {
 				);
 
 				if (isLegacyTypeTuple) {
-					// 舊版 v2~v4 解碼分支
+					// 舊版 v2~v4 解碼分支 (type === 3 為舊版 label，徹底略過不讀取)
 					const type = tuple[3];
 					const val = tuple[4];
 					if (val === undefined || val === null || val === 0) return;
@@ -181,8 +180,6 @@ export class SchemeSerializer {
 						const tile = getTile(norm.x, norm.y, z);
 						if (!tile.walls) tile.walls = {};
 						tile.walls[norm.edge] = val;
-					} else if (type === 3) {
-						getTile(x, y, z).label = val;
 					} else if (type === 4) {
 						getTile(x, y, z).floorObjects = Array.isArray(val) ? val : [val];
 					} else if (type === 5 || type === 6) {
@@ -194,31 +191,45 @@ export class SchemeSerializer {
 					}
 				} else {
 					// 新版 v5 同格多層複合元組解碼分支
-					// [x, y, z, floor, wallN, wallW, label, floorObjs, wallNObjs, wallWObjs]
+					// [x, y, z, floor, wallN, wallW, zoneId, floorObjs, wallNObjs, wallWObjs, wallZoneN, wallZoneW]
 					const floor = tuple[3];
 					const wallN = tuple[4];
 					const wallW = tuple[5];
-					const label = tuple[6];
+					const zoneId = tuple[6];
 					const floorObjs = tuple[7];
 					const wallNObjs = tuple[8];
 					const wallWObjs = tuple[9];
+					const wallZoneN = tuple[10];
+					const wallZoneW = tuple[11];
 
 					if (floor && floor !== 0) getTile(x, y, z).floorColorId = floor;
-					if (label && label !== 0) getTile(x, y, z).label = label;
+					if (zoneId && zoneId !== 0 && (paletteMap[zoneId]?.isZone || String(zoneId).startsWith('zone_'))) {
+						getTile(x, y, z).zoneId = zoneId;
+					}
 					if (Array.isArray(floorObjs) && floorObjs.length > 0) getTile(x, y, z).floorObjects = floorObjs;
 
 					if (wallN && wallN !== 0) {
 						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'N');
 						const tile = getTile(norm.x, norm.y, z);
-						if (!tile.walls) tile.walls = {};
-						tile.walls[norm.edge] = wallN;
+						if (paletteMap[wallN]?.isZone || String(wallN).startsWith('zone_')) {
+							if (!tile.wallZones) tile.wallZones = {};
+							tile.wallZones[norm.edge] = wallN;
+						} else {
+							if (!tile.walls) tile.walls = {};
+							tile.walls[norm.edge] = wallN;
+						}
 					}
 
 					if (wallW && wallW !== 0) {
 						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'W');
 						const tile = getTile(norm.x, norm.y, z);
-						if (!tile.walls) tile.walls = {};
-						tile.walls[norm.edge] = wallW;
+						if (paletteMap[wallW]?.isZone || String(wallW).startsWith('zone_')) {
+							if (!tile.wallZones) tile.wallZones = {};
+							tile.wallZones[norm.edge] = wallW;
+						} else {
+							if (!tile.walls) tile.walls = {};
+							tile.walls[norm.edge] = wallW;
+						}
 					}
 
 					if (Array.isArray(wallNObjs) && wallNObjs.length > 0) {
@@ -234,6 +245,20 @@ export class SchemeSerializer {
 						if (!tile.wallObjects) tile.wallObjects = {};
 						tile.wallObjects[norm.edge] = wallWObjs;
 					}
+
+					if (wallZoneN && wallZoneN !== 0) {
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'N');
+						const tile = getTile(norm.x, norm.y, z);
+						if (!tile.wallZones) tile.wallZones = {};
+						tile.wallZones[norm.edge] = wallZoneN;
+					}
+
+					if (wallZoneW && wallZoneW !== 0) {
+						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'W');
+						const tile = getTile(norm.x, norm.y, z);
+						if (!tile.wallZones) tile.wallZones = {};
+						tile.wallZones[norm.edge] = wallZoneW;
+					}
 				}
 			});
 		} else if (typeof obj.tiles === 'object' && obj.tiles !== null) {
@@ -248,7 +273,9 @@ export class SchemeSerializer {
 
 				const targetTile = getTile(x, y, z);
 				if (tile.floorColorId) targetTile.floorColorId = tile.floorColorId;
-				if (tile.label) targetTile.label = tile.label;
+				if (tile.zoneId && (paletteMap[tile.zoneId]?.isZone || String(tile.zoneId).startsWith('zone_'))) {
+					targetTile.zoneId = tile.zoneId;
+				}
 				if (Array.isArray(tile.floorObjects)) targetTile.floorObjects = [...tile.floorObjects];
 
 				if (tile.walls) {
@@ -256,8 +283,13 @@ export class SchemeSerializer {
 						if (colorId) {
 							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 							const normTile = getTile(norm.x, norm.y, z);
-							if (!normTile.walls) normTile.walls = {};
-							normTile.walls[norm.edge] = colorId;
+							if (paletteMap[colorId]?.isZone || String(colorId).startsWith('zone_')) {
+								if (!normTile.wallZones) normTile.wallZones = {};
+								normTile.wallZones[norm.edge] = colorId;
+							} else {
+								if (!normTile.walls) normTile.walls = {};
+								normTile.walls[norm.edge] = colorId;
+							}
 						}
 					});
 				}
@@ -272,6 +304,17 @@ export class SchemeSerializer {
 						}
 					});
 				}
+
+				if (tile.wallZones) {
+					Object.entries(tile.wallZones).forEach(([edge, colorId]) => {
+						if (colorId) {
+							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+							const normTile = getTile(norm.x, norm.y, z);
+							if (!normTile.wallZones) normTile.wallZones = {};
+							normTile.wallZones[norm.edge] = colorId;
+						}
+					});
+				}
 			});
 		}
 
@@ -283,7 +326,7 @@ export class SchemeSerializer {
 			worldOriginX: obj.ox ?? obj.worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X,
 			worldOriginY: obj.oy ?? obj.worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y,
 			palette: paletteMap,
-			tiles: tilesMap,
+			tiles: BorderEdgeNormalizer.normalizeTilesMap(tilesMap),
 		};
 	}
 
@@ -344,7 +387,7 @@ export class SchemeSerializer {
 	}
 
 	/**
-	 * 權威向下相容解碼器：支援 PZB 壓縮字串 (Regex 自動相容任意 PZB1:~PZB5: 前綴)、舊版無壓縮明文 JSON 與原始物件
+	 * 相容解碼器：支援 PZB 壓縮字串、舊版無壓縮明文 JSON 與原始物件
 	 * @param {string|Object} rawInput
 	 * @returns {Promise<Object>} 還原 Scheme 領域模型
 	 */
@@ -395,11 +438,11 @@ export class SchemeSerializer {
 	}
 
 	/**
-	 * 權威統一門面解析器 (Facade Parser)：
+	 * 統一解析器：
 	 * 接受 PZB 壓縮 Base64 字串、明文 JSON 字串、平鋪 JSON 物件或 Scheme 物件
-	 * 統一完成還原、4 方向牆面正規化與預設色票補齊
+	 * 統一完成還原、邊線正規化與預設色票補齊
 	 * @param {string|Object} rawInput
-	 * @returns {Object} 100% 合法且標準化的 Scheme 領域模型
+	 * @returns {Object} 標準化 Scheme 領域模型
 	 */
 	static parse(rawInput) {
 		if (!rawInput) return null;
@@ -445,49 +488,9 @@ export class SchemeSerializer {
 			}
 		});
 
-		// 無損正規化牆體
+		// 無損正規化牆體與地塊宿主
 		if (scheme.tiles) {
-			const updatedTiles = {};
-			Object.entries(scheme.tiles).forEach(([key, tile]) => {
-				const [xStr, yStr, zStr] = key.split(',');
-				const x = parseInt(xStr, 10);
-				const y = parseInt(yStr, 10);
-				if (isNaN(x) || isNaN(y)) return;
-
-				if (tile.walls) {
-					Object.entries(tile.walls).forEach(([edge, colorId]) => {
-						if (colorId) {
-							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-							const normKey = `${norm.x},${norm.y},${zStr}`;
-							if (!updatedTiles[normKey]) updatedTiles[normKey] = { walls: {} };
-							if (!updatedTiles[normKey].walls) updatedTiles[normKey].walls = {};
-							updatedTiles[normKey].walls[norm.edge] = colorId;
-						}
-					});
-				}
-
-				if (tile.wallObjects) {
-					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
-						if (Array.isArray(objArray) && objArray.length > 0) {
-							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-							const normKey = `${norm.x},${norm.y},${zStr}`;
-							if (!updatedTiles[normKey]) updatedTiles[normKey] = { walls: {} };
-							if (!updatedTiles[normKey].wallObjects) updatedTiles[normKey].wallObjects = {};
-							updatedTiles[normKey].wallObjects[norm.edge] = objArray;
-						}
-					});
-				}
-
-				if (tile.floorColorId || tile.label || Array.isArray(tile.floorObjects)) {
-					if (!updatedTiles[key]) updatedTiles[key] = { walls: {} };
-					if (tile.floorColorId) updatedTiles[key].floorColorId = tile.floorColorId;
-					if (tile.label) updatedTiles[key].label = tile.label;
-					if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
-						updatedTiles[key].floorObjects = tile.floorObjects;
-					}
-				}
-			});
-			scheme.tiles = updatedTiles;
+			scheme.tiles = BorderEdgeNormalizer.normalizeTilesMap(scheme.tiles);
 		}
 
 		if (!scheme.id) scheme.id = `scheme_${Date.now()}`;

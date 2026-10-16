@@ -22,11 +22,6 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'header_btn_import_text': '貼上文字',
 	'header_btn_import_text_title': '自剪貼簿匯入方案',
 
-	'prompt_import_text_title': '請貼上方案文字內容:',
-	'toast_clipboard_exported': '已成功複製方案文字至剪貼簿！',
-	'toast_text_imported': '方案文字匯入成功！',
-	'toast_text_import_invalid': '無效的方案文字內容！',
-
 	'parenthesis_wrapper': '（{val}）',
 
 	'toolbar_group_tools': '畫具',
@@ -74,17 +69,13 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'sidebar_other_floors_solid_title': '完整顯示其他樓層',
 	'sidebar_palette_title': '通用調色盤',
 	'sidebar_object_palette_title': '物件調色盤',
+	'sidebar_zone_palette_title': '標籤調色盤',
 	'sidebar_btn_add_palette': '+ 新增色塊',
 	'sidebar_btn_add_object_palette': '+ 新增物件',
+	'sidebar_btn_add_zone_palette': '+ 新增標籤',
 	'modal_palette_btn_convert_to_object': '轉為物件色票',
 	'modal_palette_btn_convert_to_normal': '轉為通用色票',
 	'modal_palette_confirm_convert': '轉為通用色票時不支援多重物件疊加，若該格已有疊加將取最新轉換者。確定要轉換嗎？',
-	'sidebar_label_title': '區域與標籤',
-	'sidebar_btn_enable_select': '👆 點擊選取',
-	'sidebar_btn_enable_select_title': '快捷進入選取模式',
-	'sidebar_no_selected_tile': '尚未選擇地塊（先點上方按鈕進入選取）',
-	'sidebar_selected_tile_coords': '選取地塊：({x}, {y}), Z：{z}',
-	'sidebar_label_input_placeholder': '例如：廚房、主臥室、儲藏室',
 
 	'modal_about_title': '關於專案',
 
@@ -114,12 +105,16 @@ window.PLANBOID_LANGUAGES['zh'] = {
 
 	'modal_palette_title_edit': '編輯色塊',
 	'modal_palette_title_add': '新增色塊',
+	'modal_palette_title_add_zone': '新增區域標籤',
 	'modal_palette_label_name': '色塊名稱：',
 	'modal_palette_name_placeholder': '例如：水泥地面',
 	'modal_palette_label_color': '選擇顏色：',
 	'modal_palette_confirm_delete': '確定要刪除此色塊嗎？',
 	'modal_palette_btn_delete': '刪除色塊',
 	'modal_palette_btn_save': '儲存變更',
+	'palette_default_color_name': '色塊 {num}',
+	'palette_default_object_name': '物件 {num}',
+	'palette_default_zone_name': '區域 {num}',
 
 	'export_svg_legend_title': '圖例',
 	'export_copy_clipboard_success': '已複製選擇範圍至剪貼簿（按 Ctrl+V 貼上）',
@@ -127,6 +122,9 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'defaults_scheme_name': '預設規劃方案',
 	'defaults_palette_road': '道路',
 	'defaults_palette_indoor': '室內空間',
+	'defaults_zone_bedroom': '臥室',
+	'defaults_zone_kitchen': '廚房',
+	'defaults_zone_living': '客廳',
 
 	'toast_scheme_created': '新方案建立成功！',
 	'toast_scheme_updated': '方案更新成功！',

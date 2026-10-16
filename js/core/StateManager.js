@@ -4,14 +4,116 @@
 
 import { BorderEdgeNormalizer } from '../renderer/BorderEdgeNormalizer.js';
 import { CONFIG } from './Config.js';
-import { eventBus } from './EventBus.js';
+import { eventBus, EVENTS } from './EventBus.js';
 import { StorageManager } from './StorageManager.js';
 import { ToolModeState } from './ToolModeState.js';
 import { UISelectionState } from './UISelectionState.js';
 
 export class StateManager {
+	/**
+	 * 地塊資料邊界裁剪與空項目過濾
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {Object} tile
+	 * @param {number} width
+	 * @param {number} height
+	 * @returns {Object|null}
+	 */
+	static sanitizeBoundaryTile(x, y, tile, width, height) {
+		if (!tile) return null;
+		if (x > width || y > height || (x === width && y === height)) {
+			return null;
+		}
+		if (x === width) {
+			delete tile.floor;
+			delete tile.floorColorId;
+			delete tile.floorObjects;
+			delete tile.zoneId;
+			if (tile.walls) delete tile.walls.N;
+			if (tile.wallObjects) delete tile.wallObjects.N;
+			if (tile.wallZones) delete tile.wallZones.N;
+		} else if (y === height) {
+			delete tile.floor;
+			delete tile.floorColorId;
+			delete tile.floorObjects;
+			delete tile.zoneId;
+			if (tile.walls) delete tile.walls.W;
+			if (tile.wallObjects) delete tile.wallObjects.W;
+			if (tile.wallZones) delete tile.wallZones.W;
+		}
+		return this.isTileEmpty(tile) ? null : tile;
+	}
+
+	/**
+	 * 判定地塊是否為無任何內容的空地塊
+	 * @param {Object} tile
+	 * @returns {boolean}
+	 */
+	static isTileEmpty(tile) {
+		if (!tile) return true;
+		const hasFloor = !!tile.floorColorId || !!tile.floor || !!tile.zoneId ||
+			(Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0);
+		const hasWalls = tile.walls && Object.values(tile.walls).some(Boolean);
+		const hasWallObjs = tile.wallObjects && Object.values(tile.wallObjects).some(arr => Array.isArray(arr) && arr.length > 0);
+		const hasWallZones = tile.wallZones && Object.values(tile.wallZones).some(Boolean);
+		return !hasFloor && !hasWalls && !hasWallObjs && !hasWallZones;
+	}
+
+	/**
+	 * 正規化 tiles 地塊集合（委派至 BorderEdgeNormalizer）
+	 * @param {Record<string, any>} tiles
+	 * @returns {Record<string, any>}
+	 */
+	static normalizeTilesMap(tiles) {
+		return BorderEdgeNormalizer.normalizeTilesMap(tiles);
+	}
+
+	/**
+	 * 統計方案中所有色票於地圖中的實體使用數量
+	 * @param {Object} scheme
+	 * @returns {Record<string, number>}
+	 */
+	static getPaletteUsageCounts(scheme) {
+		const counts = {};
+		const tiles = scheme?.tiles;
+		if (!tiles) return counts;
+
+		const addCount = (id) => {
+			if (id) counts[id] = (counts[id] || 0) + 1;
+		};
+
+		Object.values(tiles).forEach(tile => {
+			if (!tile) return;
+			if (tile.floorColorId) addCount(tile.floorColorId);
+			else if (typeof tile.floor === 'string') addCount(tile.floor);
+			if (tile.zoneId) addCount(tile.zoneId);
+			if (Array.isArray(tile.floorObjects)) tile.floorObjects.forEach(addCount);
+
+			if (tile.walls) {
+				Object.values(tile.walls).forEach(val => {
+					if (typeof val === 'string') addCount(val);
+				});
+			}
+			if (tile.wallObjects) {
+				Object.values(tile.wallObjects).forEach(arr => {
+					if (Array.isArray(arr)) arr.forEach(addCount);
+				});
+			}
+			if (tile.wallZones) {
+				Object.values(tile.wallZones).forEach(addCount);
+			}
+		});
+
+		return counts;
+	}
+
+	// 方案地塊正規化委派
+	normalizeSchemeTiles(scheme) {
+		if (!scheme || !scheme.tiles) return;
+		scheme.tiles = StateManager.normalizeTilesMap(scheme.tiles);
+	}
+
 	constructor() {
-		// 100% 同步讀取 StorageManager，確保構造函數完成時資料即為權威資料，絕不發動非同步覆蓋
 		const storedData = StorageManager.loadData();
 		this.schemes = storedData.schemes || [];
 		this.activeSchemeId = storedData.activeSchemeId;
@@ -23,85 +125,23 @@ export class StateManager {
 			this.activeSchemeId = this.scheme.id;
 		}
 
-		// 相容性正規化舊版 JSON 牆體
 		this.normalizeSchemeTiles(this.scheme);
 
-		// 獨立 UI Transient 狀態與 Tool 狀態
 		this.uiState = new UISelectionState();
 		this.toolState = new ToolModeState();
 
-		// 目前編輯狀態
 		this.currentZLevel = this.scheme.currentLevel || 0;
 
-		// 強制預設選取第一個色塊
 		const paletteKeys = Object.keys(this.scheme.palette || {});
 		if (paletteKeys.length > 0) {
 			this.toolState.setActiveColorId(paletteKeys[0]);
 		}
 
-		// Undo / Redo
 		this.maxHistory = CONFIG.HISTORY_MAX_STEPS;
 		this.undoStack = [];
 		this.redoStack = [];
 
 		this.pushHistory();
-	}
-
-	// 舊版 4 方向 JSON 相向相容：讀取舊檔案的 south 與 east 時，自動無損轉化為標準的 north 與 west
-	normalizeSchemeTiles(scheme) {
-		if (!scheme || !scheme.tiles) return;
-
-		const updatedTiles = {};
-		Object.entries(scheme.tiles).forEach(([key, tile]) => {
-			const [xStr, yStr, zStr] = key.split(',');
-			const x = parseInt(xStr, 10);
-			const y = parseInt(yStr, 10);
-
-			if (tile.walls) {
-				Object.entries(tile.walls).forEach(([edge, colorId]) => {
-					if (colorId) {
-						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-						const normKey = `${norm.x},${norm.y},${zStr}`;
-						if (!updatedTiles[normKey]) {
-							updatedTiles[normKey] = { walls: {} };
-						}
-						if (!updatedTiles[normKey].walls) {
-							updatedTiles[normKey].walls = {};
-						}
-						updatedTiles[normKey].walls[norm.edge] = colorId;
-					}
-				});
-			}
-
-			if (tile.wallObjects) {
-				Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
-					if (Array.isArray(objArray) && objArray.length > 0) {
-						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-						const normKey = `${norm.x},${norm.y},${zStr}`;
-						if (!updatedTiles[normKey]) {
-							updatedTiles[normKey] = { walls: {} };
-						}
-						if (!updatedTiles[normKey].wallObjects) {
-							updatedTiles[normKey].wallObjects = {};
-						}
-						updatedTiles[normKey].wallObjects[norm.edge] = objArray;
-					}
-				});
-			}
-
-			if (tile.floorColorId || tile.label || Array.isArray(tile.floorObjects)) {
-				if (!updatedTiles[key]) {
-					updatedTiles[key] = { walls: {} };
-				}
-				if (tile.floorColorId) updatedTiles[key].floorColorId = tile.floorColorId;
-				if (tile.label) updatedTiles[key].label = tile.label;
-				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
-					updatedTiles[key].floorObjects = tile.floorObjects;
-				}
-			}
-		});
-
-		scheme.tiles = updatedTiles;
 	}
 
 	// 快捷 getters/setters 委派
@@ -252,7 +292,7 @@ export class StateManager {
 	}
 
 	/**
-	 * 將內部 Z 座標轉為 PZ權威標準顯示 Z 樓層 (0->1, 1->2, -1->-1, -2->-2，不存在0)
+	 * 將內部 Z 座標轉為顯示 Z 樓層 (0->1, 1->2, -1->-1, -2->-2，不存在0)
 	 */
 	static toDisplayZ(z) {
 		return z >= 0 ? z + 1 : z;
@@ -281,30 +321,14 @@ export class StateManager {
 			target.width = validW;
 			target.height = validH;
 
-			// 當尺寸縮小時，清理並裁剪超出新邊界之 tiles
 			if (target.tiles) {
 				Object.keys(target.tiles).forEach(key => {
-					const [xStr, yStr, zStr] = key.split(',');
+					const [xStr, yStr] = key.split(',');
 					const x = parseInt(xStr, 10);
 					const y = parseInt(yStr, 10);
-					const tile = target.tiles[key];
-
-					if (x > validW || y > validH || (x === validW && y === validH)) {
+					const sanitized = StateManager.sanitizeBoundaryTile(x, y, target.tiles[key], validW, validH);
+					if (!sanitized) {
 						delete target.tiles[key];
-					} else if (x === validW) {
-						delete tile.floorColorId;
-						delete tile.floorObjects;
-						delete tile.label;
-						if (tile.walls) delete tile.walls.N;
-						if (tile.wallObjects) delete tile.wallObjects.N;
-						this.cleanupEmptyTile(key);
-					} else if (y === validH) {
-						delete tile.floorColorId;
-						delete tile.floorObjects;
-						delete tile.label;
-						if (tile.walls) delete tile.walls.W;
-						if (tile.wallObjects) delete tile.wallObjects.W;
-						this.cleanupEmptyTile(key);
 					}
 				});
 			}
@@ -312,6 +336,83 @@ export class StateManager {
 			this.persist();
 			this.notifyStateChange();
 		}
+	}
+
+	createScheme({ name, width, height, worldOriginX, worldOriginY }) {
+		const validW = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, width || CONFIG.DEFAULT_SCHEME_WIDTH));
+		const validH = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, height || CONFIG.DEFAULT_SCHEME_HEIGHT));
+		const validX = worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X;
+		const validY = worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y;
+
+		const newScheme = {
+			id: 'scheme_' + Date.now(),
+			name: name || '',
+			width: validW,
+			height: validH,
+			currentLevel: 0,
+			worldOriginX: validX,
+			worldOriginY: validY,
+			palette: StorageManager.getDefaultScheme().palette,
+			tiles: {},
+		};
+
+		this.schemes.push(newScheme);
+		this.activeSchemeId = newScheme.id;
+		this.scheme = newScheme;
+		this.currentZLevel = 0;
+		this.clearHistory();
+		this.notifyStateChange();
+		return newScheme;
+	}
+
+	cloneScheme(sourceSchemeId, overrides = {}) {
+		const source = this.schemes.find(s => s.id === sourceSchemeId) || this.scheme;
+		const validW = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, overrides.width || source?.width || CONFIG.DEFAULT_SCHEME_WIDTH));
+		const validH = Math.max(CONFIG.SCHEME_SIZE_MIN, Math.min(CONFIG.SCHEME_SIZE_MAX, overrides.height || source?.height || CONFIG.DEFAULT_SCHEME_HEIGHT));
+
+		const newScheme = {
+			id: 'scheme_' + Date.now(),
+			name: overrides.name || (source ? `${source.name} (Copy)` : ''),
+			width: validW,
+			height: validH,
+			currentLevel: source?.currentLevel || 0,
+			worldOriginX: overrides.worldOriginX ?? source?.worldOriginX ?? CONFIG.DEFAULT_ORIGIN_X,
+			worldOriginY: overrides.worldOriginY ?? source?.worldOriginY ?? CONFIG.DEFAULT_ORIGIN_Y,
+			palette: JSON.parse(JSON.stringify(source?.palette || StorageManager.getDefaultScheme().palette)),
+			tiles: JSON.parse(JSON.stringify(source?.tiles || {})),
+		};
+
+		if (newScheme.tiles) {
+			Object.keys(newScheme.tiles).forEach(key => {
+				const [xStr, yStr] = key.split(',');
+				const x = parseInt(xStr, 10);
+				const y = parseInt(yStr, 10);
+				const sanitized = StateManager.sanitizeBoundaryTile(x, y, newScheme.tiles[key], validW, validH);
+				if (!sanitized) {
+					delete newScheme.tiles[key];
+				}
+			});
+		}
+
+		this.schemes.push(newScheme);
+		this.activeSchemeId = newScheme.id;
+		this.scheme = newScheme;
+		this.currentZLevel = newScheme.currentLevel || 0;
+		this.clearHistory();
+		this.notifyStateChange();
+		return newScheme;
+	}
+
+	switchScheme(schemeId) {
+		const target = this.schemes.find(s => s.id === schemeId);
+		if (!target || target.id === this.activeSchemeId) return false;
+
+		this.activeSchemeId = target.id;
+		this.scheme = target;
+		this.currentZLevel = target.currentLevel || 0;
+		this.clearHistory();
+		this.notifyStateChange();
+		return true;
 	}
 
 	deleteScheme(id) {
@@ -387,18 +488,18 @@ export class StateManager {
 					if (destX === this.scheme.width) {
 						delete cloned.floorColorId;
 						delete cloned.floorObjects;
-						delete cloned.label;
+						delete cloned.zoneId;
 						if (cloned.walls) delete cloned.walls.N;
 						if (cloned.wallObjects) delete cloned.wallObjects.N;
 					} else if (destY === this.scheme.height) {
 						delete cloned.floorColorId;
 						delete cloned.floorObjects;
-						delete cloned.label;
+						delete cloned.zoneId;
 						if (cloned.walls) delete cloned.walls.W;
 						if (cloned.wallObjects) delete cloned.wallObjects.W;
 					}
 
-					const hasContent = cloned.floorColorId || cloned.label ||
+					const hasContent = cloned.floorColorId || cloned.zoneId ||
 						(cloned.floorObjects && cloned.floorObjects.length > 0) ||
 						(cloned.walls && Object.keys(cloned.walls).length > 0) ||
 						(cloned.wallObjects && Object.values(cloned.wallObjects).some(arr => arr && arr.length > 0));
@@ -454,59 +555,62 @@ export class StateManager {
 			return;
 		}
 		const key = `${x},${y},${this.currentZLevel}`;
-		if (!this.scheme.tiles[key]) {
-			this.scheme.tiles[key] = { walls: {} };
-		}
-		const isObj = !!(this.scheme.palette && this.scheme.palette[colorId] && this.scheme.palette[colorId].isObject);
-		if (isObj) {
-			if (!Array.isArray(this.scheme.tiles[key].floorObjects)) {
-				this.scheme.tiles[key].floorObjects = [];
-			}
-			this.scheme.tiles[key].floorObjects.push(colorId);
+		if (!this.scheme.tiles[key]) this.scheme.tiles[key] = {};
+		const tile = this.scheme.tiles[key];
+		const item = this.scheme.palette?.[colorId];
+
+		if (item?.isZone) {
+			tile.zoneId = colorId;
+		} else if (item?.isObject) {
+			if (!Array.isArray(tile.floorObjects)) tile.floorObjects = [];
+			tile.floorObjects.push(colorId);
 		} else {
-			this.scheme.tiles[key].floorColorId = colorId;
+			tile.floorColorId = colorId;
 		}
 	}
 
 	setTileWall(x, y, edge, colorId) {
 		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 		if (norm.x < 0 || norm.x > this.scheme.width || norm.y < 0 || norm.y > this.scheme.height) return;
+		if (colorId === null || colorId === undefined) {
+			this.removeWall(x, y, edge);
+			return;
+		}
 
 		const key = `${norm.x},${norm.y},${this.currentZLevel}`;
-		if (!this.scheme.tiles[key]) {
-			this.scheme.tiles[key] = { walls: {} };
-		}
-		if (!this.scheme.tiles[key].walls) {
-			this.scheme.tiles[key].walls = {};
-		}
+		if (!this.scheme.tiles[key]) this.scheme.tiles[key] = {};
+		const tile = this.scheme.tiles[key];
+		const item = this.scheme.palette?.[colorId];
 
-		if (colorId === null) {
-			delete this.scheme.tiles[key].walls[norm.edge];
-			if (this.scheme.tiles[key].wallObjects) {
-				delete this.scheme.tiles[key].wallObjects[norm.edge];
-			}
-			this.cleanupEmptyTile(key);
+		if (item?.isZone) {
+			if (!tile.wallZones) tile.wallZones = {};
+			tile.wallZones[norm.edge] = colorId;
+		} else if (item?.isObject) {
+			if (!tile.wallObjects) tile.wallObjects = {};
+			if (!Array.isArray(tile.wallObjects[norm.edge])) tile.wallObjects[norm.edge] = [];
+			tile.wallObjects[norm.edge].push(colorId);
 		} else {
-			const isObj = !!(this.scheme.palette && this.scheme.palette[colorId] && this.scheme.palette[colorId].isObject);
-			if (isObj) {
-				if (!this.scheme.tiles[key].wallObjects) {
-					this.scheme.tiles[key].wallObjects = {};
-				}
-				if (!Array.isArray(this.scheme.tiles[key].wallObjects[norm.edge])) {
-					this.scheme.tiles[key].wallObjects[norm.edge] = [];
-				}
-				this.scheme.tiles[key].wallObjects[norm.edge].push(colorId);
-			} else {
-				this.scheme.tiles[key].walls[norm.edge] = colorId;
-			}
+			if (!tile.walls) tile.walls = {};
+			tile.walls[norm.edge] = colorId;
 		}
 	}
 
 	removeFloor(x, y) {
 		const key = `${x},${y},${this.currentZLevel}`;
-		if (this.scheme.tiles[key]) {
-			delete this.scheme.tiles[key].floorColorId;
-			delete this.scheme.tiles[key].floorObjects;
+		const tile = this.scheme.tiles[key];
+		if (tile) {
+			delete tile.floorColorId;
+			delete tile.floor;
+			delete tile.floorObjects;
+			this.cleanupEmptyTile(key);
+		}
+	}
+
+	removeZone(x, y) {
+		const key = `${x},${y},${this.currentZLevel}`;
+		const tile = this.scheme.tiles[key];
+		if (tile) {
+			delete tile.zoneId;
 			this.cleanupEmptyTile(key);
 		}
 	}
@@ -514,26 +618,33 @@ export class StateManager {
 	removeWall(x, y, edge) {
 		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 		const key = `${norm.x},${norm.y},${this.currentZLevel}`;
-		if (this.scheme.tiles[key]) {
-			if (this.scheme.tiles[key].walls) {
-				delete this.scheme.tiles[key].walls[norm.edge];
+		const tile = this.scheme.tiles[key];
+		if (tile) {
+			if (tile.walls) {
+				delete tile.walls[norm.edge];
+				if (Object.keys(tile.walls).length === 0) delete tile.walls;
 			}
-			if (this.scheme.tiles[key].wallObjects) {
-				delete this.scheme.tiles[key].wallObjects[norm.edge];
+			if (tile.wallObjects) {
+				delete tile.wallObjects[norm.edge];
+				if (Object.keys(tile.wallObjects).length === 0) delete tile.wallObjects;
 			}
 			this.cleanupEmptyTile(key);
 		}
 	}
 
-	cleanupEmptyTile(key) {
+	removeWallZone(x, y, edge) {
+		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+		const key = `${norm.x},${norm.y},${this.currentZLevel}`;
 		const tile = this.scheme.tiles[key];
-		if (!tile) return;
-		const hasFloor = !!tile.floorColorId;
-		const hasFloorObjs = Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0;
-		const hasWalls = tile.walls && Object.keys(tile.walls).length > 0;
-		const hasWallObjs = tile.wallObjects && Object.values(tile.wallObjects).some(arr => Array.isArray(arr) && arr.length > 0);
-		const hasLabel = !!tile.label;
-		if (!hasFloor && !hasFloorObjs && !hasWalls && !hasWallObjs && !hasLabel) {
+		if (tile && tile.wallZones) {
+			delete tile.wallZones[norm.edge];
+			if (Object.keys(tile.wallZones).length === 0) delete tile.wallZones;
+			this.cleanupEmptyTile(key);
+		}
+	}
+
+	cleanupEmptyTile(key) {
+		if (StateManager.isTileEmpty(this.scheme.tiles[key])) {
 			delete this.scheme.tiles[key];
 		}
 	}
@@ -604,18 +715,36 @@ export class StateManager {
 		if (!tile) return false;
 
 		const subTargets = [];
-		if (tile.floorColorId) subTargets.push({ type: 'floor', id: tile.floorColorId });
-		if (Array.isArray(tile.floorObjects)) {
-			tile.floorObjects.forEach((id, idx) => subTargets.push({ type: 'floorObj', id, index: idx }));
-		}
-		if (tile.walls && tile.walls.N) subTargets.push({ type: 'wallN', id: tile.walls.N });
-		if (tile.wallObjects && Array.isArray(tile.wallObjects.N)) {
-			tile.wallObjects.N.forEach((id, idx) => subTargets.push({ type: 'wallNObj', id, index: idx }));
-		}
-		if (tile.walls && tile.walls.W) subTargets.push({ type: 'wallW', id: tile.walls.W });
-		if (tile.wallObjects && Array.isArray(tile.wallObjects.W)) {
-			tile.wallObjects.W.forEach((id, idx) => subTargets.push({ type: 'wallWObj', id, index: idx }));
-		}
+		const palette = this.scheme.palette || {};
+
+		// 面域項目
+		const floorItems = [
+			...(Array.isArray(tile.floor) ? tile.floor : (tile.floor ? [tile.floor] : [])),
+			tile.floorColorId,
+			tile.zoneId,
+			...(Array.isArray(tile.floorObjects) ? tile.floorObjects : [])
+		].filter(Boolean);
+
+		floorItems.forEach((id, idx) => {
+			const item = palette[id];
+			const type = item?.isZone ? 'zone' : (item?.isObject ? 'floorObj' : 'floor');
+			subTargets.push({ type, id, index: idx });
+		});
+
+		// 邊線項目
+		['N', 'W'].forEach(edge => {
+			const edgeItems = [
+				...(Array.isArray(tile.walls?.[edge]) ? tile.walls[edge] : (tile.walls?.[edge] ? [tile.walls[edge]] : [])),
+				tile.wallZones?.[edge],
+				...(Array.isArray(tile.wallObjects?.[edge]) ? tile.wallObjects[edge] : [])
+			].filter(Boolean);
+
+			edgeItems.forEach((id, idx) => {
+				const item = palette[id];
+				const type = item?.isZone ? `wallZone${edge}` : (item?.isObject ? `wall${edge}Obj` : `wall${edge}`);
+				subTargets.push({ type, id, index: idx, edge });
+			});
+		});
 
 		if (subTargets.length <= 1) {
 			this.activeSubTarget = null;
@@ -624,7 +753,7 @@ export class StateManager {
 
 		let currentIndex = -1;
 		if (this.activeSubTarget) {
-			currentIndex = subTargets.findIndex(t => t.type === this.activeSubTarget.type && (t.index === undefined || t.index === this.activeSubTarget.index));
+			currentIndex = subTargets.findIndex(t => t.id === this.activeSubTarget.id && t.type === this.activeSubTarget.type);
 		}
 
 		const nextIndex = (currentIndex + 1) % subTargets.length;
@@ -636,16 +765,6 @@ export class StateManager {
 
 	batchOperation(callback) {
 		callback();
-		this.pushHistory();
-		this.notifyStateChange();
-	}
-
-	setTileLabel(x, y, label) {
-		const key = `${x},${y},${this.currentZLevel}`;
-		if (!this.scheme.tiles[key]) {
-			this.scheme.tiles[key] = { walls: {} };
-		}
-		this.scheme.tiles[key].label = label;
 		this.pushHistory();
 		this.notifyStateChange();
 	}
@@ -665,16 +784,25 @@ export class StateManager {
 			if (this.scheme.tiles) {
 				Object.keys(this.scheme.tiles).forEach(key => {
 					const tile = this.scheme.tiles[key];
-					if (tile.floorColorId === id) {
-						delete tile.floorColorId;
+					if (Array.isArray(tile.floor)) {
+						tile.floor = tile.floor.filter(colorId => colorId !== id);
+						if (tile.floor.length === 0) delete tile.floor;
 					}
+					if (tile.floorColorId === id) delete tile.floorColorId;
+					if (tile.zoneId === id) delete tile.zoneId;
 					if (Array.isArray(tile.floorObjects)) {
 						tile.floorObjects = tile.floorObjects.filter(objId => objId !== id);
 						if (tile.floorObjects.length === 0) delete tile.floorObjects;
 					}
+
 					if (tile.walls) {
 						Object.keys(tile.walls).forEach(edge => {
-							if (tile.walls[edge] === id) delete tile.walls[edge];
+							if (Array.isArray(tile.walls[edge])) {
+								tile.walls[edge] = tile.walls[edge].filter(colorId => colorId !== id);
+								if (tile.walls[edge].length === 0) delete tile.walls[edge];
+							} else if (tile.walls[edge] === id) {
+								delete tile.walls[edge];
+							}
 						});
 						if (Object.keys(tile.walls).length === 0) delete tile.walls;
 					}
@@ -686,6 +814,12 @@ export class StateManager {
 							}
 						});
 						if (Object.keys(tile.wallObjects).length === 0) delete tile.wallObjects;
+					}
+					if (tile.wallZones) {
+						Object.keys(tile.wallZones).forEach(edge => {
+							if (tile.wallZones[edge] === id) delete tile.wallZones[edge];
+						});
+						if (Object.keys(tile.wallZones).length === 0) delete tile.wallZones;
 					}
 					this.cleanupEmptyTile(key);
 				});
@@ -700,6 +834,44 @@ export class StateManager {
 		}
 	}
 
+	addPaletteItem({ name, color, isObject = false, isZone = false }) {
+		const prefix = isZone ? 'zone_' : (isObject ? 'obj_' : 'color_');
+		const newId = prefix + Date.now();
+		if (!this.scheme.palette) this.scheme.palette = {};
+		this.scheme.palette[newId] = {
+			name: name || '',
+			color: color || CONFIG.DEFAULT_PALETTE_COLOR,
+			...(isObject ? { isObject: true } : {}),
+			...(isZone ? { isZone: true } : {}),
+		};
+		this.activeColorId = newId;
+		this.pushHistory();
+		this.notifyStateChange();
+		return newId;
+	}
+
+	reorderPalette(sourceId, targetId) {
+		const palette = this.scheme?.palette;
+		if (!palette || !palette[sourceId] || !palette[targetId]) return false;
+
+		const keys = Object.keys(palette);
+		const sourceIndex = keys.indexOf(sourceId);
+		const targetIndex = keys.indexOf(targetId);
+		if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return false;
+
+		keys.splice(sourceIndex, 1);
+		keys.splice(targetIndex, 0, sourceId);
+
+		const newPalette = {};
+		keys.forEach(k => {
+			newPalette[k] = palette[k];
+		});
+		this.scheme.palette = newPalette;
+		this.pushHistory();
+		this.notifyStateChange();
+		return true;
+	}
+
 	async persist() {
 		await StorageManager.saveData({
 			activeSchemeId: this.activeSchemeId,
@@ -709,7 +881,6 @@ export class StateManager {
 
 	notifyStateChange(eventType = 'change') {
 		this.persist();
-		eventBus.emit('state:changed', { type: eventType, state: this });
-		window.dispatchEvent(new CustomEvent('statechange', { detail: { type: eventType, state: this } }));
+		eventBus.emit(EVENTS.STATE_CHANGED, { type: eventType, state: this });
 	}
 }

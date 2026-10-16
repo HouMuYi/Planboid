@@ -22,11 +22,6 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'header_btn_import_text': 'Paste Text',
 	'header_btn_import_text_title': 'Import scheme from clipboard',
 
-	'prompt_import_text_title': 'Paste scheme text:',
-	'toast_clipboard_exported': 'Scheme text copied to clipboard successfully!',
-	'toast_text_imported': 'Scheme text imported successfully!',
-	'toast_text_import_invalid': 'Invalid scheme text content!',
-
 	'parenthesis_wrapper': ' ({val})',
 	'toolbar_group_tools': 'Tools',
 	'toolbar_tool_floor': 'Floor Tile',
@@ -73,17 +68,13 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'sidebar_other_floors_solid_title': 'Render other floors as fully visible',
 	'sidebar_palette_title': 'Palette',
 	'sidebar_object_palette_title': 'Object Palette',
+	'sidebar_zone_palette_title': 'Zone Palette',
 	'sidebar_btn_add_palette': '+ Add Colour',
 	'sidebar_btn_add_object_palette': '+ Add Object',
+	'sidebar_btn_add_zone_palette': '+ Add Zone',
 	'modal_palette_btn_convert_to_object': 'Convert to Object Palette',
 	'modal_palette_btn_convert_to_normal': 'Convert to Tile Palette',
 	'modal_palette_confirm_convert': 'Converting to tile palette does not support stacked objects. If stacked objects exist, only the latest converted one will be retained. Are you sure you want to convert?',
-	'sidebar_label_title': 'Area Labels',
-	'sidebar_btn_enable_select': '👆 Select Mode',
-	'sidebar_btn_enable_select_title': 'Enable Select Mode',
-	'sidebar_no_selected_tile': 'No tile selected (click above button)',
-	'sidebar_selected_tile_coords': 'Selected: ({x}, {y}), Z: {z}',
-	'sidebar_label_input_placeholder': 'e.g. Kitchen, Master Bedroom, Storage',
 
 	'modal_about_title': 'About Project',
 
@@ -113,12 +104,16 @@ window.PLANBOID_LANGUAGES['en'] = {
 
 	'modal_palette_title_edit': 'Edit Palette Item',
 	'modal_palette_title_add': 'Add Swatch',
+	'modal_palette_title_add_zone': 'Add Zone Tag',
 	'modal_palette_label_name': 'Swatch Name:',
 	'modal_palette_name_placeholder': 'e.g. Concrete Floor',
 	'modal_palette_label_color': 'Colour:',
 	'modal_palette_confirm_delete': 'Are you sure you want to delete this colour swatch?',
 	'modal_palette_btn_delete': 'Delete Swatch',
 	'modal_palette_btn_save': 'Save Changes',
+	'palette_default_color_name': 'Colour {num}',
+	'palette_default_object_name': 'Object {num}',
+	'palette_default_zone_name': 'Zone {num}',
 
 	'export_svg_legend_title': 'Legend',
 	'export_copy_clipboard_success': 'Selection copied to clipboard (Press Ctrl+V to paste)',
@@ -126,6 +121,9 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'defaults_scheme_name': 'Default Scheme',
 	'defaults_palette_road': 'Road',
 	'defaults_palette_indoor': 'Indoor Space',
+	'defaults_zone_bedroom': 'Bedroom',
+	'defaults_zone_kitchen': 'Kitchen',
+	'defaults_zone_living': 'Living Room',
 
 	'toast_scheme_created': 'New scheme created!',
 	'toast_scheme_updated': 'Scheme details updated!',

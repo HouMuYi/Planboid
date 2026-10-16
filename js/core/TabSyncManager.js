@@ -1,12 +1,12 @@
 /**
- * TabSyncManager.js - 多分頁實時同步與磁碟感知管理器 (BroadcastChannel + Storage Event)
- * 1. 透過 BroadcastChannel 實現同源多分頁之間零延遲畫布與狀態同步
- * 2. 透過 Storage Event 提供背景分頁休眠甦醒後的權威補償防線
- * 3. 內建 isRemoteSyncing 鎖，徹底切斷跨分頁循環寫入與死鎖
+ * TabSyncManager.js - 多分頁實時同步管理器 (BroadcastChannel + Storage Event)
+ * 1. 透過 BroadcastChannel 實現同源多分頁狀態同步
+ * 2. 透過 Storage Event 提供背景分頁休眠甦醒後的狀態補償
+ * 3. 內建 isRemoteSyncing 旗標，避免跨分頁循環寫入
  */
 
 import { ToastNotification } from '../ui/ToastNotification.js';
-import { eventBus } from './EventBus.js';
+import { eventBus, EVENTS } from './EventBus.js';
 import { I18nManager, i18n } from './I18nManager.js';
 import { SchemeSerializer } from './SchemeSerializer.js';
 import { StorageManager } from './StorageManager.js';
@@ -100,22 +100,20 @@ export class TabSyncManager {
 			}
 
 			// 觸發畫布與 UI 重新渲染 (跳過再次 persist)
-			eventBus.emit('state:changed', { type: 'remote_sync', state: this.state });
-			window.dispatchEvent(new CustomEvent('statechange', { detail: { type: 'remote_sync', state: this.state } }));
+			eventBus.emit(EVENTS.STATE_CHANGED, { type: 'remote_sync', state: this.state });
 		} finally {
 			this.isRemoteSyncing = false;
 		}
 	}
 
 	/**
-	 * 綁定 Storage Event 防線 (處理背景分頁休眠甦醒後的權威同步)
+	 * 綁定 Storage Event (處理背景分頁休眠甦醒後的同步)
 	 */
 	bindStorageEvent() {
 		if (typeof window === 'undefined') return;
 
 		window.addEventListener('storage', (e) => {
-			// 僅在 planboid_data_v4 Key 被其他分頁修改時發動
-			if (e.key !== 'planboid_data_v4' || !e.newValue) return;
+			if (e.key !== StorageManager.STORAGE_KEY || !e.newValue) return;
 
 			this.isRemoteSyncing = true;
 			try {
@@ -127,8 +125,7 @@ export class TabSyncManager {
 					this.state.normalizeSchemeTiles(this.state.scheme);
 					this.state.currentZLevel = this.state.scheme.currentLevel || 0;
 
-					eventBus.emit('state:changed', { type: 'storage_sync', state: this.state });
-					window.dispatchEvent(new CustomEvent('statechange', { detail: { type: 'storage_sync', state: this.state } }));
+					eventBus.emit(EVENTS.STATE_CHANGED, { type: 'storage_sync', state: this.state });
 
 					ToastNotification.show(
 						i18n.t('toast_tab_synced') || '已自動同步其他分頁的最新變更！',
