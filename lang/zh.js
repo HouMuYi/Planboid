@@ -34,7 +34,7 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'toolbar_tool_erase_wall': '清除邊線',
 	'toolbar_tool_erase_wall_title': '清除邊線\n操作邏輯與繪製邊線相同：吸附交叉點設定起點後，拖曳或再次點擊終點，即可沿同一水平或垂直直線批次清除整排邊線。',
 	'toolbar_tool_select': '選取工具',
-	'toolbar_tool_select_title': '選取工具\n點擊單一地塊即可選取並編輯標籤；按住拖曳後放開，可框選矩形範圍地塊，供複製（Ctrl+C）、貼上（Ctrl+V）或刪除（Delete）使用。',
+	'toolbar_tool_select_title': '選取工具\n點擊可選取單一地塊；按住拖曳後放開，可框選矩形範圍地塊，供複製（Ctrl+C）、貼上（Ctrl+V）或刪除（Delete）使用。',
 	'toolbar_group_history': '歷史',
 	'toolbar_btn_undo_title': '復原',
 	'toolbar_btn_redo_title': '重做',

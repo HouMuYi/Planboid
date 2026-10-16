@@ -33,7 +33,7 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'toolbar_tool_erase_wall': 'Erase Line',
 	'toolbar_tool_erase_wall_title': 'Erase Line\nClick or drag to clear wall lines.',
 	'toolbar_tool_select': 'Selection',
-	'toolbar_tool_select_title': 'Selection\nSelect single tile to edit label; drag to select rectangular region for Copy, Paste, or Delete.',
+	'toolbar_tool_select_title': 'Selection\nClick to select a single tile; drag to select rectangular region for Copy, Paste, or Delete.',
 	'toolbar_group_history': 'History',
 	'toolbar_btn_undo_title': 'Undo',
 	'toolbar_btn_redo_title': 'Redo',
