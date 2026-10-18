@@ -123,8 +123,9 @@ export class InputDispatcher {
 
 	/**
 	 * 結算地塊矩形操作 (floor 筆刷 / 選取工具共用)：起點與終點格相同視為單格，否則視為矩形
+	 * @param {boolean} [isCtrl=false]
 	 */
-	finalizeRectOperation() {
+	finalizeRectOperation(isCtrl = false) {
 		const start = this.renderer.rectStartCell;
 		this.renderer.rectStartCell = null;
 		this.renderer.isPainting = false;
@@ -151,7 +152,7 @@ export class InputDispatcher {
 				this.state.notifyStateChange();
 			}
 		} else {
-			this.applicator.applyRectFloor(minX, minY, maxX, maxY);
+			this.applicator.applyRectFloor(minX, minY, maxX, maxY, isCtrl);
 		}
 
 		this.renderer.requestRenderAll();
@@ -159,8 +160,9 @@ export class InputDispatcher {
 
 	/**
 	 * 結算邊線交叉點直線操作：僅在終點 (依軸向鎖定後) 與起點不同時才真正寫入並重置起點
+	 * @param {boolean} [isCtrl=false]
 	 */
-	finalizeWallOperationIfMoved() {
+	finalizeWallOperationIfMoved(isCtrl = false) {
 		const start = this.renderer.wallStartPoint;
 		if (!start) return;
 
@@ -174,7 +176,7 @@ export class InputDispatcher {
 		const end = GeometryPipeline.constrainAxisPoint(start, raw);
 		if (end.x === start.x && end.y === start.y) return; // 尚未移動到不同交叉點，繼續等待下一次互動
 
-		this.applicator.applyWallLine(start, end);
+		this.applicator.applyWallLine(start, end, isCtrl);
 		this.renderer.wallStartPoint = null;
 		this.renderer.requestRenderAll();
 	}
@@ -186,6 +188,7 @@ export class InputDispatcher {
 			if (this.renderer.isAnimating) return;
 
 			const { cellX, cellY, edge, ix, iy } = this.getMouseGridPos(e);
+			this.isCtrlDrag = e.ctrlKey || e.metaKey;
 
 			if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
 				this.renderer.isDraggingCamera = true;
@@ -199,7 +202,7 @@ export class InputDispatcher {
 				e.preventDefault();
 				this.state.pushHistory();
 				this.renderer.isRightPainting = true;
-				this.applicator.applyRightClickErase(cellX, cellY, edge);
+				this.applicator.applyRightClickErase(cellX, cellY, edge, this.isCtrlDrag);
 				return;
 			}
 
@@ -241,7 +244,7 @@ export class InputDispatcher {
 			});
 		});
 
-		const handleMouseUp = () => {
+		const handleMouseUp = (e) => {
 			if (this.renderer.isDraggingCamera) {
 				this.renderer.isDraggingCamera = false;
 				el.style.cursor = 'default';
@@ -252,14 +255,17 @@ export class InputDispatcher {
 				this.state.pushHistory();
 			}
 
+			const isCtrl = e ? (e.ctrlKey || e.metaKey || this.isCtrlDrag) : this.isCtrlDrag;
+
 			if (this.renderer.rectStartCell) {
-				this.finalizeRectOperation();
+				this.finalizeRectOperation(isCtrl);
 			}
 
 			if (this.renderer.wallStartPoint) {
-				this.finalizeWallOperationIfMoved();
+				this.finalizeWallOperationIfMoved(isCtrl);
 			}
 
+			this.isCtrlDrag = false;
 			this.notifyHoverState();
 		};
 
@@ -499,7 +505,7 @@ export class InputDispatcher {
 			this.updateHoverState(cellX, cellY, edge, ix, iy);
 
 			if (this.renderer.isRightPainting) {
-				this.applicator.applyRightClickErase(cellX, cellY, edge);
+				this.applicator.applyRightClickErase(cellX, cellY, edge, e.ctrlKey || e.metaKey || this.isCtrlDrag);
 			}
 		}
 	}

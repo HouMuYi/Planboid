@@ -174,6 +174,8 @@ export class Toolbar {
 			{ id: 'redo', keys: ['ctrl+y', 'ctrl+shift+z'], i18nKey: 'toolbar_btn_redo_title', displayKey: 'Ctrl+Y', action: () => this.state.redo() },
 			{ id: 'cancel', keys: ['escape', 'esc'], i18nKey: 'toolbar_btn_cancel_op_title', displayKey: 'Esc', action: () => this.renderer?.dispatcher?.cancelActiveOperation() },
 			{ id: 'toggle_3d', keys: ['home', 'end'], i18nKey: 'viewport_toggle_3d_walls_title', displayKey: 'Home / End', action: (e, key) => toggle3DWalls(key) },
+			{ id: 'pan_camera', keys: [], i18nKey: 'hotkey_pan_camera', displayKey: 'Shift + Drag' },
+			{ id: 'exclusive_modifier', keys: [], i18nKey: 'hotkey_exclusive_modifier', displayKey: 'Ctrl + Draw / Erase' },
 		];
 
 		const hotkeyLegend = document.getElementById('canvas-hotkey-legend');
