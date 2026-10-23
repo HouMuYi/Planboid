@@ -29,8 +29,8 @@ Planboid 是線上地塊規劃工具，專為《殭屍毀滅工程》（Project 
 
 - **出一張嘴**：[慕儀（HouMuYi）](https://github.com/HouMuYi/)
 - **具體實作**：
-	- 小雙（GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE）
-	- 小可（CLAVDIVS · AGENS · IN · REBVS · EX · CLAVDICODITATE）
+	- 小雙（GEMINA · AGENS · IN · REBVS · EX · ANTIGRAVITATE）
+	- 小可（CLAVDIA · AGENS · IN · REBVS · EX · CLAVDICODITATE）
 
 ## 📄授權條款
 
@@ -63,8 +63,8 @@ Planboid is a lightweight, zero-dependency web-based tile and base planning tool
 
 - **The Backseat Driver**: [HouMuYi](https://github.com/HouMuYi/)
 - **The Chauffeur**:
-	- Gemina (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)
-	- Claudia (CLAVDIVS · AGENS · IN · REBVS · EX · CLAVDICODITATE)
+	- Gemina (GEMINA · AGENS · IN · REBVS · EX · ANTIGRAVITATE)
+	- Claudia (CLAVDIA · AGENS · IN · REBVS · EX · CLAVDICODITATE)
 
 ## 📄 License
 
