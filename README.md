@@ -63,8 +63,8 @@ Planboid is a lightweight, zero-dependency web-based tile and base planning tool
 
 - **The Backseat Driver**: [HouMuYi](https://github.com/HouMuYi/)
 - **The Chauffeur**:
-	- Jemmy (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)
-	- Claudie (CLAVDIVS · AGENS · IN · REBVS · EX · CLAVDICODITATE)
+	- Gemina (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)
+	- Claudia (CLAVDIVS · AGENS · IN · REBVS · EX · CLAVDICODITATE)
 
 ## 📄 License
 
