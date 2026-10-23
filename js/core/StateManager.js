@@ -26,16 +26,20 @@ export class StateManager {
 		}
 		if (x === width) {
 			delete tile.floor;
+			delete tile.N;
 			delete tile.floorColorId;
 			delete tile.floorObjects;
+			delete tile.zoneIds;
 			delete tile.zoneId;
 			if (tile.walls) delete tile.walls.N;
 			if (tile.wallObjects) delete tile.wallObjects.N;
 			if (tile.wallZones) delete tile.wallZones.N;
 		} else if (y === height) {
 			delete tile.floor;
+			delete tile.W;
 			delete tile.floorColorId;
 			delete tile.floorObjects;
+			delete tile.zoneIds;
 			delete tile.zoneId;
 			if (tile.walls) delete tile.walls.W;
 			if (tile.wallObjects) delete tile.wallObjects.W;
@@ -45,18 +49,151 @@ export class StateManager {
 	}
 
 	/**
+	 * 將地塊物件無損標準化為統一的三槽位陣列格式 { floor: [], N: [], W: [] }
+	 * @param {Object} tile
+	 * @returns {{ floor: string[], N: string[], W: string[] }}
+	 */
+	static normalizeTile(tile) {
+		if (!tile) return { floor: [], N: [], W: [] };
+		const floor = Array.isArray(tile.floor)
+			? [...tile.floor]
+			: [
+				tile.floorColorId || (typeof tile.floor === 'string' ? tile.floor : null),
+				...(Array.isArray(tile.zoneIds) ? tile.zoneIds : (tile.zoneId ? [tile.zoneId] : [])),
+				...(Array.isArray(tile.floorObjects) ? tile.floorObjects : [])
+			].filter(Boolean);
+
+		const nArr = Array.isArray(tile.N)
+			? [...tile.N]
+			: [
+				tile.walls?.N,
+				...(Array.isArray(tile.wallZones?.N) ? tile.wallZones.N : (tile.wallZones?.N ? [tile.wallZones.N] : [])),
+				...(Array.isArray(tile.wallObjects?.N) ? tile.wallObjects.N : [])
+			].filter(Boolean);
+
+		const wArr = Array.isArray(tile.W)
+			? [...tile.W]
+			: [
+				tile.walls?.W,
+				...(Array.isArray(tile.wallZones?.W) ? tile.wallZones.W : (tile.wallZones?.W ? [tile.wallZones.W] : [])),
+				...(Array.isArray(tile.wallObjects?.W) ? tile.wallObjects.W : [])
+			].filter(Boolean);
+
+		return { floor, N: nArr, W: wArr };
+	}
+
+	/**
+	 * 槽位繪製守門鎖 (統一處理 normal 排他替換、zone 集合去重、object 清單累加)
+	 * @param {string[]} slotArray
+	 * @param {string} colorId
+	 * @param {Record<string, any>} palette
+	 * @param {boolean} [isExclusive=false]
+	 * @returns {string[]}
+	 */
+	static applySlotPaint(slotArray, colorId, palette, isExclusive = false) {
+		if (!colorId || !palette) return slotArray || [];
+		if (isExclusive) {
+			return [colorId];
+		}
+		const arr = Array.isArray(slotArray) ? [...slotArray] : [];
+		const item = palette[colorId];
+		if (item?.isZone) {
+			if (!arr.includes(colorId)) {
+				arr.push(colorId);
+			}
+		} else if (item?.isObject) {
+			arr.push(colorId);
+		} else {
+			// 通用色票：排他替換掉槽位中既有的通用色票，保留標籤與物件
+			const filtered = arr.filter(id => {
+				const p = palette[id];
+				return p?.isZone || p?.isObject;
+			});
+			filtered.push(colorId);
+			return filtered;
+		}
+		return arr;
+	}
+
+	/**
+	 * 槽位清除守門鎖 (統一處理 object 的 N-1 扣減、zone/normal 的指定刪除)
+	 * @param {string[]} slotArray
+	 * @param {string|null} colorId
+	 * @param {Record<string, any>} palette
+	 * @param {boolean} [isForceAll=false]
+	 * @returns {string[]}
+	 */
+	static removeSlotPaint(slotArray, colorId, palette, isForceAll = false) {
+		if (!Array.isArray(slotArray) || slotArray.length === 0) return [];
+		if (isForceAll || !colorId) {
+			return [];
+		}
+		const item = palette?.[colorId];
+		if (item?.isObject) {
+			const idx = slotArray.lastIndexOf(colorId);
+			if (idx !== -1) {
+				const arr = [...slotArray];
+				arr.splice(idx, 1);
+				return arr;
+			}
+			return slotArray;
+		} else {
+			return slotArray.filter(id => id !== colorId);
+		}
+	}
+
+	/**
+	 * 提取地塊上的所有標籤色票 ID 清單 (向下相容單一字串或陣列)
+	 * @param {Object} tile
+	 * @returns {string[]}
+	 */
+	static getTileZoneIds(tile) {
+		if (!tile) return [];
+		if (Array.isArray(tile.floor)) {
+			return tile.floor.filter(id => String(id).startsWith('zone_'));
+		}
+		if (Array.isArray(tile.zoneIds)) return tile.zoneIds;
+		if (tile.zoneId) return [tile.zoneId];
+		return [];
+	}
+
+	/**
+	 * 提取邊線上的所有標籤色票 ID 清單 (向下相容單一字串或陣列)
+	 * @param {Object} tile
+	 * @param {'N'|'W'} edge
+	 * @returns {string[]}
+	 */
+	static getWallZoneIds(tile, edge) {
+		if (!tile) return [];
+		if (Array.isArray(tile[edge])) {
+			return tile[edge].filter(id => String(id).startsWith('zone_'));
+		}
+		if (!tile.wallZones) return [];
+		const val = tile.wallZones[edge];
+		if (Array.isArray(val)) return val;
+		if (val) return [val];
+		return [];
+	}
+
+	/**
 	 * 判定地塊是否為無任何內容的空地塊
 	 * @param {Object} tile
 	 * @returns {boolean}
 	 */
 	static isTileEmpty(tile) {
 		if (!tile) return true;
-		const hasFloor = !!tile.floorColorId || !!tile.floor || !!tile.zoneId ||
+		const hasFloor = Array.isArray(tile.floor) && tile.floor.length > 0;
+		const hasN = Array.isArray(tile.N) && tile.N.length > 0;
+		const hasW = Array.isArray(tile.W) && tile.W.length > 0;
+		if (hasFloor || hasN || hasW) return false;
+
+		const legacyFloor = !!tile.floorColorId || (typeof tile.floor === 'string' && !!tile.floor) ||
+			!!tile.zoneId || (Array.isArray(tile.zoneIds) && tile.zoneIds.length > 0) ||
 			(Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0);
-		const hasWalls = tile.walls && Object.values(tile.walls).some(Boolean);
-		const hasWallObjs = tile.wallObjects && Object.values(tile.wallObjects).some(arr => Array.isArray(arr) && arr.length > 0);
-		const hasWallZones = tile.wallZones && Object.values(tile.wallZones).some(Boolean);
-		return !hasFloor && !hasWalls && !hasWallObjs && !hasWallZones;
+		const legacyWalls = tile.walls && Object.values(tile.walls).some(Boolean);
+		const legacyWallObjs = tile.wallObjects && Object.values(tile.wallObjects).some(arr => Array.isArray(arr) && arr.length > 0);
+		const legacyWallZones = tile.wallZones && Object.values(tile.wallZones).some(arr => (Array.isArray(arr) ? arr.length > 0 : !!arr));
+		return !legacyFloor && !legacyWalls && !legacyWallObjs && !legacyWallZones;
 	}
 
 	/**
@@ -84,9 +221,15 @@ export class StateManager {
 
 		Object.values(tiles).forEach(tile => {
 			if (!tile) return;
+			if (Array.isArray(tile.floor)) tile.floor.forEach(addCount);
+			if (Array.isArray(tile.N)) tile.N.forEach(addCount);
+			if (Array.isArray(tile.W)) tile.W.forEach(addCount);
+
+			// 向下相容舊版結構
 			if (tile.floorColorId) addCount(tile.floorColorId);
 			else if (typeof tile.floor === 'string') addCount(tile.floor);
-			if (tile.zoneId) addCount(tile.zoneId);
+			if (Array.isArray(tile.zoneIds)) tile.zoneIds.forEach(addCount);
+			else if (tile.zoneId) addCount(tile.zoneId);
 			if (Array.isArray(tile.floorObjects)) tile.floorObjects.forEach(addCount);
 
 			if (tile.walls) {
@@ -100,7 +243,10 @@ export class StateManager {
 				});
 			}
 			if (tile.wallZones) {
-				Object.values(tile.wallZones).forEach(addCount);
+				Object.values(tile.wallZones).forEach(val => {
+					if (Array.isArray(val)) val.forEach(addCount);
+					else if (val) addCount(val);
+				});
 			}
 		});
 
@@ -555,25 +701,17 @@ export class StateManager {
 			return;
 		}
 		const key = `${x},${y},${this.currentZLevel}`;
-		if (!this.scheme.tiles[key]) this.scheme.tiles[key] = {};
+		if (!this.scheme.tiles[key]) this.scheme.tiles[key] = { floor: [], N: [], W: [] };
 		const tile = this.scheme.tiles[key];
-		const item = this.scheme.palette?.[colorId];
-
-		if (isExclusive) {
-			delete tile.floorColorId;
-			delete tile.floor;
-			delete tile.floorObjects;
-			delete tile.zoneId;
+		if (!Array.isArray(tile.floor)) {
+			const norm = StateManager.normalizeTile(tile);
+			tile.floor = norm.floor;
+			tile.N = norm.N;
+			tile.W = norm.W;
 		}
-
-		if (item?.isZone) {
-			tile.zoneId = colorId;
-		} else if (item?.isObject) {
-			if (!Array.isArray(tile.floorObjects)) tile.floorObjects = [];
-			tile.floorObjects.push(colorId);
-		} else {
-			tile.floorColorId = colorId;
-		}
+		tile.floor = StateManager.applySlotPaint(tile.floor, colorId, this.scheme.palette, isExclusive);
+		if (tile.floor.length === 0) delete tile.floor;
+		this.cleanupEmptyTile(key);
 	}
 
 	setTileWall(x, y, edge, colorId, isExclusive = false) {
@@ -585,27 +723,17 @@ export class StateManager {
 		}
 
 		const key = `${norm.x},${norm.y},${this.currentZLevel}`;
-		if (!this.scheme.tiles[key]) this.scheme.tiles[key] = {};
+		if (!this.scheme.tiles[key]) this.scheme.tiles[key] = { floor: [], N: [], W: [] };
 		const tile = this.scheme.tiles[key];
-		const item = this.scheme.palette?.[colorId];
-
-		if (isExclusive) {
-			if (tile.walls) delete tile.walls[norm.edge];
-			if (tile.wallObjects) delete tile.wallObjects[norm.edge];
-			if (tile.wallZones) delete tile.wallZones[norm.edge];
+		if (!Array.isArray(tile[norm.edge])) {
+			const normalized = StateManager.normalizeTile(tile);
+			tile.floor = normalized.floor;
+			tile.N = normalized.N;
+			tile.W = normalized.W;
 		}
-
-		if (item?.isZone) {
-			if (!tile.wallZones) tile.wallZones = {};
-			tile.wallZones[norm.edge] = colorId;
-		} else if (item?.isObject) {
-			if (!tile.wallObjects) tile.wallObjects = {};
-			if (!Array.isArray(tile.wallObjects[norm.edge])) tile.wallObjects[norm.edge] = [];
-			tile.wallObjects[norm.edge].push(colorId);
-		} else {
-			if (!tile.walls) tile.walls = {};
-			tile.walls[norm.edge] = colorId;
-		}
+		tile[norm.edge] = StateManager.applySlotPaint(tile[norm.edge], colorId, this.scheme.palette, isExclusive);
+		if (tile[norm.edge].length === 0) delete tile[norm.edge];
+		this.cleanupEmptyTile(key);
 	}
 
 	removeFloor(x, y, colorId = null, isForceAll = false) {
@@ -613,32 +741,19 @@ export class StateManager {
 		const tile = this.scheme.tiles[key];
 		if (!tile) return;
 
-		if (isForceAll || !colorId) {
+		if (!Array.isArray(tile.floor)) {
+			const norm = StateManager.normalizeTile(tile);
+			tile.floor = norm.floor;
+			tile.N = norm.N;
+			tile.W = norm.W;
 			delete tile.floorColorId;
-			delete tile.floor;
 			delete tile.floorObjects;
+			delete tile.zoneIds;
 			delete tile.zoneId;
-			this.cleanupEmptyTile(key);
-			return;
 		}
 
-		const item = this.scheme.palette?.[colorId];
-		if (item?.isZone) {
-			if (tile.zoneId === colorId) delete tile.zoneId;
-		} else if (item?.isObject) {
-			if (Array.isArray(tile.floorObjects)) {
-				const idx = tile.floorObjects.lastIndexOf(colorId);
-				if (idx !== -1) {
-					tile.floorObjects.splice(idx, 1);
-					if (tile.floorObjects.length === 0) delete tile.floorObjects;
-				}
-			}
-		} else {
-			if (tile.floorColorId === colorId || tile.floor === colorId) {
-				delete tile.floorColorId;
-				delete tile.floor;
-			}
-		}
+		tile.floor = StateManager.removeSlotPaint(tile.floor, colorId, this.scheme.palette, isForceAll);
+		if (tile.floor.length === 0) delete tile.floor;
 		this.cleanupEmptyTile(key);
 	}
 
@@ -652,46 +767,18 @@ export class StateManager {
 		const tile = this.scheme.tiles[key];
 		if (!tile) return;
 
-		if (isForceAll || !colorId) {
-			if (tile.walls) {
-				delete tile.walls[norm.edge];
-				if (Object.keys(tile.walls).length === 0) delete tile.walls;
-			}
-			if (tile.wallObjects) {
-				delete tile.wallObjects[norm.edge];
-				if (Object.keys(tile.wallObjects).length === 0) delete tile.wallObjects;
-			}
-			if (tile.wallZones) {
-				delete tile.wallZones[norm.edge];
-				if (Object.keys(tile.wallZones).length === 0) delete tile.wallZones;
-			}
-			this.cleanupEmptyTile(key);
-			return;
+		if (!Array.isArray(tile[norm.edge])) {
+			const normalized = StateManager.normalizeTile(tile);
+			tile.floor = normalized.floor;
+			tile.N = normalized.N;
+			tile.W = normalized.W;
+			delete tile.walls;
+			delete tile.wallObjects;
+			delete tile.wallZones;
 		}
 
-		const item = this.scheme.palette?.[colorId];
-		if (item?.isZone) {
-			if (tile.wallZones && tile.wallZones[norm.edge] === colorId) {
-				delete tile.wallZones[norm.edge];
-				if (Object.keys(tile.wallZones).length === 0) delete tile.wallZones;
-			}
-		} else if (item?.isObject) {
-			if (tile.wallObjects && Array.isArray(tile.wallObjects[norm.edge])) {
-				const idx = tile.wallObjects[norm.edge].lastIndexOf(colorId);
-				if (idx !== -1) {
-					tile.wallObjects[norm.edge].splice(idx, 1);
-					if (tile.wallObjects[norm.edge].length === 0) {
-						delete tile.wallObjects[norm.edge];
-						if (Object.keys(tile.wallObjects).length === 0) delete tile.wallObjects;
-					}
-				}
-			}
-		} else {
-			if (tile.walls && tile.walls[norm.edge] === colorId) {
-				delete tile.walls[norm.edge];
-				if (Object.keys(tile.walls).length === 0) delete tile.walls;
-			}
-		}
+		tile[norm.edge] = StateManager.removeSlotPaint(tile[norm.edge], colorId, this.scheme.palette, isForceAll);
+		if (tile[norm.edge].length === 0) delete tile[norm.edge];
 		this.cleanupEmptyTile(key);
 	}
 
@@ -712,52 +799,59 @@ export class StateManager {
 		}
 	}
 
-	convertPaletteItemType(id, toObject) {
+	convertPaletteItemType(id, targetType) {
 		const item = this.scheme.palette[id];
 		if (!item) return;
 
-		item.isObject = !!toObject;
+		let toType = targetType;
+		if (targetType === true) toType = 'object';
+		else if (targetType === false) toType = 'normal';
 
-		if (!toObject) {
-			Object.values(this.scheme.tiles).forEach(tile => {
-				if (Array.isArray(tile.floorObjects) && tile.floorObjects.includes(id)) {
-					tile.floorObjects = tile.floorObjects.filter(itemId => itemId !== id);
-					tile.floorColorId = id;
-					if (tile.floorObjects.length === 0) delete tile.floorObjects;
-				}
-				if (tile.wallObjects) {
-					Object.entries(tile.wallObjects).forEach(([edge, arr]) => {
-						if (Array.isArray(arr) && arr.includes(id)) {
-							tile.wallObjects[edge] = arr.filter(itemId => itemId !== id);
-							if (!tile.walls) tile.walls = {};
-							tile.walls[edge] = id;
-							if (tile.wallObjects[edge].length === 0) delete tile.wallObjects[edge];
+		const fromType = item.isZone ? 'zone' : (item.isObject ? 'object' : 'normal');
+		if (fromType === toType) return;
+
+		item.isObject = (toType === 'object');
+		item.isZone = (toType === 'zone');
+
+		Object.keys(this.scheme.tiles).forEach(key => {
+			const tile = this.scheme.tiles[key];
+			if (!tile) return;
+
+			if (!Array.isArray(tile.floor) && !Array.isArray(tile.N) && !Array.isArray(tile.W)) {
+				const norm = StateManager.normalizeTile(tile);
+				tile.floor = norm.floor;
+				tile.N = norm.N;
+				tile.W = norm.W;
+				delete tile.floorColorId;
+				delete tile.floorObjects;
+				delete tile.zoneIds;
+				delete tile.zoneId;
+				delete tile.walls;
+				delete tile.wallObjects;
+				delete tile.wallZones;
+			}
+
+			['floor', 'N', 'W'].forEach(slotKey => {
+				const slot = tile[slotKey];
+				if (!Array.isArray(slot) || !slot.includes(id)) return;
+
+				if (toType === 'normal') {
+					const nonNormals = slot.filter(tid => tid !== id && (this.scheme.palette[tid]?.isZone || this.scheme.palette[tid]?.isObject));
+					tile[slotKey] = [...nonNormals, id];
+				} else if (toType === 'zone') {
+					const seen = new Set();
+					tile[slotKey] = slot.filter(tid => {
+						if (tid === id) {
+							if (seen.has(id)) return false;
+							seen.add(id);
+							return true;
 						}
+						return true;
 					});
-					if (Object.keys(tile.wallObjects).length === 0) delete tile.wallObjects;
 				}
 			});
-		} else {
-			Object.values(this.scheme.tiles).forEach(tile => {
-				if (tile.floorColorId === id) {
-					delete tile.floorColorId;
-					if (!Array.isArray(tile.floorObjects)) tile.floorObjects = [];
-					tile.floorObjects.push(id);
-				}
-				if (tile.walls && tile.walls.N === id) {
-					delete tile.walls.N;
-					if (!tile.wallObjects) tile.wallObjects = {};
-					if (!Array.isArray(tile.wallObjects.N)) tile.wallObjects.N = [];
-					tile.wallObjects.N.push(id);
-				}
-				if (tile.walls && tile.walls.W === id) {
-					delete tile.walls.W;
-					if (!tile.wallObjects) tile.wallObjects = {};
-					if (!Array.isArray(tile.wallObjects.W)) tile.wallObjects.W = [];
-					tile.wallObjects.W.push(id);
-				}
-			});
-		}
+			this.cleanupEmptyTile(key);
+		});
 
 		this.pushHistory();
 		this.notifyStateChange();
@@ -770,34 +864,20 @@ export class StateManager {
 		const tile = this.scheme.tiles[key];
 		if (!tile) return false;
 
+		const norm = StateManager.normalizeTile(tile);
 		const subTargets = [];
 		const palette = this.scheme.palette || {};
 
-		// 面域項目
-		const floorItems = [
-			...(Array.isArray(tile.floor) ? tile.floor : (tile.floor ? [tile.floor] : [])),
-			tile.floorColorId,
-			tile.zoneId,
-			...(Array.isArray(tile.floorObjects) ? tile.floorObjects : [])
-		].filter(Boolean);
-
-		floorItems.forEach((id, idx) => {
+		norm.floor.forEach((id, idx) => {
 			const item = palette[id];
-			const type = item?.isZone ? 'zone' : (item?.isObject ? 'floorObj' : 'floor');
+			const type = item?.isZone ? 'floorZone' : (item?.isObject ? 'floorObj' : 'floor');
 			subTargets.push({ type, id, index: idx });
 		});
 
-		// 邊線項目
 		['N', 'W'].forEach(edge => {
-			const edgeItems = [
-				...(Array.isArray(tile.walls?.[edge]) ? tile.walls[edge] : (tile.walls?.[edge] ? [tile.walls[edge]] : [])),
-				tile.wallZones?.[edge],
-				...(Array.isArray(tile.wallObjects?.[edge]) ? tile.wallObjects[edge] : [])
-			].filter(Boolean);
-
-			edgeItems.forEach((id, idx) => {
+			norm[edge].forEach((id, idx) => {
 				const item = palette[id];
-				const type = item?.isZone ? `wallZone${edge}` : (item?.isObject ? `wall${edge}Obj` : `wall${edge}`);
+				const type = item?.isZone ? `wall${edge}Zone` : (item?.isObject ? `wall${edge}Obj` : `wall${edge}`);
 				subTargets.push({ type, id, index: idx, edge });
 			});
 		});
@@ -840,12 +920,21 @@ export class StateManager {
 			if (this.scheme.tiles) {
 				Object.keys(this.scheme.tiles).forEach(key => {
 					const tile = this.scheme.tiles[key];
-					if (Array.isArray(tile.floor)) {
-						tile.floor = tile.floor.filter(colorId => colorId !== id);
-						if (tile.floor.length === 0) delete tile.floor;
-					}
+					if (!tile) return;
+					['floor', 'N', 'W'].forEach(slotKey => {
+						if (Array.isArray(tile[slotKey])) {
+							tile[slotKey] = tile[slotKey].filter(colorId => colorId !== id);
+							if (tile[slotKey].length === 0) delete tile[slotKey];
+						}
+					});
+
+					// 向下相容清理舊屬性
 					if (tile.floorColorId === id) delete tile.floorColorId;
 					if (tile.zoneId === id) delete tile.zoneId;
+					if (Array.isArray(tile.zoneIds)) {
+						tile.zoneIds = tile.zoneIds.filter(zid => zid !== id);
+						if (tile.zoneIds.length === 0) delete tile.zoneIds;
+					}
 					if (Array.isArray(tile.floorObjects)) {
 						tile.floorObjects = tile.floorObjects.filter(objId => objId !== id);
 						if (tile.floorObjects.length === 0) delete tile.floorObjects;
@@ -873,7 +962,12 @@ export class StateManager {
 					}
 					if (tile.wallZones) {
 						Object.keys(tile.wallZones).forEach(edge => {
-							if (tile.wallZones[edge] === id) delete tile.wallZones[edge];
+							if (Array.isArray(tile.wallZones[edge])) {
+								tile.wallZones[edge] = tile.wallZones[edge].filter(zid => zid !== id);
+								if (tile.wallZones[edge].length === 0) delete tile.wallZones[edge];
+							} else if (tile.wallZones[edge] === id) {
+								delete tile.wallZones[edge];
+							}
 						});
 						if (Object.keys(tile.wallZones).length === 0) delete tile.wallZones;
 					}
@@ -891,9 +985,15 @@ export class StateManager {
 	}
 
 	addPaletteItem({ name, color, isObject = false, isZone = false }) {
-		const prefix = isZone ? 'zone_' : (isObject ? 'obj_' : 'color_');
-		const newId = prefix + Date.now();
 		if (!this.scheme.palette) this.scheme.palette = {};
+
+		// 自增數值 ID：完全無前綴，遞增尋找當前方案中未被使用的最小整數，徹底杜絕毫秒卡頓連點衝突
+		let nextNum = 1;
+		while (this.scheme.palette[String(nextNum)]) {
+			nextNum++;
+		}
+		const newId = String(nextNum);
+
 		this.scheme.palette[newId] = {
 			name: name || '',
 			color: color || CONFIG.DEFAULT_PALETTE_COLOR,

@@ -586,10 +586,13 @@ export class CanvasRenderer {
 			const y = targetY + ry;
 
 			if (x >= 0 && x <= this.state.scheme.width && y >= 0 && y <= this.state.scheme.height) {
-				if (tileData.floorColorId && palette[tileData.floorColorId]) {
+				const floorId = Array.isArray(tileData.floor)
+					? tileData.floor.find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject)
+					: (tileData.floorColorId || (typeof tileData.floor === 'string' ? tileData.floor : null));
+				if (floorId && palette[floorId]) {
 					const savedAlpha = ctx.globalAlpha;
 					ctx.globalAlpha = savedAlpha * 0.6;
-					this.drawTilePoly(ctx, x, y, palette[tileData.floorColorId].color);
+					this.drawTilePoly(ctx, x, y, palette[floorId].color);
 					ctx.globalAlpha = savedAlpha;
 				}
 				this.drawCellHighlight(ctx, x, y, 'rgba(16, 185, 129, 0.2)', '#10b981', 1.5);

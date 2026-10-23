@@ -23,7 +23,7 @@ export class BorderEdgeNormalizer {
 	}
 
 	/**
-	 * 正規化 tiles 地塊集合（將 S/E 邊線映射為 N/W）
+	 * 正規化 tiles 地塊集合（將 S/E 邊線映射為 N/W，並統一收束為 floor, N, W 三槽位陣列）
 	 * @param {Record<string, any>} tiles
 	 * @returns {Record<string, any>}
 	 */
@@ -32,7 +32,7 @@ export class BorderEdgeNormalizer {
 
 		const updatedTiles = {};
 		const getTile = (key) => {
-			if (!updatedTiles[key]) updatedTiles[key] = {};
+			if (!updatedTiles[key]) updatedTiles[key] = { floor: [], N: [], W: [] };
 			return updatedTiles[key];
 		};
 
@@ -42,57 +42,61 @@ export class BorderEdgeNormalizer {
 			const x = parseInt(xStr, 10);
 			const y = parseInt(yStr, 10);
 
-			// 1. 面域宿主 (保持 floorColorId, zoneId, floorObjects 獨立)
 			const curTile = getTile(key);
-			const floorColor = tile.floorColorId || (typeof tile.floor === 'string' ? tile.floor : null);
-			if (floorColor) curTile.floorColorId = floorColor;
-			if (tile.zoneId) curTile.zoneId = tile.zoneId;
-			if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
-				curTile.floorObjects = [...tile.floorObjects];
+
+			// 1. 地面槽位 (整合新格式 floor 陣列與舊格式屬性)
+			if (Array.isArray(tile.floor)) {
+				curTile.floor.push(...tile.floor);
+			} else {
+				const floorColor = tile.floorColorId || (typeof tile.floor === 'string' ? tile.floor : null);
+				if (floorColor) curTile.floor.push(floorColor);
+				if (Array.isArray(tile.zoneIds)) curTile.floor.push(...tile.zoneIds);
+				else if (tile.zoneId) curTile.floor.push(tile.zoneId);
+				if (Array.isArray(tile.floorObjects)) curTile.floor.push(...tile.floorObjects);
 			}
 
-			// 2. 邊線實體牆 (South/East -> North/West 映射)
+			// 輔助函式：將項目陣列或單值正規化後存入目標邊線槽位
+			const addEdgeItems = (edge, items) => {
+				if (!items) return;
+				const arr = Array.isArray(items) ? items : [items];
+				if (arr.length === 0) return;
+				const norm = this.normalizeEdge(x, y, edge);
+				const target = getTile(`${norm.x},${norm.y},${zStr}`);
+				target[norm.edge].push(...arr);
+			};
+
+			// 2. 新格式 N / W 槽位 (或 S / E 映射)
+			['N', 'W', 'S', 'E'].forEach(edge => {
+				if (Array.isArray(tile[edge])) {
+					addEdgeItems(edge, tile[edge]);
+				}
+			});
+
+			// 3. 向下相容舊格式 walls, wallObjects, wallZones
 			if (tile.walls && typeof tile.walls === 'object') {
 				Object.entries(tile.walls).forEach(([edge, val]) => {
-					if (!val || typeof val !== 'string') return;
-					const norm = this.normalizeEdge(x, y, edge);
-					const t = getTile(`${norm.x},${norm.y},${zStr}`);
-					if (!t.walls) t.walls = {};
-					t.walls[norm.edge] = val;
+					if (val) addEdgeItems(edge, val);
 				});
 			}
-
-			// 3. 邊線物件 (South/East -> North/West 映射，陣列保留多重疊加)
 			if (tile.wallObjects && typeof tile.wallObjects === 'object') {
 				Object.entries(tile.wallObjects).forEach(([edge, objs]) => {
-					if (!Array.isArray(objs) || objs.length === 0) return;
-					const norm = this.normalizeEdge(x, y, edge);
-					const t = getTile(`${norm.x},${norm.y},${zStr}`);
-					if (!t.wallObjects) t.wallObjects = {};
-					if (!Array.isArray(t.wallObjects[norm.edge])) t.wallObjects[norm.edge] = [];
-					t.wallObjects[norm.edge].push(...objs);
+					if (objs) addEdgeItems(edge, objs);
 				});
 			}
-
-			// 4. 邊線標籤 (South/East -> North/West 映射)
 			if (tile.wallZones && typeof tile.wallZones === 'object') {
 				Object.entries(tile.wallZones).forEach(([edge, zoneVal]) => {
-					if (!zoneVal || typeof zoneVal !== 'string') return;
-					const norm = this.normalizeEdge(x, y, edge);
-					const t = getTile(`${norm.x},${norm.y},${zStr}`);
-					if (!t.wallZones) t.wallZones = {};
-					t.wallZones[norm.edge] = zoneVal;
+					if (zoneVal) addEdgeItems(edge, zoneVal);
 				});
 			}
 		});
 
+		// 清理空槽位與空地塊
 		Object.keys(updatedTiles).forEach(k => {
 			const t = updatedTiles[k];
-			const hasFloor = !!t.floorColorId || !!t.zoneId || (Array.isArray(t.floorObjects) && t.floorObjects.length > 0);
-			const hasWalls = t.walls && Object.keys(t.walls).length > 0;
-			const hasWallObjs = t.wallObjects && Object.values(t.wallObjects).some(arr => Array.isArray(arr) && arr.length > 0);
-			const hasWallZones = t.wallZones && Object.keys(t.wallZones).length > 0;
-			if (!hasFloor && !hasWalls && !hasWallObjs && !hasWallZones) {
+			if (t.floor.length === 0) delete t.floor;
+			if (t.N.length === 0) delete t.N;
+			if (t.W.length === 0) delete t.W;
+			if (!t.floor && !t.N && !t.W) {
 				delete updatedTiles[k];
 			}
 		});

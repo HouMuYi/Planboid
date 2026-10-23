@@ -253,21 +253,21 @@
 
 						<hr class="divider">
 
-						<!-- 通用調色盤區塊 -->
+						<!-- 通用圖層區塊 -->
 						<div class="panel-section palette-section">
 							<div class="section-header">
-								<h3 class="section-title" data-i18n="sidebar_palette_title">通用調色盤</h3>
-								<button class="btn" id="btn-add-palette" data-i18n="sidebar_btn_add_palette">+ 新增色塊</button>
+								<h3 class="section-title" data-i18n="sidebar_palette_title">通用圖層</h3>
+								<button class="btn" id="btn-add-palette" data-i18n="sidebar_btn_add_palette">+ 新增色票</button>
 							</div>
 							<div class="palette-list" id="palette-container"></div>
 						</div>
 
 						<hr class="divider">
 
-						<!-- 物件調色盤區塊 -->
+						<!-- 物件圖層區塊 -->
 						<div class="panel-section object-palette-section">
 							<div class="section-header">
-								<h3 class="section-title" data-i18n="sidebar_object_palette_title">物件調色盤</h3>
+								<h3 class="section-title" data-i18n="sidebar_object_palette_title">物件圖層</h3>
 								<button class="btn" id="btn-add-object-palette" data-i18n="sidebar_btn_add_object_palette">+ 新增物件</button>
 							</div>
 							<div class="palette-list" id="object-palette-container"></div>
@@ -275,10 +275,10 @@
 
 						<hr class="divider">
 
-						<!-- 標籤調色盤區塊 -->
+						<!-- 標籤圖層區塊 -->
 						<div class="panel-section zone-palette-section">
 							<div class="section-header">
-								<h3 class="section-title" data-i18n="sidebar_zone_palette_title">標籤調色盤</h3>
+								<h3 class="section-title" data-i18n="sidebar_zone_palette_title">標籤圖層</h3>
 								<button class="btn" id="btn-add-zone-palette" data-i18n="sidebar_btn_add_zone_palette">+ 新增標籤</button>
 							</div>
 							<div class="palette-list" id="zone-palette-container"></div>
@@ -397,17 +397,17 @@
 			</div>
 		</dialog>
 
-		<!-- 色塊 Modal -->
+		<!-- 色票 Modal -->
 		<dialog class="app-modal" id="modal-palette-edit">
 			<div class="modal-content panel modal-sm">
 				<div class="modal-header">
-					<h2 id="palette-modal-title" data-i18n="modal_palette_title_edit">編輯色塊</h2>
+					<h2 id="palette-modal-title" data-i18n="modal_palette_title_edit">編輯色票</h2>
 					<button class="btn-close" id="btn-close-palette-modal">✕</button>
 				</div>
 				<div class="modal-body stack">
 					<input type="hidden" id="edit-palette-id">
 					<div>
-						<label class="field-label" data-i18n="modal_palette_label_name">色塊名稱：</label>
+						<label class="field-label" data-i18n="modal_palette_label_name">色票名稱：</label>
 						<input
 							type="text"
 							id="edit-palette-name"
@@ -424,14 +424,12 @@
 						</div>
 						<div id="preset-color-swatches"></div>
 					</div>
-					<div class="cluster cluster-between">
+					<div class="stack" id="palette-modal-actions">
+						<button class="btn btn-primary" id="btn-save-palette" data-i18n="modal_palette_btn_save">儲存變更</button>
+						<div class="stack" id="palette-convert-actions"></div>
 						<button class="btn btn-danger" id="btn-delete-palette" data-i18n="modal_palette_btn_delete">
-							刪除色塊
+							刪除色票
 						</button>
-						<div class="cluster">
-							<button class="btn btn-secondary" id="btn-convert-palette-type" data-i18n="modal_palette_btn_convert_to_object">轉為物件色票</button>
-							<button class="btn btn-primary" id="btn-save-palette" data-i18n="modal_palette_btn_save">儲存變更</button>
-						</div>
 					</div>
 				</div>
 			</div>

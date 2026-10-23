@@ -107,7 +107,12 @@ export class GeometryPipeline {
 		// Pass 1: 地塊多邊形
 		if (onFloor) {
 			items.forEach(({ x, y, tile }) => {
-				const id = tile.floorColorId || (typeof tile.floor === 'string' ? tile.floor : null);
+				let id = null;
+				if (Array.isArray(tile.floor)) {
+					id = tile.floor.find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject);
+				} else {
+					id = tile.floorColorId || (typeof tile.floor === 'string' ? tile.floor : null);
+				}
 				if (id && palette[id] && !palette[id].isZone && !palette[id].isObject) {
 					onFloor(x, y, id, tile);
 				}
@@ -117,8 +122,14 @@ export class GeometryPipeline {
 		// Pass 1.5: 地塊物件 (Floor Objects)
 		if (onFloorObjects) {
 			items.forEach(({ x, y, tile }) => {
-				if (Array.isArray(tile.floorObjects) && tile.floorObjects.length > 0) {
-					onFloorObjects(x, y, tile.floorObjects, tile);
+				let objs = null;
+				if (Array.isArray(tile.floor)) {
+					objs = tile.floor.filter(cid => palette[cid]?.isObject);
+				} else if (Array.isArray(tile.floorObjects)) {
+					objs = tile.floorObjects;
+				}
+				if (objs && objs.length > 0) {
+					onFloorObjects(x, y, objs, tile);
 				}
 			});
 		}
@@ -126,26 +137,34 @@ export class GeometryPipeline {
 		// Pass 2: 牆面面片與邊線
 		if (onWall) {
 			items.forEach(({ x, y, tile }) => {
-				if (tile.walls) {
-					Object.entries(tile.walls).forEach(([edge, id]) => {
-						if (typeof id === 'string' && palette[id] && !palette[id].isZone && !palette[id].isObject) {
-							onWall(x, y, edge, id, tile);
-						}
-					});
-				}
+				['N', 'W'].forEach(edge => {
+					let id = null;
+					if (Array.isArray(tile[edge])) {
+						id = tile[edge].find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject);
+					} else if (tile.walls?.[edge]) {
+						id = tile.walls[edge];
+					}
+					if (typeof id === 'string' && palette[id] && !palette[id].isZone && !palette[id].isObject) {
+						onWall(x, y, edge, id, tile);
+					}
+				});
 			});
 		}
 
 		// Pass 2.5: 牆面物件 (Wall Objects)
 		if (onWallObjects) {
 			items.forEach(({ x, y, tile }) => {
-				if (tile.wallObjects) {
-					Object.entries(tile.wallObjects).forEach(([edge, objArray]) => {
-						if (Array.isArray(objArray) && objArray.length > 0) {
-							onWallObjects(x, y, edge, objArray, tile);
-						}
-					});
-				}
+				['N', 'W'].forEach(edge => {
+					let objs = null;
+					if (Array.isArray(tile[edge])) {
+						objs = tile[edge].filter(cid => palette[cid]?.isObject);
+					} else if (Array.isArray(tile.wallObjects?.[edge])) {
+						objs = tile.wallObjects[edge];
+					}
+					if (objs && objs.length > 0) {
+						onWallObjects(x, y, edge, objs, tile);
+					}
+				});
 			});
 		}
 	}
@@ -259,26 +278,38 @@ export class GeometryPipeline {
 
 	/**
 	 * 計算牆面物件的堆疊幾何 (2D 正方形圓角 / 3D 菱形立體面片)
+	 * @param {import("./IsoMath.js").IsoMath} isoMath
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {'N'|'W'} edge
+	 * @param {number} count
+	 * @param {number} [progress=1.0]
+	 * @param {boolean} [is3D=true] 是否依立體牆面抬升繪製 (若為 false 則貼平於地面邊線)
 	 * @returns {Array<{ is2D: boolean, points?: Array<{x:number, y:number}>, cx: number, cy: number, size: number }>}
 	 */
-	static getWallObjectGeometries(isoMath, x, y, edge, count, progress = 1.0) {
+	static getWallObjectGeometries(isoMath, x, y, edge, count, progress = 1.0, is3D = true) {
 		if (!count) return [];
-		if (progress === 0) {
+		if (!is3D || progress === 0) {
 			const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
-			const p0 = isoMath.gridToScreen(norm.x, norm.y, 0);
-			const p1 = norm.edge === 'N' ? isoMath.gridToScreen(norm.x + 1, norm.y, 0) : isoMath.gridToScreen(norm.x, norm.y + 1, 0);
+			const p0 = isoMath.gridToScreen(norm.x, norm.y, progress);
+			const p1 = norm.edge === 'N' ? isoMath.gridToScreen(norm.x + 1, norm.y, progress) : isoMath.gridToScreen(norm.x, norm.y + 1, progress);
 			if (!p0 || !p1) return [];
 			const cx = (p0.x + p1.x) / 2;
 			const cy = (p0.y + p1.y) / 2;
+			const dirX = p1.x - p0.x;
+			const dirY = p1.y - p0.y;
+			const len = Math.hypot(dirX, dirY);
 			const scale = Math.max(0.6, 1.0 - Math.max(0, count - 1) * 0.1);
 			const boxSize = Math.max(16, CONFIG.TILE_SIZE * 0.75) * scale;
+			const stepX = (len > 0 ? dirX / len : 0) * 6 * scale;
+			const stepY = (len > 0 ? dirY / len : 0) * 6 * scale;
 			const items = [];
 			for (let idx = 0; idx < count; idx++) {
 				const shift = idx - (count - 1) / 2;
 				items.push({
 					is2D: true,
-					cx: cx + shift * 5 * scale,
-					cy: cy + shift * 4 * scale,
+					cx: cx + shift * stepX,
+					cy: cy + shift * stepY,
 					size: boxSize,
 				});
 			}
@@ -369,15 +400,14 @@ export class GeometryPipeline {
 	 * 支援地面多邊形與外框虛線，以及邊線區域之 3D 透視懸空帶狀多邊形與相鄰連通外框
 	 */
 	static getZoneGeometries(isoMath, layer, palette, progress = 1.0) {
-		const data = this._collectZones(layer, palette);
-		if (!data) return [];
-		const { tileMap, zones } = data;
+		const zones = this._collectZones(layer, palette);
+		if (!zones || zones.size === 0) return [];
 
 		const result = [];
 		zones.forEach(({ id, item, cells, islands, edgeIslands }) => {
 			const polygons = cells.map(({ x, y }) => this.getTilePolyPoints(isoMath, x, y, progress));
 			const borderEdges = [];
-			this._forEachZoneBorderEdge(cells, id, tileMap, (x0, y0, x1, y1) => {
+			this._forEachZoneBorderEdge(cells, (x0, y0, x1, y1) => {
 				borderEdges.push({
 					p0: isoMath.gridToScreen(x0, y0, progress),
 					p1: isoMath.gridToScreen(x1, y1, progress),
@@ -438,7 +468,6 @@ export class GeometryPipeline {
 	static _collectZones(layer, palette) {
 		const { items } = layer;
 		if (!items || items.length === 0) return null;
-		const tileMap = new Map();
 		const zones = new Map();
 
 		const getOrCreateZone = (zoneId) => {
@@ -449,27 +478,39 @@ export class GeometryPipeline {
 		};
 
 		items.forEach(({ x, y, tile }) => {
-			// 地面標籤
-			const floorZoneId = tile.zoneId || (typeof tile.floor === 'string' && palette[tile.floor]?.isZone ? tile.floor : null);
-			if (floorZoneId && palette[floorZoneId]) {
-				tileMap.set(`${x},${y}`, floorZoneId);
-				getOrCreateZone(floorZoneId).cells.push({ x, y });
+			// 地面標籤 (支援新三槽位 floor 與舊格式向下相容)
+			let floorZoneIds = [];
+			if (Array.isArray(tile.floor)) {
+				floorZoneIds = tile.floor.filter(id => palette[id]?.isZone);
+			} else {
+				floorZoneIds = Array.isArray(tile.zoneIds)
+					? tile.zoneIds
+					: (tile.zoneId ? [tile.zoneId] : (typeof tile.floor === 'string' && palette[tile.floor]?.isZone ? [tile.floor] : []));
 			}
+			floorZoneIds.forEach(floorZoneId => {
+				if (floorZoneId && palette[floorZoneId]) {
+					getOrCreateZone(floorZoneId).cells.push({ x, y });
+				}
+			});
 
-			// 邊線標籤
-			if (tile.wallZones) {
-				Object.entries(tile.wallZones).forEach(([edge, colorId]) => {
+			// 邊線標籤 (支援新三槽位 N/W 與舊格式向下相容)
+			['N', 'W'].forEach(edge => {
+				let edgeZoneIds = [];
+				if (Array.isArray(tile[edge])) {
+					edgeZoneIds = tile[edge].filter(id => palette[id]?.isZone);
+				} else if (tile.wallZones?.[edge]) {
+					const val = tile.wallZones[edge];
+					edgeZoneIds = Array.isArray(val) ? val : [val];
+				} else if (tile.walls?.[edge]) {
+					const val = tile.walls[edge];
+					edgeZoneIds = Array.isArray(val) ? val : [val];
+				}
+				edgeZoneIds.forEach(colorId => {
 					if (colorId && palette[colorId]?.isZone) {
 						getOrCreateZone(colorId).wallEdges.push({ x, y, edge });
 					}
 				});
-			} else if (tile.walls) {
-				Object.entries(tile.walls).forEach(([edge, val]) => {
-					if (typeof val === 'string' && palette[val]?.isZone) {
-						getOrCreateZone(val).wallEdges.push({ x, y, edge });
-					}
-				});
-			}
+			});
 		});
 
 		if (zones.size === 0) return null;
@@ -497,7 +538,7 @@ export class GeometryPipeline {
 				zone.edgeIslands = [];
 			}
 		});
-		return { tileMap, zones };
+		return zones;
 	}
 
 	static _partitionIslands(cells) {
@@ -595,12 +636,13 @@ export class GeometryPipeline {
 		return islands;
 	}
 
-	static _forEachZoneBorderEdge(cells, id, tileMap, onEdge) {
+	static _forEachZoneBorderEdge(cells, onEdge) {
+		const cellSet = new Set(cells.map(c => `${c.x},${c.y}`));
 		cells.forEach(({ x, y }) => {
-			if (tileMap.get(`${x},${y - 1}`) !== id) onEdge(x, y, x + 1, y);
-			if (tileMap.get(`${x - 1},${y}`) !== id) onEdge(x, y, x, y + 1);
-			if (tileMap.get(`${x},${y + 1}`) !== id) onEdge(x, y + 1, x + 1, y + 1);
-			if (tileMap.get(`${x + 1},${y}`) !== id) onEdge(x + 1, y, x + 1, y + 1);
+			if (!cellSet.has(`${x},${y - 1}`)) onEdge(x, y, x + 1, y);
+			if (!cellSet.has(`${x - 1},${y}`)) onEdge(x, y, x, y + 1);
+			if (!cellSet.has(`${x},${y + 1}`)) onEdge(x, y + 1, x + 1, y + 1);
+			if (!cellSet.has(`${x + 1},${y}`)) onEdge(x + 1, y, x + 1, y + 1);
 		});
 	}
 
@@ -794,7 +836,7 @@ export class GeometryPipeline {
 	 * 2D 牆面物件繪製 (斷線嵌入式，正方形圓角，去除死白背景)
 	 */
 	static drawWallObjects2D(ctx, isoMath, x, y, edge, objArray, palette, zoom, currentProgress = 0) {
-		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, 0);
+		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, currentProgress, false);
 		if (geometries.length === 0) return;
 
 		ctx.save();
@@ -1015,17 +1057,21 @@ export class GeometryPipeline {
 	/**
 	 * 牆面物件 SVG 向量標籤生成管道
 	 */
-	static getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette) {
-		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, 1.0);
+	static getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette, is3D = true) {
+		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, 1.0, is3D);
 		if (geometries.length === 0) return '';
 		let str = '';
-		geometries.forEach(({ points, cx, cy, size }, idx) => {
+		geometries.forEach(({ is2D, points, cx, cy, size }, idx) => {
 			const objId = objArray[idx];
 			const item = palette[objId];
 			if (!item || !item.color) return;
-			const pts = points.map(p => `${p.x},${p.y}`).join(' ');
 			const safeColorId = Utils.escapeXml(String(objId));
-			str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall-object" data-edge="${edge}" data-color-id="${safeColorId}" points="${pts}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
+			if (is2D || !points) {
+				str += `<rect data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall-object" data-edge="${edge}" data-color-id="${safeColorId}" x="${cx - size / 2}" y="${cy - size / 2}" width="${size}" height="${size}" rx="4" ry="4" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2" />\n`;
+			} else {
+				const pts = points.map(p => `${p.x},${p.y}`).join(' ');
+				str += `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall-object" data-edge="${edge}" data-color-id="${safeColorId}" points="${pts}" fill="${CONFIG.OBJECT_PANEL_BG}" stroke="${item.color}" stroke-width="2.5" />\n`;
+			}
 			str += this._formatObjectSvgText(cx, cy, item.name, size);
 		});
 		return str;

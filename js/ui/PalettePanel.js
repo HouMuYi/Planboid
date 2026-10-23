@@ -1,5 +1,5 @@
 /**
- * PalettePanel.js - 通用調色盤 (支援拖曳排序與 16 進位色碼輸入)
+ * PalettePanel.js - 圖層色票面板 (支援拖曳排序與 16 進位色碼輸入)
  */
 
 import { CONFIG } from '../core/Config.js';
@@ -132,7 +132,7 @@ export class PalettePanel {
 			this.editModal?.close();
 		});
 
-		// 彈窗確認刪除色塊
+		// 彈窗確認刪除色票
 		this.btnDeletePalette?.addEventListener('click', async () => {
 			const id = this.editIdInput?.value;
 			if (id) {
@@ -306,8 +306,8 @@ export class PalettePanel {
 		if (this.editColorInput) this.editColorInput.value = randomColor;
 		if (this.editHexInput) this.editHexInput.value = randomColor;
 
-		const btnConvert = document.getElementById('btn-convert-palette-type');
-		if (btnConvert) btnConvert.style.display = 'none';
+		const convertContainer = document.getElementById('palette-convert-actions');
+		if (convertContainer) convertContainer.innerHTML = '';
 
 		if (this.btnDeletePalette) this.btnDeletePalette.style.display = 'none';
 		this.editModal.showModal();
@@ -322,34 +322,33 @@ export class PalettePanel {
 		if (this.editColorInput) this.editColorInput.value = colorVal;
 		if (this.editHexInput) this.editHexInput.value = colorVal.toUpperCase();
 
-		const btnConvert = document.getElementById('btn-convert-palette-type');
-		if (btnConvert && btnConvert.parentNode) {
-			if (item.isZone) {
-				btnConvert.style.display = 'none';
-			} else {
-				btnConvert.style.display = 'inline-flex';
-				const isObj = !!item.isObject;
-				btnConvert.textContent = isObj
-					? i18n.t('modal_palette_btn_convert_to_normal')
-					: i18n.t('modal_palette_btn_convert_to_object');
+		const convertContainer = document.getElementById('palette-convert-actions');
+		if (convertContainer) {
+			convertContainer.innerHTML = '';
+			const currentType = item.isZone ? 'zone' : (item.isObject ? 'object' : 'normal');
+			const allTypes = [
+				{ type: 'normal', labelKey: 'modal_palette_btn_convert_to_normal', defaultText: '轉為通用色票' },
+				{ type: 'object', labelKey: 'modal_palette_btn_convert_to_object', defaultText: '轉為物件色票' },
+				{ type: 'zone', labelKey: 'modal_palette_btn_convert_to_zone', defaultText: '轉為標籤色票' },
+			];
 
-				const newBtn = btnConvert.cloneNode(true);
-				btnConvert.parentNode.replaceChild(newBtn, btnConvert);
-				newBtn.addEventListener('click', async () => {
-					if (!isObj) {
-						this.state.convertPaletteItemType(id, true);
-					} else {
+			allTypes.filter(t => t.type !== currentType).forEach(target => {
+				const btn = document.createElement('button');
+				btn.className = 'btn btn-secondary';
+				btn.textContent = i18n.t(target.labelKey) || target.defaultText;
+				btn.addEventListener('click', async () => {
+					if (target.type === 'normal') {
 						const confirmed = await ConfirmModal.show(i18n.t('modal_palette_confirm_convert'));
-						if (confirmed) {
-							this.state.convertPaletteItemType(id, false);
-						}
+						if (!confirmed) return;
 					}
+					this.state.convertPaletteItemType(id, target.type);
 					this.editModal?.close();
 				});
-			}
+				convertContainer.appendChild(btn);
+			});
 		}
 
-		if (this.btnDeletePalette) this.btnDeletePalette.style.display = 'inline-flex';
+		if (this.btnDeletePalette) this.btnDeletePalette.style.display = 'flex';
 		this.editModal.showModal();
 	}
 }
