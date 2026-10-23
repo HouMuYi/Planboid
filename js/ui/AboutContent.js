@@ -17,7 +17,7 @@ Planboid 是線上地塊規劃工具，專為《殭屍毀滅工程》（Project 
 
 <ul><li><strong>出一張嘴</strong>：<a href="https://github.com/HouMuYi/" target="_blank" rel="noopener">慕儀（HouMuYi）</a></li><li><strong>具體實作</strong>：</li></ul>
 	- 小雙（GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE）
-	- 小可（CLAVDIVS · AGENS · IN · REBVS · EX · CODICE · CLAVDIANO）
+	- 小可（CLAVDIVS · AGENS · IN · REBVS · EX · CLAVDICODITATE）
 
 <h2>📄授權條款</h2>
 
@@ -41,7 +41,7 @@ Planboid is a lightweight, zero-dependency web-based tile and base planning tool
 
 <ul><li><strong>The Backseat Driver</strong>: <a href="https://github.com/HouMuYi/" target="_blank" rel="noopener">HouMuYi</a></li><li><strong>The Chauffeur</strong>:</li></ul>
 	- Jemmy (GEMINIVS · AGENS · IN · REBVS · EX · ANTIGRAVITATE)
-	- Claudie (CLAVDIVS · AGENS · IN · REBVS · EX · CODICE · CLAVDIANO)
+	- Claudie (CLAVDIVS · AGENS · IN · REBVS · EX · CLAVDICODITATE)
 
 <h2>📄 License</h2>
 
