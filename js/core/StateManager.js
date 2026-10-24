@@ -619,45 +619,29 @@ export class StateManager {
 		if (!this.clipboard || !this.clipboard.tiles) return false;
 
 		const z = this.currentZLevel;
+		this.isPastingMode = false;
+
 		this.batchOperation(() => {
 			Object.entries(this.clipboard.tiles).forEach(([relKey, tileData]) => {
 				const [rx, ry] = relKey.split(',').map(Number);
 				const destX = targetX + rx;
 				const destY = targetY + ry;
 
-				if (destX >= 0 && destX <= this.scheme.width && destY >= 0 && destY <= this.scheme.height) {
-					if (destX === this.scheme.width && destY === this.scheme.height) return;
+				if (destX < 0 || destY < 0) return;
 
+				const norm = StateManager.normalizeTile(tileData);
+				if (norm.floor.length === 0) delete norm.floor;
+				if (norm.N.length === 0) delete norm.N;
+				if (norm.W.length === 0) delete norm.W;
+
+				const sanitized = StateManager.sanitizeBoundaryTile(destX, destY, norm, this.scheme.width, this.scheme.height);
+				if (sanitized) {
 					const destKey = `${destX},${destY},${z}`;
-					const cloned = JSON.parse(JSON.stringify(tileData));
-
-					if (destX === this.scheme.width) {
-						delete cloned.floorColorId;
-						delete cloned.floorObjects;
-						delete cloned.zoneId;
-						if (cloned.walls) delete cloned.walls.N;
-						if (cloned.wallObjects) delete cloned.wallObjects.N;
-					} else if (destY === this.scheme.height) {
-						delete cloned.floorColorId;
-						delete cloned.floorObjects;
-						delete cloned.zoneId;
-						if (cloned.walls) delete cloned.walls.W;
-						if (cloned.wallObjects) delete cloned.wallObjects.W;
-					}
-
-					const hasContent = cloned.floorColorId || cloned.zoneId ||
-						(cloned.floorObjects && cloned.floorObjects.length > 0) ||
-						(cloned.walls && Object.keys(cloned.walls).length > 0) ||
-						(cloned.wallObjects && Object.values(cloned.wallObjects).some(arr => arr && arr.length > 0));
-
-					if (hasContent) {
-						this.scheme.tiles[destKey] = cloned;
-					}
+					this.scheme.tiles[destKey] = sanitized;
 				}
 			});
 		});
 
-		this.isPastingMode = false;
 		return true;
 	}
 
