@@ -427,6 +427,9 @@ export class CanvasRenderer {
 			this.currentProgress,
 			this.zoom,
 			this.state.currentZLevel,
+			scheme.worldOriginX,
+			scheme.worldOriginY,
+			this.state.isCellGridEnabled,
 		);
 	}
 
@@ -507,6 +510,21 @@ export class CanvasRenderer {
 			onFloor: passes.floor ? (x, y, colorId) => {
 				const color = isCurrent ? palette[colorId].color : GeometryPipeline.desaturateHex(palette[colorId].color, desatFactor);
 				GeometryPipeline.drawTilePoly(targetCtx, this.isoMath, x, y, color, progress);
+			} : null,
+			onAfterFloor: (passes.floor && isCurrent && !this.isAnimating) ? () => {
+				const scheme = this.state.scheme;
+				GeometryPipeline.drawGrid(
+					targetCtx,
+					this.isoMath,
+					scheme.width,
+					scheme.height,
+					progress,
+					zoom,
+					0,
+					scheme.worldOriginX,
+					scheme.worldOriginY,
+					this.state.isCellGridEnabled,
+				);
 			} : null,
 			onFloorObjects: passes.floor ? (x, y, objArray) => {
 				GeometryPipeline.drawFloorObjects(targetCtx, this.isoMath, x, y, objArray, palette, zoom, progress);

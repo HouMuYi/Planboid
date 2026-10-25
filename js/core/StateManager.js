@@ -372,6 +372,12 @@ export class StateManager {
 	set is3DWallsEnabled(val) {
 		this.toolState.is3DWallsEnabled = val;
 	}
+	get isCellGridEnabled() {
+		return this.toolState.isCellGridEnabled;
+	}
+	set isCellGridEnabled(val) {
+		this.toolState.isCellGridEnabled = !!val;
+	}
 
 	clearHistory() {
 		this.undoStack = [];

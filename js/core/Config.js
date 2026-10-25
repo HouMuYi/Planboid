@@ -36,7 +36,8 @@ export const CONFIG = Object.freeze({
 
 	// 視覺與顏色
 	COLOR_BG: '#0b0f19', // 底層 Canvas 純黑主背景色
-	COLOR_GRID_NORMAL: 'rgba(255, 255, 255, 0.08)', // 畫布輔助網格線顏色
+	COLOR_GRID_NORMAL: 'rgba(255, 255, 255, 0.12)', // 畫布輔助網格線顏色 (略微提亮以利於地塊覆蓋時清晰可見)
+	COLOR_GRID_CELL: 'rgba(234, 179, 8, 0.35)', // 對齊遊戲座標之 8 倍數 Cell 邊線顏色 (柔和半透明黃色)
 	COLOR_GRID_BOUNDS: 'rgba(99, 102, 241, 0.5)', // 地塊外框邊界網格線顏色
 	WALL_FILL_ALPHA: 0.6, // 3D 牆面面片基礎不透明度
 	// 鬼影層配置

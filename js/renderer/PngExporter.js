@@ -67,6 +67,9 @@ export class PngExporter {
 			currentProgress,
 			fit.zoom,
 			currentZ,
+			scheme.worldOriginX,
+			scheme.worldOriginY,
+			stateManager.isCellGridEnabled,
 		);
 
 		// 3. 渲染所有樓層 (按層分組 ctx.translate 統一偏置)
@@ -90,6 +93,20 @@ export class PngExporter {
 					GeometryPipeline.drawTilePoly(ctx, isoMath, x, y, finalColor, currentProgress);
 					ctx.restore();
 				},
+				onAfterFloor: isCurrent ? () => {
+					GeometryPipeline.drawGrid(
+						ctx,
+						isoMath,
+						scheme.width,
+						scheme.height,
+						currentProgress,
+						fit.zoom,
+						0,
+						scheme.worldOriginX,
+						scheme.worldOriginY,
+						stateManager.isCellGridEnabled,
+					);
+				} : null,
 				onFloorObjects: (x, y, objArray) => {
 					GeometryPipeline.drawFloorObjects(ctx, isoMath, x, y, objArray, palette, fit.zoom, currentProgress);
 				},

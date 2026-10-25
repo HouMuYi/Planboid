@@ -102,7 +102,7 @@ export class GeometryPipeline {
 	 */
 	static traverseLayerPasses(layer, palette, callbacks = {}) {
 		const { items } = layer;
-		const { onFloor, onFloorObjects, onWall, onWallObjects } = callbacks;
+		const { onFloor, onAfterFloor, onFloorObjects, onWall, onWallObjects } = callbacks;
 
 		// Pass 1: 地塊多邊形
 		if (onFloor) {
@@ -117,6 +117,10 @@ export class GeometryPipeline {
 					onFloor(x, y, id, tile);
 				}
 			});
+		}
+
+		if (onAfterFloor) {
+			onAfterFloor();
 		}
 
 		// Pass 1.5: 地塊物件 (Floor Objects)
@@ -1194,33 +1198,73 @@ export class GeometryPipeline {
 	 * @param {number} currentProgress 視角過渡進度
 	 * @param {number} zoom 視角縮放倍率
 	 * @param {number} [zLevel=0] Z 軸層級
+	 * @param {number} [worldOriginX=CONFIG.DEFAULT_ORIGIN_X] PZ 世界原點 X
+	 * @param {number} [worldOriginY=CONFIG.DEFAULT_ORIGIN_Y] PZ 世界原點 Y
+	 * @param {boolean} [showCellGrid=false] 是否顯示對齊遊戲座標之 8 倍數 Cell 邊線
 	 */
-	static drawGrid(ctx, isoMath, width, height, currentProgress, zoom = 1.0, zLevel = 0) {
+	static drawGrid(
+		ctx,
+		isoMath,
+		width,
+		height,
+		currentProgress,
+		zoom = 1.0,
+		zLevel = 0,
+		worldOriginX = CONFIG.DEFAULT_ORIGIN_X,
+		worldOriginY = CONFIG.DEFAULT_ORIGIN_Y,
+		showCellGrid = false,
+	) {
 		const { dx, dy } = calcZTranslate(zLevel, currentProgress);
 
 		ctx.save();
 		ctx.translate(dx, dy);
-		ctx.lineWidth = 1 / zoom;
-		ctx.strokeStyle = CONFIG.COLOR_GRID_NORMAL;
 
+		const originX = Number(worldOriginX) || 0;
+		const originY = Number(worldOriginY) || 0;
+
+		// 1. 繪製普通網格線 (若開啟 Cell 網格則排除 8 倍數邊線)
+		ctx.beginPath();
 		for (let x = 0; x <= width; x++) {
+			if (showCellGrid && ((originX + x) % 8 + 8) % 8 === 0) continue;
 			const start = isoMath.gridToScreen(x, 0, currentProgress);
 			const end = isoMath.gridToScreen(x, height, currentProgress);
-			ctx.beginPath();
 			ctx.moveTo(start.x, start.y);
 			ctx.lineTo(end.x, end.y);
-			ctx.stroke();
 		}
-
 		for (let y = 0; y <= height; y++) {
+			if (showCellGrid && ((originY + y) % 8 + 8) % 8 === 0) continue;
 			const start = isoMath.gridToScreen(0, y, currentProgress);
 			const end = isoMath.gridToScreen(width, y, currentProgress);
-			ctx.beginPath();
 			ctx.moveTo(start.x, start.y);
 			ctx.lineTo(end.x, end.y);
+		}
+		ctx.strokeStyle = CONFIG.COLOR_GRID_NORMAL;
+		ctx.lineWidth = 1 / zoom;
+		ctx.stroke();
+
+		// 2. 繪製對齊 PZ 遊戲座標之 Cell 邊線 (黃色：X 為 8 倍數則 W 邊線，Y 為 8 倍數則 N 邊線)
+		if (showCellGrid) {
+			ctx.beginPath();
+			for (let x = 0; x <= width; x++) {
+				if (((originX + x) % 8 + 8) % 8 !== 0) continue;
+				const start = isoMath.gridToScreen(x, 0, currentProgress);
+				const end = isoMath.gridToScreen(x, height, currentProgress);
+				ctx.moveTo(start.x, start.y);
+				ctx.lineTo(end.x, end.y);
+			}
+			for (let y = 0; y <= height; y++) {
+				if (((originY + y) % 8 + 8) % 8 !== 0) continue;
+				const start = isoMath.gridToScreen(0, y, currentProgress);
+				const end = isoMath.gridToScreen(width, y, currentProgress);
+				ctx.moveTo(start.x, start.y);
+				ctx.lineTo(end.x, end.y);
+			}
+			ctx.strokeStyle = CONFIG.COLOR_GRID_CELL;
+			ctx.lineWidth = 1.5 / zoom;
 			ctx.stroke();
 		}
 
+		// 3. 繪製地塊外框邊界 (Bounds)
 		ctx.strokeStyle = CONFIG.COLOR_GRID_BOUNDS;
 		ctx.lineWidth = 2 / zoom;
 		const p00 = isoMath.gridToScreen(0, 0, currentProgress);
@@ -1235,6 +1279,7 @@ export class GeometryPipeline {
 		ctx.lineTo(p01.x, p01.y);
 		ctx.closePath();
 		ctx.stroke();
+
 		ctx.restore();
 	}
 

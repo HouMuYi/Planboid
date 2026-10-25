@@ -13,6 +13,7 @@ export class ToolModeState {
 		this.otherFloorsMode = 'ghost'; // "hidden" | "ghost" | "solid"
 		this.visualOffsetEnabled = true;
 		this.is3DWallsEnabled = true;
+		this.isCellGridEnabled = false;
 	}
 
 	get ghostLayerEnabled() {
@@ -68,5 +69,6 @@ export class ToolModeState {
 		this.otherFloorsMode = 'ghost';
 		this.visualOffsetEnabled = true;
 		this.is3DWallsEnabled = true;
+		this.isCellGridEnabled = false;
 	}
 }

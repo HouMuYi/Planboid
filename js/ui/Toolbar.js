@@ -86,6 +86,12 @@ export class Toolbar {
 			this.state.notifyStateChange();
 		});
 
+		const chkCellGrid = document.getElementById('chk-cell-grid');
+		chkCellGrid?.addEventListener('change', (e) => {
+			this.state.isCellGridEnabled = e.target.checked;
+			this.state.notifyStateChange();
+		});
+
 		const btnFloorUp = document.getElementById('floor-up');
 		const btnFloorDown = document.getElementById('floor-down');
 		const displayFloor = document.getElementById('current-floor-display');

@@ -47,6 +47,8 @@ window.PLANBOID_LANGUAGES['en'] = {
 	'viewport_view_ortho_title': '1:1 Orthographic View',
 	'viewport_toggle_3d_walls': '3D Walls',
 	'viewport_toggle_3d_walls_title': '3D Walls',
+	'viewport_toggle_cell_grid': 'Cell Grid',
+	'viewport_toggle_cell_grid_title': 'Toggle 8x8 Cell Grid',
 	'viewport_btn_reset_view_title': 'Reset View & Zoom',
 	'viewport_btn_fit_view_title': 'Fit All Tiles to Screen',
 	'viewport_info_coords': 'Grid: ({x}, {y}), Z: {z}',

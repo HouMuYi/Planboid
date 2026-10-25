@@ -48,6 +48,8 @@ window.PLANBOID_LANGUAGES['zh'] = {
 	'viewport_view_ortho_title': '1:1 正交視角',
 	'viewport_toggle_3d_walls': '立體牆面',
 	'viewport_toggle_3d_walls_title': '立體牆面',
+	'viewport_toggle_cell_grid': 'Cell 網格',
+	'viewport_toggle_cell_grid_title': '顯示或隱藏 8x8 Cell 邊線',
 	'viewport_btn_reset_view_title': '重設視角與縮放',
 	'viewport_btn_fit_view_title': '顯示全部畫布與地塊',
 	'viewport_info_coords': '網格：({x}, {y}), Z：{z}',
