@@ -74,11 +74,14 @@ export class SvgExporter {
 				},
 				onWall: (x, y, edge, colorId) => {
 					const color = palette[colorId].color;
+					const isHalfWall = !!palette[colorId]?.isHalfWall;
 					const safeColorId = ExportCanvasPipeline.escapeXml(colorId);
-					svgContent += GeometryPipeline.getWallSvgElements(isoMath, x, y, z, edge, safeColorId, color);
+					svgContent += GeometryPipeline.getWallSvgElements(isoMath, x, y, z, edge, safeColorId, color, isHalfWall);
 				},
-				onWallObjects: (x, y, edge, objArray) => {
-					svgContent += GeometryPipeline.getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette);
+				onWallObjects: (x, y, edge, objArray, tile) => {
+					const wallColorId = Array.isArray(tile[edge]) ? tile[edge].find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject) : null;
+					const isHalfWall = !!(wallColorId && palette[wallColorId]?.isHalfWall);
+					svgContent += GeometryPipeline.getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette, true, isHalfWall);
 				},
 			});
 

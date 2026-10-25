@@ -44,14 +44,15 @@ export class GeometryPipeline {
 		];
 	}
 
-	static getWallQuad96Points(isoMath, x, y, edge, progress = 1.0) {
+	static getWallQuad96Points(isoMath, x, y, edge, progress = 1.0, isHalfWall = false) {
 		const { x: nx, y: ny, edge: e } = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 		const b0 = isoMath.gridToScreen(nx, ny, progress);
 		const b1 = e === 'N' ? isoMath.gridToScreen(nx + 1, ny, progress) : (e === 'W' ? isoMath.gridToScreen(nx, ny + 1, progress) : null);
 
 		if (!b0 || !b1) return null;
 
-		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * progress;
+		const heightFactor = isHalfWall ? 0.5 : 1.0;
+		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * progress * heightFactor;
 		return [b0, b1, { x: b1.x, y: b1.y - wallHeight }, { x: b0.x, y: b0.y - wallHeight }];
 	}
 
@@ -291,7 +292,7 @@ export class GeometryPipeline {
 	 * @param {boolean} [is3D=true] 是否依立體牆面抬升繪製 (若為 false 則貼平於地面邊線)
 	 * @returns {Array<{ is2D: boolean, points?: Array<{x:number, y:number}>, cx: number, cy: number, size: number }>}
 	 */
-	static getWallObjectGeometries(isoMath, x, y, edge, count, progress = 1.0, is3D = true) {
+	static getWallObjectGeometries(isoMath, x, y, edge, count, progress = 1.0, is3D = true, isHalfWall = false) {
 		if (!count) return [];
 		if (!is3D || progress === 0) {
 			const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
@@ -320,7 +321,7 @@ export class GeometryPipeline {
 			return items;
 		}
 
-		const quad = this.getWallQuad96Points(isoMath, x, y, edge, progress);
+		const quad = this.getWallQuad96Points(isoMath, x, y, edge, progress, isHalfWall);
 		if (!quad) return [];
 		const [b0, b1, t1, t0] = quad;
 		const cx = (b0.x + b1.x + t1.x + t0.x) / 4;
@@ -757,8 +758,8 @@ export class GeometryPipeline {
 	/**
 	 * 3D 菱形立體牆面渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
 	 */
-	static drawWallQuad96px(ctx, isoMath, x, y, edge, colorHex, zoom, currentProgress = 1.0, fillAlpha = CONFIG.WALL_FILL_ALPHA) {
-		const quad = this.getWallQuad96Points(isoMath, x, y, edge, currentProgress);
+	static drawWallQuad96px(ctx, isoMath, x, y, edge, colorHex, zoom, currentProgress = 1.0, fillAlpha = CONFIG.WALL_FILL_ALPHA, isHalfWall = false) {
+		const quad = this.getWallQuad96Points(isoMath, x, y, edge, currentProgress, isHalfWall);
 		if (!quad) return;
 		const [b0, b1, t1, t0] = quad;
 		const savedAlpha = ctx.globalAlpha;
@@ -863,8 +864,8 @@ export class GeometryPipeline {
 	/**
 	 * 3D 牆面物件繪製 (立於牆面的正方形圓角面板，四邊長度完全相等呈正菱形)
 	 */
-	static drawWallObjects3D(ctx, isoMath, x, y, edge, objArray, palette, zoom, currentProgress = 1.0) {
-		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, currentProgress);
+	static drawWallObjects3D(ctx, isoMath, x, y, edge, objArray, palette, zoom, currentProgress = 1.0, isHalfWall = false) {
+		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, currentProgress, true, isHalfWall);
 		if (geometries.length === 0) return;
 
 		ctx.save();
@@ -1029,8 +1030,8 @@ export class GeometryPipeline {
 	/**
 	 * 3D 牆體 SVG 向量標籤生成管道
 	 */
-	static getWallSvgElements(isoMath, x, y, z, edge, colorId, color) {
-		const quad = this.getWallQuad96Points(isoMath, x, y, edge, 1.0);
+	static getWallSvgElements(isoMath, x, y, z, edge, colorId, color, isHalfWall = false) {
+		const quad = this.getWallQuad96Points(isoMath, x, y, edge, 1.0, isHalfWall);
 		if (!quad) return '';
 		const [b0, b1, t1, t0] = quad;
 		return `<polygon data-x="${x}" data-y="${y}" data-z="${z}" data-type="wall" data-edge="${edge}" data-color-id="${colorId}" points="${b0.x},${b0.y} ${b1.x},${b1.y} ${t1.x},${t1.y} ${t0.x},${t0.y}" fill="${color}" fill-opacity="${CONFIG.WALL_FILL_ALPHA}" stroke="${color}" stroke-opacity="0.675" stroke-width="1.5" />\n` +
@@ -1061,8 +1062,8 @@ export class GeometryPipeline {
 	/**
 	 * 牆面物件 SVG 向量標籤生成管道
 	 */
-	static getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette, is3D = true) {
-		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, 1.0, is3D);
+	static getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette, is3D = true, isHalfWall = false) {
+		const geometries = this.getWallObjectGeometries(isoMath, x, y, edge, objArray?.length || 0, 1.0, is3D, isHalfWall);
 		if (geometries.length === 0) return '';
 		let str = '';
 		geometries.forEach(({ is2D, points, cx, cy, size }, idx) => {

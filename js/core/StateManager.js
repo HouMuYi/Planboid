@@ -895,9 +895,14 @@ export class StateManager {
 		this.notifyStateChange();
 	}
 
-	updatePaletteItem(id, { name, color }) {
+	updatePaletteItem(id, { name, color, isHalfWall }) {
 		if (this.scheme.palette[id]) {
-			this.scheme.palette[id] = { ...this.scheme.palette[id], name, color };
+			this.scheme.palette[id] = {
+				...this.scheme.palette[id],
+				name,
+				color,
+				...(isHalfWall !== undefined ? { isHalfWall: !!isHalfWall } : {}),
+			};
 			this.pushHistory();
 			this.notifyStateChange();
 		}
@@ -974,7 +979,7 @@ export class StateManager {
 		}
 	}
 
-	addPaletteItem({ name, color, isObject = false, isZone = false }) {
+	addPaletteItem({ name, color, isObject = false, isZone = false, isHalfWall = false }) {
 		if (!this.scheme.palette) this.scheme.palette = {};
 
 		// 自增字串 ID：使用 'c' 前綴 + 遞增整數，杜絕毫秒卡頓連點衝突與 JS 物件整數鍵強制升序排序
@@ -989,6 +994,7 @@ export class StateManager {
 			color: color || CONFIG.DEFAULT_PALETTE_COLOR,
 			...(isObject ? { isObject: true } : {}),
 			...(isZone ? { isZone: true } : {}),
+			...(!isObject && !isZone && isHalfWall ? { isHalfWall: true } : {}),
 		};
 		this.activeColorId = newId;
 		this.pushHistory();

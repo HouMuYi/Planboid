@@ -25,6 +25,8 @@ export class PalettePanel {
 		this.editColorInput = document.getElementById('edit-palette-color');
 		this.editHexInput = document.getElementById('edit-palette-hex');
 		this.btnDeletePalette = document.getElementById('btn-delete-palette');
+		this.editHalfWallInput = document.getElementById('edit-palette-half-wall');
+		this.halfWallRow = document.getElementById('palette-half-wall-row');
 
 		this.draggedKey = null;
 		this.creatingType = 'floor'; // 'floor' | 'object' | 'zone'
@@ -118,15 +120,17 @@ export class PalettePanel {
 				}
 			}
 
+			const isHalfWall = this.editHalfWallInput ? this.editHalfWallInput.checked : false;
 			if (!id) {
 				this.state.addPaletteItem({
 					name,
 					color,
 					isObject: this.creatingType === 'object',
 					isZone: this.creatingType === 'zone',
+					isHalfWall,
 				});
 			} else {
-				this.state.updatePaletteItem(id, { name, color });
+				this.state.updatePaletteItem(id, { name, color, isHalfWall });
 			}
 
 			this.editModal?.close();
@@ -306,6 +310,13 @@ export class PalettePanel {
 		if (this.editColorInput) this.editColorInput.value = randomColor;
 		if (this.editHexInput) this.editHexInput.value = randomColor;
 
+		if (this.halfWallRow) {
+			this.halfWallRow.style.display = type === 'floor' ? 'block' : 'none';
+		}
+		if (this.editHalfWallInput) {
+			this.editHalfWallInput.checked = false;
+		}
+
 		const convertContainer = document.getElementById('palette-convert-actions');
 		if (convertContainer) convertContainer.innerHTML = '';
 
@@ -321,6 +332,14 @@ export class PalettePanel {
 		const colorVal = item.color || CONFIG.DEFAULT_PALETTE_COLOR;
 		if (this.editColorInput) this.editColorInput.value = colorVal;
 		if (this.editHexInput) this.editHexInput.value = colorVal.toUpperCase();
+
+		const isNormal = !item.isZone && !item.isObject;
+		if (this.halfWallRow) {
+			this.halfWallRow.style.display = isNormal ? 'block' : 'none';
+		}
+		if (this.editHalfWallInput) {
+			this.editHalfWallInput.checked = isNormal && !!item.isHalfWall;
+		}
 
 		const convertContainer = document.getElementById('palette-convert-actions');
 		if (convertContainer) {

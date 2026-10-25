@@ -113,15 +113,18 @@ export class PngExporter {
 				onWall: (x, y, edge, colorId) => {
 					const rawColor = palette[colorId].color;
 					const finalColor = isCurrent ? rawColor : GeometryPipeline.desaturateHex(rawColor, desatFactor);
+					const isHalfWall = !!palette[colorId]?.isHalfWall;
 					if (stateManager.is3DWallsEnabled && currentProgress > 0) {
-						GeometryPipeline.drawWallQuad96px(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress, CONFIG.WALL_FILL_ALPHA);
+						GeometryPipeline.drawWallQuad96px(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress, CONFIG.WALL_FILL_ALPHA, isHalfWall);
 					} else {
 						GeometryPipeline.drawWallLine2D(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress);
 					}
 				},
-				onWallObjects: (x, y, edge, objArray) => {
+				onWallObjects: (x, y, edge, objArray, tile) => {
+					const wallColorId = Array.isArray(tile[edge]) ? tile[edge].find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject) : null;
+					const isHalfWall = !!(wallColorId && palette[wallColorId]?.isHalfWall);
 					if (stateManager.is3DWallsEnabled && currentProgress > 0) {
-						GeometryPipeline.drawWallObjects3D(ctx, isoMath, x, y, edge, objArray, palette, fit.zoom, currentProgress);
+						GeometryPipeline.drawWallObjects3D(ctx, isoMath, x, y, edge, objArray, palette, fit.zoom, currentProgress, isHalfWall);
 					} else {
 						GeometryPipeline.drawWallObjects2D(ctx, isoMath, x, y, edge, objArray, palette, fit.zoom, currentProgress);
 					}

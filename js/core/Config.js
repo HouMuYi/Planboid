@@ -60,16 +60,18 @@ export const CONFIG = Object.freeze({
 
 	// 預設調色盤項目清單（包含一般色塊、物件色票與區域標籤基礎定義）
 	DEFAULT_PALETTE_ITEMS: [
-		{ id: 'color_road', color: '#334155', nameKey: 'defaults_palette_road', defaultName: '道路' },
-		{ id: 'color_indoor', color: '#B38147', nameKey: 'defaults_palette_indoor', defaultName: '室內空間' },
+		{ id: 'color_road', color: '#334155', name: 'defaults_palette_road' },
+		{ id: 'color_indoor', color: '#B38147', name: 'defaults_palette_indoor' },
+		{ id: 'color_wall', color: '#664422', name: 'defaults_palette_wall' },
+		{ id: 'color_low_wall', color: '#BF9E8D', name: 'defaults_palette_low_wall', isHalfWall: true },
 		{ id: 'obj_door', color: '#e11d48', name: '🚪', isObject: true },
 		{ id: 'obj_window', color: '#f59e0b', name: '🪟', isObject: true },
 		{ id: 'obj_sink', color: '#38bdf8', name: '🚰', isObject: true },
 		{ id: 'obj_bucket', color: '#1e40af', name: '🪣', isObject: true },
 		{ id: 'obj_ladder', color: '#991b1b', name: '🪜', isObject: true },
-		{ id: 'zone_bedroom', color: '#818cf8', nameKey: 'defaults_zone_bedroom', defaultName: '臥室', isZone: true },
-		{ id: 'zone_kitchen', color: '#fb923c', nameKey: 'defaults_zone_kitchen', defaultName: '廚房', isZone: true },
-		{ id: 'zone_living', color: '#38bdf8', nameKey: 'defaults_zone_living', defaultName: '客廳', isZone: true },
+		{ id: 'zone_bedroom', color: '#818cf8', name: 'defaults_zone_bedroom', isZone: true },
+		{ id: 'zone_kitchen', color: '#fb923c', name: 'defaults_zone_kitchen', isZone: true },
+		{ id: 'zone_living', color: '#38bdf8', name: 'defaults_zone_living', isZone: true },
 	],
 
 	// 區域標籤統一視覺配置

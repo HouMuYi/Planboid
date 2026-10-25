@@ -26,11 +26,13 @@ export class StorageManager {
 	static getDefaultScheme() {
 		const palette = {};
 		CONFIG.DEFAULT_PALETTE_ITEMS.forEach(item => {
-			const name = item.nameKey ? (i18n.t(item.nameKey) || item.defaultName) : item.name;
+			const name = i18n.t(item.name) || item.name;
 			palette[item.id] = {
 				color: item.color,
 				name,
-				...(item.isObject ? { isObject: true } : {})
+				...(item.isObject ? { isObject: true } : {}),
+				...(item.isZone ? { isZone: true } : {}),
+				...(item.isHalfWall ? { isHalfWall: true } : {}),
 			};
 		});
 

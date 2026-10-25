@@ -14,13 +14,19 @@ export class SchemeSerializer {
 	static serialize(scheme) {
 		if (!scheme || typeof scheme !== 'object') return null;
 
-		// Palette 調色盤元組陣列: [[id, name, color, typeFlag], ...] (typeFlag: 0=floor, 1=object, 2=zone)
-		const paletteTuples = Object.entries(scheme.palette || {}).map(([id, item]) => [
-			id,
-			item?.name || '',
-			item?.color || '#000000',
-			item?.isZone ? 2 : (item?.isObject ? 1 : 0),
-		]);
+		// Palette 調色盤元組陣列: [[id, name, color, typeFlag, halfFlag], ...] (typeFlag: 0=floor, 1=object, 2=zone)
+		const paletteTuples = Object.entries(scheme.palette || {}).map(([id, item]) => {
+			const tuple = [
+				id,
+				item?.name || '',
+				item?.color || '#000000',
+				item?.isZone ? 2 : (item?.isObject ? 1 : 0),
+			];
+			if (item?.isHalfWall) {
+				tuple.push(1);
+			}
+			return tuple;
+		});
 
 		// 扁平三槽位六元組陣列: [x, y, z, floor, N, W]
 		const denseTiles = [];
@@ -93,16 +99,18 @@ export class SchemeSerializer {
 		if (Array.isArray(rawPalette)) {
 			rawPalette.forEach(item => {
 				if (Array.isArray(item)) {
-					const [rawId, name, color, typeFlag] = item;
+					const [rawId, name, color, typeFlag, halfFlag] = item;
 					if (!rawId && rawId !== 0) return;
 					const id = normalizePaletteId(rawId);
 					const isZone = typeFlag === 2 || String(id).startsWith('zone_');
 					const isObj = !isZone && (typeFlag === 1 || typeFlag === true || String(id).startsWith('obj_'));
+					const isHalfWall = !isZone && !isObj && (halfFlag === 1 || halfFlag === true);
 					paletteMap[id] = {
 						name: name || '',
 						color: color || '#000000',
 						...(isObj ? { isObject: true } : {}),
 						...(isZone ? { isZone: true } : {}),
+						...(isHalfWall ? { isHalfWall: true } : {}),
 					};
 				} else if (typeof item === 'object' && item !== null) {
 					const rawId = item.i ?? item.id;
@@ -110,11 +118,13 @@ export class SchemeSerializer {
 					const id = normalizePaletteId(rawId);
 					const isZone = !!item.isZone || String(id).startsWith('zone_');
 					const isObj = !isZone && (!!item.isObject || !!item.o || String(id).startsWith('obj_'));
+					const isHalfWall = !isZone && !isObj && (!!item.isHalfWall || !!item.halfWall || item.h === 1);
 					paletteMap[id] = {
 						name: item.n || item.name || '',
 						color: item.c || item.color || '#000000',
 						...(isObj ? { isObject: true } : {}),
 						...(isZone ? { isZone: true } : {}),
+						...(isHalfWall ? { isHalfWall: true } : {}),
 					};
 				}
 			});
@@ -124,10 +134,12 @@ export class SchemeSerializer {
 				const id = normalizePaletteId(rawId);
 				const isZone = !!item.isZone || String(id).startsWith('zone_');
 				const isObj = !isZone && (!!item.isObject || String(id).startsWith('obj_'));
+				const isHalfWall = !isZone && !isObj && !!item.isHalfWall;
 				paletteMap[id] = {
 					...item,
 					...(isObj ? { isObject: true } : {}),
 					...(isZone ? { isZone: true } : {}),
+					...(isHalfWall ? { isHalfWall: true } : {}),
 				};
 			});
 		}
