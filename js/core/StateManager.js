@@ -977,12 +977,12 @@ export class StateManager {
 	addPaletteItem({ name, color, isObject = false, isZone = false }) {
 		if (!this.scheme.palette) this.scheme.palette = {};
 
-		// 自增數值 ID：完全無前綴，遞增尋找當前方案中未被使用的最小整數，徹底杜絕毫秒卡頓連點衝突
+		// 自增字串 ID：使用 'c' 前綴 + 遞增整數，杜絕毫秒卡頓連點衝突與 JS 物件整數鍵強制升序排序
 		let nextNum = 1;
-		while (this.scheme.palette[String(nextNum)]) {
+		while (this.scheme.palette[`c${nextNum}`]) {
 			nextNum++;
 		}
-		const newId = String(nextNum);
+		const newId = `c${nextNum}`;
 
 		this.scheme.palette[newId] = {
 			name: name || '',

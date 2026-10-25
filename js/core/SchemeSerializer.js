@@ -82,13 +82,20 @@ export class SchemeSerializer {
 		if (!obj || typeof obj !== 'object') throw new Error('解碼目標非合法物件');
 
 		// 解析調色盤
+		const normalizePaletteId = (rawId) => {
+			if (rawId === undefined || rawId === null || rawId === '') return rawId;
+			const s = String(rawId).trim();
+			return /^\d+$/.test(s) ? `c${s}` : s;
+		};
+
 		const paletteMap = {};
 		const rawPalette = obj.p || obj.palette;
 		if (Array.isArray(rawPalette)) {
 			rawPalette.forEach(item => {
 				if (Array.isArray(item)) {
-					const [id, name, color, typeFlag] = item;
-					if (!id) return;
+					const [rawId, name, color, typeFlag] = item;
+					if (!rawId && rawId !== 0) return;
+					const id = normalizePaletteId(rawId);
 					const isZone = typeFlag === 2 || String(id).startsWith('zone_');
 					const isObj = !isZone && (typeFlag === 1 || typeFlag === true || String(id).startsWith('obj_'));
 					paletteMap[id] = {
@@ -98,8 +105,9 @@ export class SchemeSerializer {
 						...(isZone ? { isZone: true } : {}),
 					};
 				} else if (typeof item === 'object' && item !== null) {
-					const id = item.i || item.id;
-					if (!id) return;
+					const rawId = item.i ?? item.id;
+					if (!rawId && rawId !== 0) return;
+					const id = normalizePaletteId(rawId);
 					const isZone = !!item.isZone || String(id).startsWith('zone_');
 					const isObj = !isZone && (!!item.isObject || !!item.o || String(id).startsWith('obj_'));
 					paletteMap[id] = {
@@ -111,8 +119,9 @@ export class SchemeSerializer {
 				}
 			});
 		} else if (typeof rawPalette === 'object' && rawPalette !== null) {
-			Object.entries(rawPalette).forEach(([id, item]) => {
+			Object.entries(rawPalette).forEach(([rawId, item]) => {
 				if (!item || typeof item !== 'object') return;
+				const id = normalizePaletteId(rawId);
 				const isZone = !!item.isZone || String(id).startsWith('zone_');
 				const isObj = !isZone && (!!item.isObject || String(id).startsWith('obj_'));
 				paletteMap[id] = {
@@ -157,28 +166,28 @@ export class SchemeSerializer {
 
 					if (type === 0) {
 						if (!tile.floor) tile.floor = [];
-						tile.floor.push(val);
+						tile.floor.push(normalizePaletteId(val));
 					} else if (type === 1 || type === 2) {
 						const edge = (type === 1) ? 'N' : 'W';
 						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 						const target = getTile(norm.x, norm.y, z);
 						if (!target[norm.edge]) target[norm.edge] = [];
-						target[norm.edge].push(val);
+						target[norm.edge].push(normalizePaletteId(val));
 					} else if (type === 4) {
 						if (!tile.floor) tile.floor = [];
-						const objs = Array.isArray(val) ? val : [val];
+						const objs = (Array.isArray(val) ? val : [val]).map(normalizePaletteId);
 						tile.floor.push(...objs);
 					} else if (type === 5 || type === 6) {
 						const edge = (type === 5) ? 'N' : 'W';
 						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 						const target = getTile(norm.x, norm.y, z);
 						if (!target[norm.edge]) target[norm.edge] = [];
-						const objs = Array.isArray(val) ? val : [val];
+						const objs = (Array.isArray(val) ? val : [val]).map(normalizePaletteId);
 						target[norm.edge].push(...objs);
 					}
 				} else if (obj.v >= 6 || (tuple.length <= 6 && (Array.isArray(tuple[3]) || Array.isArray(tuple[4]) || Array.isArray(tuple[5])))) {
 					// 新版 v6 三槽位六元組解碼: [x, y, z, floorArr, northArr, westArr]
-					const toArr = (v) => Array.isArray(v) ? v : (v && v !== 0 ? [v] : []);
+					const toArr = (v) => (Array.isArray(v) ? v : (v && v !== 0 ? [v] : [])).map(normalizePaletteId);
 					const fArr = toArr(tuple[3]);
 					const nArr = toArr(tuple[4]);
 					const wArr = toArr(tuple[5]);
@@ -214,7 +223,7 @@ export class SchemeSerializer {
 						floor && floor !== 0 ? floor : null,
 						...(Array.isArray(zoneId) ? zoneId : (zoneId && zoneId !== 0 ? [zoneId] : [])),
 						...(Array.isArray(floorObjs) ? floorObjs : [])
-					].filter(Boolean);
+					].filter(Boolean).map(normalizePaletteId);
 					if (fItems.length > 0) {
 						if (!tile.floor) tile.floor = [];
 						tile.floor.push(...fItems);
@@ -224,7 +233,7 @@ export class SchemeSerializer {
 						wallN && wallN !== 0 ? wallN : null,
 						...(Array.isArray(wallZoneN) ? wallZoneN : (wallZoneN && wallZoneN !== 0 ? [wallZoneN] : [])),
 						...(Array.isArray(wallNObjs) ? wallNObjs : [])
-					].filter(Boolean);
+					].filter(Boolean).map(normalizePaletteId);
 					if (nItems.length > 0) {
 						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'N');
 						const target = getTile(norm.x, norm.y, z);
@@ -236,7 +245,7 @@ export class SchemeSerializer {
 						wallW && wallW !== 0 ? wallW : null,
 						...(Array.isArray(wallZoneW) ? wallZoneW : (wallZoneW && wallZoneW !== 0 ? [wallZoneW] : [])),
 						...(Array.isArray(wallWObjs) ? wallWObjs : [])
-					].filter(Boolean);
+					].filter(Boolean).map(normalizePaletteId);
 					if (wItems.length > 0) {
 						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, 'W');
 						const target = getTile(norm.x, norm.y, z);
@@ -256,13 +265,13 @@ export class SchemeSerializer {
 
 				const targetTile = getTile(x, y, z);
 				if (Array.isArray(rawTile.floor)) {
-					targetTile.floor = [...rawTile.floor];
+					targetTile.floor = rawTile.floor.map(normalizePaletteId);
 				} else {
 					const fItems = [
 						rawTile.floorColorId || (typeof rawTile.floor === 'string' ? rawTile.floor : null),
 						...(Array.isArray(rawTile.zoneIds) ? rawTile.zoneIds : (rawTile.zoneId ? [rawTile.zoneId] : [])),
 						...(Array.isArray(rawTile.floorObjects) ? rawTile.floorObjects : [])
-					].filter(Boolean);
+					].filter(Boolean).map(normalizePaletteId);
 					if (fItems.length > 0) targetTile.floor = fItems;
 				}
 
@@ -271,7 +280,7 @@ export class SchemeSerializer {
 						const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 						const normTile = getTile(norm.x, norm.y, z);
 						if (!normTile[norm.edge]) normTile[norm.edge] = [];
-						normTile[norm.edge].push(...rawTile[edge]);
+						normTile[norm.edge].push(...rawTile[edge].map(normalizePaletteId));
 					}
 				});
 
@@ -281,7 +290,7 @@ export class SchemeSerializer {
 							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 							const normTile = getTile(norm.x, norm.y, z);
 							if (!normTile[norm.edge]) normTile[norm.edge] = [];
-							normTile[norm.edge].push(colorId);
+							normTile[norm.edge].push(normalizePaletteId(colorId));
 						}
 					});
 				}
@@ -291,7 +300,7 @@ export class SchemeSerializer {
 							const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
 							const normTile = getTile(norm.x, norm.y, z);
 							if (!normTile[norm.edge]) normTile[norm.edge] = [];
-							normTile[norm.edge].push(...objArray);
+							normTile[norm.edge].push(...objArray.map(normalizePaletteId));
 						}
 					});
 				}
@@ -302,7 +311,7 @@ export class SchemeSerializer {
 							const normTile = getTile(norm.x, norm.y, z);
 							if (!normTile[norm.edge]) normTile[norm.edge] = [];
 							const wzs = Array.isArray(colorId) ? colorId : [colorId];
-							normTile[norm.edge].push(...wzs);
+							normTile[norm.edge].push(...wzs.map(normalizePaletteId));
 						}
 					});
 				}
