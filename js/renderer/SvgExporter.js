@@ -26,13 +26,13 @@ export class SvgExporter {
 	 * @param {Object} scheme
 	 * @param {Object} isoMath
 	 * @param {number} currentZ
-	 * @param {string|boolean} otherFloorsMode
+	 * @param {'hidden' | 'ghost' | 'solid'} otherFloorsMode
 	 * @returns {string} XML SVG 字串
 	 */
 	static exportSvg(scheme, isoMath, currentZ = 0, otherFloorsMode = 'ghost') {
 		if (!scheme) return '';
 		const fit = ExportCanvasPipeline.calculateFitCamera(scheme, isoMath, currentZ);
-		const palette = scheme.palette || {};
+		const { palette } = scheme;
 
 		const viewBoxX = Math.floor(fit.minX - 40);
 		const viewBoxY = Math.floor(fit.minY - 40);
@@ -78,9 +78,7 @@ export class SvgExporter {
 					const safeColorId = ExportCanvasPipeline.escapeXml(colorId);
 					svgContent += GeometryPipeline.getWallSvgElements(isoMath, x, y, z, edge, safeColorId, color, isHalfWall);
 				},
-				onWallObjects: (x, y, edge, objArray, tile) => {
-					const wallColorId = Array.isArray(tile[edge]) ? tile[edge].find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject) : null;
-					const isHalfWall = !!(wallColorId && palette[wallColorId]?.isHalfWall);
+				onWallObjects: (x, y, edge, objArray, isHalfWall) => {
 					svgContent += GeometryPipeline.getWallObjectsSvgElements(isoMath, x, y, z, edge, objArray, palette, true, isHalfWall);
 				},
 			});

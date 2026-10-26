@@ -16,14 +16,6 @@ export class ToolModeState {
 		this.isCellGridEnabled = false;
 	}
 
-	get ghostLayerEnabled() {
-		return this.otherFloorsMode !== 'hidden';
-	}
-
-	set ghostLayerEnabled(val) {
-		this.otherFloorsMode = val ? 'ghost' : 'hidden';
-	}
-
 	setOtherFloorsMode(mode) {
 		if (['hidden', 'ghost', 'solid'].includes(mode)) {
 			this.otherFloorsMode = mode;

@@ -23,7 +23,7 @@ export class PngExporter {
 
 		const scheme = stateManager.scheme;
 		const currentZ = stateManager.currentZLevel;
-		const palette = scheme.palette || {};
+		const { palette } = scheme;
 		const isoMath = new IsoMath(CONFIG.TILE_SIZE);
 
 		// 離屏 Canvas 尺寸同目前主畫布
@@ -120,9 +120,7 @@ export class PngExporter {
 						GeometryPipeline.drawWallLine2D(ctx, isoMath, x, y, edge, finalColor, fit.zoom, currentProgress);
 					}
 				},
-				onWallObjects: (x, y, edge, objArray, tile) => {
-					const wallColorId = Array.isArray(tile[edge]) ? tile[edge].find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject) : null;
-					const isHalfWall = !!(wallColorId && palette[wallColorId]?.isHalfWall);
+				onWallObjects: (x, y, edge, objArray, isHalfWall) => {
 					if (stateManager.is3DWallsEnabled && currentProgress > 0) {
 						GeometryPipeline.drawWallObjects3D(ctx, isoMath, x, y, edge, objArray, palette, fit.zoom, currentProgress, isHalfWall);
 					} else {

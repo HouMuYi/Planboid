@@ -269,14 +269,12 @@ export class SchemeModal {
 		this.state.scheme = scheme;
 		this.state.currentZLevel = scheme.currentLevel || 0;
 
-		const paletteKeys = Object.keys(scheme.palette || {});
+		const paletteKeys = Object.keys(scheme.palette);
 		if (paletteKeys.length > 0) {
 			this.state.activeColorId = paletteKeys[0];
 		}
 
 		this.state.clearHistory();
-		this.state.pushHistory();
-		this.state.persist();
 		this.state.notifyStateChange();
 
 		this.setEditorToEditMode(scheme.id);

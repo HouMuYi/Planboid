@@ -6,6 +6,7 @@ import { CONFIG } from '../core/Config.js';
 import { eventBus, EVENTS } from '../core/EventBus.js';
 import { i18n } from '../core/I18nManager.js';
 import { StateManager } from '../core/StateManager.js';
+import { TileModel } from '../core/TileModel.js';
 import { ConfirmModal } from './ConfirmModal.js';
 
 export class PalettePanel {
@@ -29,7 +30,7 @@ export class PalettePanel {
 		this.halfWallRow = document.getElementById('palette-half-wall-row');
 
 		this.draggedKey = null;
-		this.creatingType = 'floor'; // 'floor' | 'object' | 'zone'
+		this.creatingType = 'normal'; // 新增色票的種類，值域同 TileModel.paletteKind
 
 		this.init();
 	}
@@ -68,7 +69,7 @@ export class PalettePanel {
 
 		const btnAdd = document.getElementById('btn-add-palette');
 		btnAdd?.addEventListener('click', () => {
-			this.openAddModal('floor');
+			this.openAddModal('normal');
 		});
 
 		const btnAddObj = document.getElementById('btn-add-object-palette');
@@ -86,24 +87,14 @@ export class PalettePanel {
 			const id = this.editIdInput?.value || '';
 			let name = this.editNameInput?.value?.trim() || '';
 			if (!name) {
-				const palette = this.state.scheme?.palette || {};
-				let type = this.creatingType;
-				if (id) {
-					const item = palette[id];
-					if (item?.isZone) type = 'zone';
-					else if (item?.isObject) type = 'object';
-					else type = 'floor';
-				}
-				const sameTypeCount = Object.values(palette).filter(item => {
-					if (type === 'zone') return !!item.isZone;
-					if (type === 'object') return !!item.isObject && !item.isZone;
-					return !item.isObject && !item.isZone;
-				}).length;
+				const { palette } = this.state.scheme;
+				const type = id ? TileModel.paletteKind(palette[id]) : this.creatingType;
+				const sameTypeCount = Object.values(palette).filter(item => TileModel.paletteKind(item) === type).length;
 				const nextNum = id ? sameTypeCount : sameTypeCount + 1;
 				const keyMap = {
 					zone: 'palette_default_zone_name',
 					object: 'palette_default_object_name',
-					floor: 'palette_default_color_name',
+					normal: 'palette_default_color_name',
 				};
 				name = i18n.t(keyMap[type], { num: Math.max(1, nextNum) });
 			}
@@ -205,9 +196,10 @@ export class PalettePanel {
 		const counts = this.getPaletteUsageCounts();
 		const wrapper = i18n.t('parenthesis_wrapper') || ' ({val})';
 
-		const normalItems = Object.entries(palette).filter(([, item]) => !item.isObject && !item.isZone);
-		const objectItems = Object.entries(palette).filter(([, item]) => !!item.isObject && !item.isZone);
-		const zoneItems = Object.entries(palette).filter(([, item]) => !!item.isZone);
+		const itemsOfKind = kind => Object.entries(palette).filter(([, item]) => TileModel.paletteKind(item) === kind);
+		const normalItems = itemsOfKind('normal');
+		const objectItems = itemsOfKind('object');
+		const zoneItems = itemsOfKind('zone');
 
 		const renderGroup = (items, targetContainer) => {
 			if (!targetContainer) return;
@@ -295,7 +287,7 @@ export class PalettePanel {
 		this.state.reorderPalette(sourceId, targetId);
 	}
 
-	openAddModal(type = 'floor') {
+	openAddModal(type = 'normal') {
 		this.creatingType = type;
 		if (!this.editModal) return;
 		if (this.modalTitle) {
@@ -311,7 +303,7 @@ export class PalettePanel {
 		if (this.editHexInput) this.editHexInput.value = randomColor;
 
 		if (this.halfWallRow) {
-			this.halfWallRow.style.display = type === 'floor' ? 'block' : 'none';
+			this.halfWallRow.style.display = type === 'normal' ? 'block' : 'none';
 		}
 		if (this.editHalfWallInput) {
 			this.editHalfWallInput.checked = false;
@@ -333,7 +325,8 @@ export class PalettePanel {
 		if (this.editColorInput) this.editColorInput.value = colorVal;
 		if (this.editHexInput) this.editHexInput.value = colorVal.toUpperCase();
 
-		const isNormal = !item.isZone && !item.isObject;
+		const currentType = TileModel.paletteKind(item);
+		const isNormal = currentType === 'normal';
 		if (this.halfWallRow) {
 			this.halfWallRow.style.display = isNormal ? 'block' : 'none';
 		}
@@ -344,7 +337,6 @@ export class PalettePanel {
 		const convertContainer = document.getElementById('palette-convert-actions');
 		if (convertContainer) {
 			convertContainer.innerHTML = '';
-			const currentType = item.isZone ? 'zone' : (item.isObject ? 'object' : 'normal');
 			const allTypes = [
 				{ type: 'normal', labelKey: 'modal_palette_btn_convert_to_normal', defaultText: '轉為通用色票' },
 				{ type: 'object', labelKey: 'modal_palette_btn_convert_to_object', defaultText: '轉為物件色票' },

@@ -122,7 +122,6 @@ export class TabSyncManager {
 					this.state.schemes = refreshedData.schemes;
 					this.state.activeSchemeId = refreshedData.activeSchemeId || refreshedData.schemes[0].id;
 					this.state.scheme = this.state.schemes.find(s => s.id === this.state.activeSchemeId) || this.state.schemes[0];
-					this.state.normalizeSchemeTiles(this.state.scheme);
 					this.state.currentZLevel = this.state.scheme.currentLevel || 0;
 
 					eventBus.emit(EVENTS.STATE_CHANGED, { type: 'storage_sync', state: this.state });

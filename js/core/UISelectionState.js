@@ -7,7 +7,7 @@ export class UISelectionState {
 	constructor() {
 		this.selectedCell = null; // { x, y }
 		this.selectionBox = null; // { minX, minY, maxX, maxY }
-		this.clipboard = null; // { width, height, tiles: {} }
+		this.clipboard = null; // { width, height, tiles: [{ dx, dy, tile }] }，dx / dy 為相對選區左上角之位移
 		this.isPastingMode = false;
 	}
 
@@ -55,13 +55,13 @@ export class UISelectionState {
 			return;
 		}
 
-		const tilesObj = data.tiles && typeof data.tiles === 'object' ? data.tiles : {};
+		const tiles = Array.isArray(data.tiles) ? data.tiles : [];
 		this.clipboard = {
 			width: Math.max(1, Number(data.width) || 1),
 			height: Math.max(1, Number(data.height) || 1),
-			tiles: tilesObj
+			tiles,
 		};
-		console.log('📋 剪貼簿更新，包含地塊數:', Object.keys(tilesObj).length);
+		console.log('📋 剪貼簿更新，包含地塊數:', tiles.length);
 	}
 
 	clearClipboard() {

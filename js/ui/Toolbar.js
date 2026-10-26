@@ -209,13 +209,6 @@ export class Toolbar {
 			const isShift = e.shiftKey;
 			const isAlt = e.altKey;
 
-			// R 鍵特別處理：旋轉/切換子物件選取
-			if (key === 'r' && !isCtrl && !isAlt) {
-				e.preventDefault();
-				this.state.cycleSelectedSubTarget();
-				return;
-			}
-
 			// C / V 複製貼上
 			if (isCtrl) {
 				if (key === 'c') {

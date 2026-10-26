@@ -6,6 +6,7 @@
 
 import { CONFIG } from '../core/Config.js';
 import { eventBus, EVENTS } from '../core/EventBus.js';
+import { TileModel } from '../core/TileModel.js';
 import { BrushActionApplicator } from './BrushActionApplicator.js';
 import { calcZTranslate, GeometryPipeline } from './GeometryPipeline.js';
 import { InputDispatcher } from './InputDispatcher.js';
@@ -538,9 +539,7 @@ export class CanvasRenderer {
 					GeometryPipeline.drawWallLine2D(targetCtx, this.isoMath, x, y, edge, color, zoom, progress);
 				}
 			} : null,
-			onWallObjects: passes.wall ? (x, y, edge, objArray, tile) => {
-				const wallColorId = Array.isArray(tile[edge]) ? tile[edge].find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject) : null;
-				const isHalfWall = !!(wallColorId && palette[wallColorId]?.isHalfWall);
+			onWallObjects: passes.wall ? (x, y, edge, objArray, isHalfWall) => {
 				if (this.state.is3DWallsEnabled && progress > 0) {
 					GeometryPipeline.drawWallObjects3D(targetCtx, this.isoMath, x, y, edge, objArray, palette, zoom, progress, isHalfWall);
 				} else {
@@ -556,10 +555,6 @@ export class CanvasRenderer {
 
 	drawWallLine2D(ctx, x, y, edge, colorHex) {
 		GeometryPipeline.drawWallLine2D(ctx, this.isoMath, x, y, edge, colorHex, this.zoom, this.currentProgress);
-	}
-
-	drawWallQuad96px(ctx, x, y, edge, colorHex, fillAlpha = CONFIG.WALL_FILL_ALPHA) {
-		GeometryPipeline.drawWallQuad96px(ctx, this.isoMath, x, y, edge, colorHex, this.zoom, this.currentProgress, fillAlpha);
 	}
 
 	// 以下方法在頂層 Overlay 上繪製
@@ -597,20 +592,17 @@ export class CanvasRenderer {
 
 	drawPastePreview(ctx, targetX, targetY) {
 		const clip = this.state.clipboard;
-		if (!clip || !clip.tiles) return;
+		if (!clip) return;
 
 		const palette = this.state.scheme.palette;
 
-		Object.entries(clip.tiles).forEach(([relKey, tileData]) => {
-			const [rx, ry] = relKey.split(',').map(Number);
-			const x = targetX + rx;
-			const y = targetY + ry;
+		clip.tiles.forEach(({ dx, dy, tile }) => {
+			const x = targetX + dx;
+			const y = targetY + dy;
 
 			if (x >= 0 && x <= this.state.scheme.width && y >= 0 && y <= this.state.scheme.height) {
-				const floorId = Array.isArray(tileData.floor)
-					? tileData.floor.find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject)
-					: (tileData.floorColorId || (typeof tileData.floor === 'string' ? tileData.floor : null));
-				if (floorId && palette[floorId]) {
+				const floorId = TileModel.slotBaseColor(tile.floor, palette);
+				if (floorId) {
 					const savedAlpha = ctx.globalAlpha;
 					ctx.globalAlpha = savedAlpha * 0.6;
 					this.drawTilePoly(ctx, x, y, palette[floorId].color);

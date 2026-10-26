@@ -9,8 +9,8 @@
  */
 
 import { CONFIG } from '../core/Config.js';
+import { TileModel } from '../core/TileModel.js';
 import { Utils } from '../core/Utils.js';
-import { BorderEdgeNormalizer } from './BorderEdgeNormalizer.js';
 
 /**
  * 計算第 z 層樓相對於 z=0 的螢幕像素偏移量
@@ -45,7 +45,7 @@ export class GeometryPipeline {
 	}
 
 	static getWallQuad96Points(isoMath, x, y, edge, progress = 1.0, isHalfWall = false) {
-		const { x: nx, y: ny, edge: e } = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+		const { x: nx, y: ny, edge: e } = TileModel.normalizeEdge(x, y, edge);
 		const b0 = isoMath.gridToScreen(nx, ny, progress);
 		const b1 = e === 'N' ? isoMath.gridToScreen(nx + 1, ny, progress) : (e === 'W' ? isoMath.gridToScreen(nx, ny + 1, progress) : null);
 
@@ -56,31 +56,30 @@ export class GeometryPipeline {
 		return [b0, b1, { x: b1.x, y: b1.y - wallHeight }, { x: b0.x, y: b0.y - wallHeight }];
 	}
 
+	/**
+	 * 依樓層分組地塊並計算鬼影透明度，各層地塊依等角繪製順序 (x + y 由遠至近) 排序
+	 * @returns {{ z: number, isCurrent: boolean, alpha: number, desatFactor: number, items: Object[] }[]} items 為該層地塊紀錄
+	 */
 	static getSortedLayersToRender(tiles, currentZ, otherFloorsMode = 'ghost') {
-		const mode = typeof otherFloorsMode === 'boolean' ? (otherFloorsMode ? 'ghost' : 'hidden') : otherFloorsMode;
 		const zBuckets = new Map([[currentZ, []]]);
 
-		if (tiles) {
-			Object.entries(tiles).forEach(([key, tile]) => {
-				const [xStr, yStr, zStr] = key.split(',');
-				const z = parseInt(zStr, 10);
-				if (!zBuckets.has(z)) zBuckets.set(z, []);
-				zBuckets.get(z).push({ x: parseInt(xStr, 10), y: parseInt(yStr, 10), tile });
-			});
-		}
+		Object.values(tiles).forEach(tile => {
+			if (!zBuckets.has(tile.z)) zBuckets.set(tile.z, []);
+			zBuckets.get(tile.z).push(tile);
+		});
 
 		const sortedZLevels = Array.from(zBuckets.keys()).sort((a, b) => a - b);
 		const layers = [];
 
 		sortedZLevels.forEach(z => {
 			const isCurrent = z === currentZ;
-			if (!isCurrent && mode === 'hidden') return;
+			if (!isCurrent && otherFloorsMode === 'hidden') return;
 
 			const dist = Math.abs(z - currentZ);
 			let alpha = 1.0;
 			let desatFactor = 0.0;
 
-			if (!isCurrent && mode === 'ghost') {
+			if (!isCurrent && otherFloorsMode === 'ghost') {
 				alpha = Math.max(0.05, CONFIG.GHOST_BASE_ALPHA * Math.pow(CONFIG.GHOST_ALPHA_DECAY, dist - 1));
 				desatFactor = Math.min(0.95, 1.0 - Math.pow(CONFIG.GHOST_SATURATION_DECAY, dist));
 			}
@@ -107,16 +106,9 @@ export class GeometryPipeline {
 
 		// Pass 1: 地塊多邊形
 		if (onFloor) {
-			items.forEach(({ x, y, tile }) => {
-				let id = null;
-				if (Array.isArray(tile.floor)) {
-					id = tile.floor.find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject);
-				} else {
-					id = tile.floorColorId || (typeof tile.floor === 'string' ? tile.floor : null);
-				}
-				if (id && palette[id] && !palette[id].isZone && !palette[id].isObject) {
-					onFloor(x, y, id, tile);
-				}
+			items.forEach(tile => {
+				const id = TileModel.slotBaseColor(tile.floor, palette);
+				if (id) onFloor(tile.x, tile.y, id);
 			});
 		}
 
@@ -126,49 +118,28 @@ export class GeometryPipeline {
 
 		// Pass 1.5: 地塊物件 (Floor Objects)
 		if (onFloorObjects) {
-			items.forEach(({ x, y, tile }) => {
-				let objs = null;
-				if (Array.isArray(tile.floor)) {
-					objs = tile.floor.filter(cid => palette[cid]?.isObject);
-				} else if (Array.isArray(tile.floorObjects)) {
-					objs = tile.floorObjects;
-				}
-				if (objs && objs.length > 0) {
-					onFloorObjects(x, y, objs, tile);
-				}
+			items.forEach(tile => {
+				const objs = TileModel.slotObjects(tile.floor, palette);
+				if (objs.length > 0) onFloorObjects(tile.x, tile.y, objs);
 			});
 		}
 
 		// Pass 2: 牆面面片與邊線
 		if (onWall) {
-			items.forEach(({ x, y, tile }) => {
+			items.forEach(tile => {
 				['N', 'W'].forEach(edge => {
-					let id = null;
-					if (Array.isArray(tile[edge])) {
-						id = tile[edge].find(cid => palette[cid] && !palette[cid].isZone && !palette[cid].isObject);
-					} else if (tile.walls?.[edge]) {
-						id = tile.walls[edge];
-					}
-					if (typeof id === 'string' && palette[id] && !palette[id].isZone && !palette[id].isObject) {
-						onWall(x, y, edge, id, tile);
-					}
+					const id = TileModel.slotBaseColor(tile[edge], palette);
+					if (id) onWall(tile.x, tile.y, edge, id);
 				});
 			});
 		}
 
-		// Pass 2.5: 牆面物件 (Wall Objects)
+		// Pass 2.5: 牆面物件 (Wall Objects)，半高牆上的物件隨牆高縮放
 		if (onWallObjects) {
-			items.forEach(({ x, y, tile }) => {
+			items.forEach(tile => {
 				['N', 'W'].forEach(edge => {
-					let objs = null;
-					if (Array.isArray(tile[edge])) {
-						objs = tile[edge].filter(cid => palette[cid]?.isObject);
-					} else if (Array.isArray(tile.wallObjects?.[edge])) {
-						objs = tile.wallObjects[edge];
-					}
-					if (objs && objs.length > 0) {
-						onWallObjects(x, y, edge, objs, tile);
-					}
+					const objs = TileModel.slotObjects(tile[edge], palette);
+					if (objs.length > 0) onWallObjects(tile.x, tile.y, edge, objs, TileModel.isHalfWallSlot(tile[edge], palette));
 				});
 			});
 		}
@@ -199,15 +170,10 @@ export class GeometryPipeline {
 
 		let minZ = Math.min(0, currentZ);
 		let maxZ = Math.max(0, currentZ);
-		if (scheme.tiles) {
-			Object.keys(scheme.tiles).forEach(k => {
-				const zVal = parseInt(k.split(',')[2], 10);
-				if (!isNaN(zVal)) {
-					if (zVal < minZ) minZ = zVal;
-					if (zVal > maxZ) maxZ = zVal;
-				}
-			});
-		}
+		Object.values(scheme.tiles).forEach(({ z }) => {
+			if (z < minZ) minZ = z;
+			if (z > maxZ) maxZ = z;
+		});
 
 		const p = Math.max(0, padding);
 		const wallHeight = CONFIG.TILE_SIZE * CONFIG.Z_VISUAL_OFFSET * currentProgress;
@@ -295,7 +261,7 @@ export class GeometryPipeline {
 	static getWallObjectGeometries(isoMath, x, y, edge, count, progress = 1.0, is3D = true, isHalfWall = false) {
 		if (!count) return [];
 		if (!is3D || progress === 0) {
-			const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+			const norm = TileModel.normalizeEdge(x, y, edge);
 			const p0 = isoMath.gridToScreen(norm.x, norm.y, progress);
 			const p1 = norm.edge === 'N' ? isoMath.gridToScreen(norm.x + 1, norm.y, progress) : isoMath.gridToScreen(norm.x, norm.y + 1, progress);
 			if (!p0 || !p1) return [];
@@ -362,7 +328,7 @@ export class GeometryPipeline {
 	 * 計算單一邊線標籤在空間中的透視懸空帶狀多邊形幾何
 	 */
 	static calcWallBandGeometry(isoMath, x, y, edge, progress) {
-		const norm = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+		const norm = TileModel.normalizeEdge(x, y, edge);
 		const b0 = isoMath.gridToScreen(norm.x, norm.y, progress);
 		const b1 = norm.edge === 'N'
 			? isoMath.gridToScreen(norm.x + 1, norm.y, progress)
@@ -482,38 +448,15 @@ export class GeometryPipeline {
 			return zones.get(zoneId);
 		};
 
-		items.forEach(({ x, y, tile }) => {
-			// 地面標籤 (支援新三槽位 floor 與舊格式向下相容)
-			let floorZoneIds = [];
-			if (Array.isArray(tile.floor)) {
-				floorZoneIds = tile.floor.filter(id => palette[id]?.isZone);
-			} else {
-				floorZoneIds = Array.isArray(tile.zoneIds)
-					? tile.zoneIds
-					: (tile.zoneId ? [tile.zoneId] : (typeof tile.floor === 'string' && palette[tile.floor]?.isZone ? [tile.floor] : []));
-			}
-			floorZoneIds.forEach(floorZoneId => {
-				if (floorZoneId && palette[floorZoneId]) {
-					getOrCreateZone(floorZoneId).cells.push({ x, y });
-				}
+		items.forEach(tile => {
+			const { x, y } = tile;
+			TileModel.slotZones(tile.floor, palette).forEach(zoneId => {
+				getOrCreateZone(zoneId).cells.push({ x, y });
 			});
 
-			// 邊線標籤 (支援新三槽位 N/W 與舊格式向下相容)
 			['N', 'W'].forEach(edge => {
-				let edgeZoneIds = [];
-				if (Array.isArray(tile[edge])) {
-					edgeZoneIds = tile[edge].filter(id => palette[id]?.isZone);
-				} else if (tile.wallZones?.[edge]) {
-					const val = tile.wallZones[edge];
-					edgeZoneIds = Array.isArray(val) ? val : [val];
-				} else if (tile.walls?.[edge]) {
-					const val = tile.walls[edge];
-					edgeZoneIds = Array.isArray(val) ? val : [val];
-				}
-				edgeZoneIds.forEach(colorId => {
-					if (colorId && palette[colorId]?.isZone) {
-						getOrCreateZone(colorId).wallEdges.push({ x, y, edge });
-					}
+				TileModel.slotZones(tile[edge], palette).forEach(zoneId => {
+					getOrCreateZone(zoneId).wallEdges.push({ x, y, edge });
 				});
 			});
 		});
@@ -530,7 +473,7 @@ export class GeometryPipeline {
 				const edgeKeySet = new Set();
 				const uniqueEdges = [];
 				zone.wallEdges.forEach(e => {
-					const norm = BorderEdgeNormalizer.normalizeEdge(e.x, e.y, e.edge);
+					const norm = TileModel.normalizeEdge(e.x, e.y, e.edge);
 					const key = `${norm.edge},${norm.x},${norm.y}`;
 					if (!edgeKeySet.has(key)) {
 						edgeKeySet.add(key);
@@ -717,7 +660,7 @@ export class GeometryPipeline {
 	 * 2D 正交牆線渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
 	 */
 	static drawWallLine2D(ctx, isoMath, x, y, edge, colorHex, zoom, currentProgress = 0) {
-		const normalized = BorderEdgeNormalizer.normalizeEdge(x, y, edge);
+		const normalized = TileModel.normalizeEdge(x, y, edge);
 		const p0 = isoMath.gridToScreen(normalized.x, normalized.y, currentProgress);
 		const p1 = normalized.edge === 'N'
 			? isoMath.gridToScreen(normalized.x + 1, normalized.y, currentProgress)
@@ -885,6 +828,18 @@ export class GeometryPipeline {
 	}
 
 	/**
+	 * 以多個閉合多邊形建立單一路徑 (供合併填色與裁切)
+	 */
+	static _tracePolygons(ctx, polygons) {
+		ctx.beginPath();
+		polygons.forEach(pts => {
+			ctx.moveTo(pts[0].x, pts[0].y);
+			for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+			ctx.closePath();
+		});
+	}
+
+	/**
 	 * 區域標籤渲染管道 (Canvas 2D 畫布與 PNG 匯出共用)
 	 * 包含邊界內向光暈 (Inset Glow)、外周虛線邊界與質心最近實體格投影法文字
 	 */
@@ -896,14 +851,7 @@ export class GeometryPipeline {
 			// 1. 地面標籤光暈與外框
 			if (polygons.length > 0) {
 				ctx.save();
-				ctx.beginPath();
-				polygons.forEach(pts => {
-					ctx.moveTo(pts[0].x, pts[0].y);
-					ctx.lineTo(pts[1].x, pts[1].y);
-					ctx.lineTo(pts[2].x, pts[2].y);
-					ctx.lineTo(pts[3].x, pts[3].y);
-					ctx.closePath();
-				});
+				this._tracePolygons(ctx, polygons);
 
 				if (CONFIG.ZONE_CENTER_ALPHA > 0) {
 					ctx.globalAlpha = CONFIG.ZONE_CENTER_ALPHA;
@@ -951,14 +899,7 @@ export class GeometryPipeline {
 			// 2. 邊線標籤 (3D 透視懸空立面：中心填色、內向光暈與外周虛線外框)
 			if (wallPolygons && wallPolygons.length > 0) {
 				ctx.save();
-				ctx.beginPath();
-				wallPolygons.forEach(pts => {
-					ctx.moveTo(pts[0].x, pts[0].y);
-					ctx.lineTo(pts[1].x, pts[1].y);
-					ctx.lineTo(pts[2].x, pts[2].y);
-					ctx.lineTo(pts[3].x, pts[3].y);
-					ctx.closePath();
-				});
+				this._tracePolygons(ctx, wallPolygons);
 
 				if (CONFIG.ZONE_CENTER_ALPHA > 0) {
 					ctx.globalAlpha = CONFIG.ZONE_CENTER_ALPHA;

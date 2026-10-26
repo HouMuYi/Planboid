@@ -4,6 +4,7 @@
  */
 
 import { i18n } from '../core/I18nManager.js';
+import { TileModel } from '../core/TileModel.js';
 import { Utils } from '../core/Utils.js';
 import { IsoMath } from './IsoMath.js';
 
@@ -83,12 +84,13 @@ export class ExportCanvasPipeline {
 	 * @returns {Object} 圖例排版規格與 renderList
 	 */
 	static getLegendLayoutData(palette) {
-		const paletteEntries = Object.values(palette || {});
+		const paletteEntries = Object.values(palette);
 		if (paletteEntries.length === 0) return null;
 
-		const normalItems = paletteEntries.filter(item => !item.isObject);
-		const objectItems = paletteEntries.filter(item => item.isObject);
-		const hasDivider = normalItems.length > 0 && objectItems.length > 0;
+		// 依調色盤面板順序分組：通用色票、物件色票、區域標籤
+		const groups = ['normal', 'object', 'zone']
+			.map(kind => paletteEntries.filter(item => TileModel.paletteKind(item) === kind))
+			.filter(items => items.length > 0);
 
 		const scale = 1.2; // 1.2 倍整體尺寸放大
 		const legendX = Math.round(28 * scale);
@@ -104,35 +106,25 @@ export class ExportCanvasPipeline {
 		let currentY = headerHeight;
 		const renderList = [];
 
-		// 通用色塊
-		normalItems.forEach(item => {
-			renderList.push({
-				type: 'item',
-				color: item.color,
-				name: item.name,
-				y: currentY,
-			});
-			currentY += itemHeight;
-		});
+		groups.forEach((items, groupIndex) => {
+			// 組與組之間插入分隔線
+			if (groupIndex > 0) {
+				renderList.push({
+					type: 'divider',
+					y: currentY - Math.round(itemHeight / 2) + Math.round(dividerGap / 2),
+				});
+				currentY += dividerGap;
+			}
 
-		// 若同時包含通用色塊與物件色塊，插入分隔線數據
-		if (hasDivider) {
-			renderList.push({
-				type: 'divider',
-				y: currentY - Math.round(itemHeight / 2) + Math.round(dividerGap / 2),
+			items.forEach(item => {
+				renderList.push({
+					type: 'item',
+					color: item.color,
+					name: item.name,
+					y: currentY,
+				});
+				currentY += itemHeight;
 			});
-			currentY += dividerGap;
-		}
-
-		// 物件色塊
-		objectItems.forEach(item => {
-			renderList.push({
-				type: 'item',
-				color: item.color,
-				name: item.name,
-				y: currentY,
-			});
-			currentY += itemHeight;
 		});
 
 		const legendHeight = Math.round(currentY + 12 * scale);
