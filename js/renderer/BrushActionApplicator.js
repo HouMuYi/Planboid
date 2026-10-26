@@ -12,7 +12,7 @@ export class BrushActionApplicator {
 	}
 
 	/**
-	 * 右鍵快速抹除操作
+	 * 右鍵快速抹除操作 (清除規則同清除工具：預設清空，按住 Ctrl 僅清除目前色票)
 	 */
 	applyRightClickErase(x, y, edge, isCtrl = false) {
 		if (!this.state || !this.state.scheme) return;
@@ -22,16 +22,17 @@ export class BrushActionApplicator {
 
 		if (brushType === 'wall' || tool === 'erase-wall') {
 			if (edge) {
-				this.state.removeWall(x, y, edge, colorId, isCtrl);
+				this.state.removeWall(x, y, edge, colorId, !isCtrl);
 			}
 		} else {
-			this.state.removeFloor(x, y, colorId, isCtrl);
+			this.state.removeFloor(x, y, colorId, !isCtrl);
 		}
 		this.state.notifyStateChange();
 	}
 
 	/**
 	 * 地塊矩形批次操作：點擊放開為單格 (minX===maxX && minY===maxY)，拖曳放開則為矩形範圍
+	 * Ctrl 於繪製時為排他模式，於清除時為僅清除目前色票
 	 */
 	applyRectFloor(minX, minY, maxX, maxY, isCtrl = false) {
 		if (!this.state || !this.state.scheme) return;
@@ -52,7 +53,7 @@ export class BrushActionApplicator {
 					if (tool === 'pencil') {
 						this.state.setTileFloor(x, y, colorId, isCtrl);
 					} else if (tool === 'erase-floor') {
-						this.state.removeFloor(x, y, colorId, isCtrl);
+						this.state.removeFloor(x, y, colorId, !isCtrl);
 					}
 				}
 			}
@@ -61,6 +62,7 @@ export class BrushActionApplicator {
 
 	/**
 	 * 邊線交叉點直線操作：start 與 end 必須同 X 軸或同 Y 軸 (由呼叫端保證軸向鎖定)
+	 * Ctrl 於繪製時為排他模式，於清除時為僅清除目前色票
 	 * @param {{x: number, y: number}} start
 	 * @param {{x: number, y: number}} end
 	 * @param {boolean} [isCtrl=false]
@@ -81,7 +83,7 @@ export class BrushActionApplicator {
 				const maxX = Math.min(width, Math.max(start.x, end.x));
 				for (let x = minX; x < maxX; x++) {
 					if (tool === 'pencil') this.state.setTileWall(x, y, 'N', colorId, isCtrl);
-					else if (tool === 'erase-wall') this.state.removeWall(x, y, 'N', colorId, isCtrl);
+					else if (tool === 'erase-wall') this.state.removeWall(x, y, 'N', colorId, !isCtrl);
 				}
 			} else {
 				const x = start.x;
@@ -89,7 +91,7 @@ export class BrushActionApplicator {
 				const maxY = Math.min(height, Math.max(start.y, end.y));
 				for (let y = minY; y < maxY; y++) {
 					if (tool === 'pencil') this.state.setTileWall(x, y, 'W', colorId, isCtrl);
-					else if (tool === 'erase-wall') this.state.removeWall(x, y, 'W', colorId, isCtrl);
+					else if (tool === 'erase-wall') this.state.removeWall(x, y, 'W', colorId, !isCtrl);
 				}
 			}
 		});
